@@ -1,9 +1,0 @@
-{
-  "name": "anirium-addon-watch-party",
-  "version": "1.0.0",
-  "description": "Anirium Community Addon: Watch Party Realtime Video Sync & Chat",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  }
-}

@@ -1,9 +1,0 @@
-{
-  "name": "anirium-addon-mal-sync",
-  "version": "1.0.0",
-  "description": "Anirium Official Plus Addon: MyAnimeList OAuth & Tracking Synchronization",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  }
-}
