@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 
 interface TooltipProps {
-  content: string;
+  content?: string;
+  text?: string;
   children: React.ReactNode;
   position?: "top" | "bottom" | "left" | "right";
   className?: string;
@@ -16,11 +17,13 @@ interface TooltipProps {
  */
 export default function Tooltip({
   content,
+  text,
   children,
   position = "top",
   className = "",
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const message = text || content || "";
 
   const positionClasses = {
     top: "bottom-full left-1/2 -translate-x-1/2 mb-2",
@@ -38,12 +41,12 @@ export default function Tooltip({
       onBlur={() => setIsVisible(false)}
     >
       {children}
-      {isVisible && content && (
+      {isVisible && Boolean(message) && (
         <div
           role="tooltip"
           className={`absolute z-50 px-2.5 py-1.5 text-[11px] font-medium leading-tight text-[var(--color-text-primary)] bg-[var(--color-bg-raised,#23232A)] border border-[var(--color-border-highlight,#FFC766)]/50 rounded-lg shadow-xl backdrop-blur-md pointer-events-none whitespace-normal max-w-xs transition-opacity duration-200 animate-in fade-in-0 zoom-in-95 ${positionClasses[position]}`}
         >
-          {content}
+          {message}
         </div>
       )}
     </div>

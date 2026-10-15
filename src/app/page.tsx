@@ -36,6 +36,7 @@ import {
   Award,
   ShieldCheck,
   ExternalLink,
+} from "lucide-react";
 import { buildFranchisesFromCatalog, extractFranchiseRoot, FranchiseGroup } from "@/lib/franchiseUtils";
 import { getModularCatalogFromParquet } from "@/lib/parquetCatalog";
 import { aniriumFetch, resolveApiUrl } from "@/lib/apiConfig";

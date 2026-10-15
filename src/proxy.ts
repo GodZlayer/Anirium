@@ -4,6 +4,11 @@ import { randomBytes } from "node:crypto";
 import { contentSecurityPolicy } from "./lib/contentSecurityPolicy";
 
 export function proxy(request: NextRequest) {
+  const host = request.headers.get("host") || "";
+  if (host.includes("api.anirium.com.br") && !request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.redirect(new URL("https://anirium.com.br" + request.nextUrl.pathname, request.url), 302);
+  }
+
   if (!request.nextUrl.pathname.startsWith("/api/")) {
     const nonce = randomBytes(24).toString("base64");
     const policy = contentSecurityPolicy(nonce, process.env.NODE_ENV === "development");

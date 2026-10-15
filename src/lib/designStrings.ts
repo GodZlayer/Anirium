@@ -207,6 +207,18 @@ export const UI_STRINGS = {
     tv: "Série",
     ova: "OVA",
   },
+  sections: {
+    continueWatching: "Continuar Assistindo",
+    popularReleases: "Mais Populares",
+    seasonalReleases: "Lançamentos da Temporada",
+    upcomingReleases: "Próximos Lançamentos",
+    canonicalFranchises: "Genealogia de Franquias",
+  },
+  badges: {
+    resumed: "Histórico Ativo",
+    synced: "Nuvem Sincronizada",
+    local: "Local P2P",
+  },
   tooltips: {
     legalBoundary: "O Anirium não hospeda vídeos. Os metadados vêm do catálogo público e a mídia é resolvida no seu serviço local.",
     parquetCache: "Catálogo carregado de fatias compactadas Zstandard com latência zero e offline-first.",
