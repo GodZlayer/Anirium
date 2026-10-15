@@ -21,11 +21,11 @@ export function proxy(request: NextRequest) {
     response.headers.set("Cache-Control", "private, no-store");
     return response;
   }
-  // Handle CORS Preflight for API
+  // Handle CORS Preflight for API (except removed /api/addons which returns 410 tombstone)
   const origin = request.headers.get("origin") || "";
   const allowedOrigin = (origin === "https://anirium.com.br" || origin === "http://localhost:3000") ? origin : "https://anirium.com.br";
 
-  if (request.method === "OPTIONS") {
+  if (request.method === "OPTIONS" && !request.nextUrl.pathname.startsWith("/api/addons")) {
     return new NextResponse(null, {
       status: 204,
       headers: {
