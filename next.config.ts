@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
+const isExport = process.env.NEXT_EXPORT === "true" || process.env.GITHUB_ACTIONS === "true";
+
 const nextConfig: NextConfig = {
+  output: isExport ? "export" : undefined,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   async redirects() {
