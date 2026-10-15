@@ -1,0 +1,9 @@
+{
+  "name": "anirium-addon-youtube-trailers",
+  "version": "1.0.0",
+  "description": "Anirium Community Addon: YouTube Trailers & Teasers",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

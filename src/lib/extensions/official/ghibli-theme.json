@@ -1,0 +1,20 @@
+{
+  "id": "community.ghibli.theme",
+  "name": "Studio Ghibli Nature & Glassmorphism",
+  "version": "1.0.0",
+  "description": "Extensão Oficial da Comunidade: Transforma o visual com gradientes inspirados na natureza (verde esmeralda, céu anil, texturas de vidro fosco) e tipografia suave.",
+  "author": "Ghibli Fan Arts",
+  "license": "MIT",
+  "type": "community",
+  "capabilities": ["ui.theme.apply", "ui.panel.render"],
+  "uiEdits": ["ui.theme.palette", "ui.theme.borders"],
+  "display": ["ui.theme"],
+  "permissions": ["ui.theme.apply"],
+  "enabled": false,
+  "themeConfig": {
+    "accentColor": "#10b981",
+    "badgeStyle": "border-emerald-500/60 bg-emerald-950/60 text-emerald-300",
+    "cardBorder": "hover:border-emerald-500 hover:shadow-emerald-500/20",
+    "bannerGradients": "from-[#041a14] via-[#082a20]/80 to-transparent"
+  }
+}

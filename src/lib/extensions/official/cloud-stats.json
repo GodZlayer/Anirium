@@ -1,0 +1,14 @@
+{
+  "id": "official.cloud.stats",
+  "name": "Anirium Cloud Stats & Insights+",
+  "version": "1.0.0",
+  "description": "Extensão Oficial Anirium+: Painel avançado de métricas pessoais, tempo assistido, grafo de gêneros e sincronização de progresso entre múltiplos dispositivos.",
+  "author": "Anirium Analytics",
+  "license": "Proprietary",
+  "type": "official-plus",
+  "capabilities": ["ui.panel.render", "data.stats"],
+  "uiEdits": ["ui.profile.panel", "ui.stats.dashboard"],
+  "display": ["data.stats"],
+  "permissions": [],
+  "enabled": false
+}

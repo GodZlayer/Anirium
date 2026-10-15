@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+
+const module={exports:{}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/catalogHierarchyPlan.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,module);
+const plan=module.exports.planCatalogHierarchy;
+const node=(id,format,type='ANIME')=>({namespace:'anilist:media',id,type,...(format===undefined?{}:{format})});
+const edge=(fromId,toId,relationType,fromType='ANIME',toType='ANIME')=>({namespace:'anilist:media',fromId,toId,relationType,fromType,toType});
+const nodes=[node('1','TV'),node('2','TV'),node('3','MOVIE'),node('4','TV'),node('5'),node('6','TV'),node('7','MANGA','MANGA')];
+const edges=[edge('1','2','SEQUEL'),edge('2','1','PREQUEL'),edge('2','3','SEQUEL'),edge('1','4','SPIN_OFF'),edge('2','5','SEQUEL'),edge('7','6','ADAPTATION','MANGA')];
+const plain=value=>JSON.parse(JSON.stringify(value));
+const expected=plain(plan(nodes,edges));
+assert.deepEqual(expected.universes,[{releases:['1','2','3','4','5'],works:[['1','2'],['3'],['4'],['5']]},{releases:['6'],works:[['6']]}]);
+assert.deepEqual(expected.unresolved,[{releaseId:'3',reason:'non-tv-format'},{releaseId:'5',reason:'unknown-format'}]);
+assert.deepEqual(plain(plan([...nodes].reverse(),[...edges].reverse())),expected,'input traversal order never determines grouping');
+assert.deepEqual(plain(plan(nodes,[...edges,...edges])),expected,'duplicate edges and cycles do not duplicate entities');
+assert.throws(()=>plan(nodes,[edge('1','999','SEQUEL')]),/missing source node/);
+assert.throws(()=>plan([...nodes,node('1','TV')],edges),/Duplicate/);
+assert.throws(()=>plan([node('0','TV')],[]),/identity/);
+assert.deepEqual(plain(plan([node('1','TV'),node('2','TV')],[edge('1','2','CHARACTER')])).universes.map(u=>u.releases),[['1'],['2']],'shared character is not universe proof');
+assert.deepEqual(plain(plan([],[])),{universes:[],unresolved:[]});
+console.log('PASS: source hierarchy groups mainline TV while separating films, spin-offs and unknown formats; deterministic, bounded, evidence required');

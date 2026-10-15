@@ -1,0 +1,14 @@
+{
+  "id": "official.mal.sync",
+  "name": "Anirium MAL Sync+ (MyAnimeList OAuth)",
+  "version": "1.0.0",
+  "description": "Extensão Oficial Anirium+: Integração autorizada via OAuth com a API do MyAnimeList para sincronização automática de episódios assistidos, notas e status da lista pessoal.",
+  "author": "Anirium Core Team",
+  "license": "Proprietary",
+  "type": "official-plus",
+  "capabilities": ["tracking.sync", "ui.panel.render"],
+  "uiEdits": ["ui.profile.panel", "ui.episode.badge"],
+  "display": ["data.tracking"],
+  "permissions": ["network.external.fetch"],
+  "enabled": false
+}

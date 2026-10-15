@@ -1,0 +1,208 @@
+# Native Docker retention; applies when containers are created/recreated.
+x-runtime-logging: &runtime-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+    compress: "true"
+
+services:
+  # Servidor Oficial do Anirium Core (Catálogo Canônico, Franquias, Calendário, Social e Extension Runtime)
+  anirium-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+    container_name: anirium_core
+    restart: unless-stopped
+    logging: *runtime-logging
+    ports:
+      - "3050:3000"
+    environment:
+      - NODE_ENV=production
+      - ANIRIUM_OPEN_BETA=${ANIRIUM_OPEN_BETA:-true}
+      - PORT=3000
+      - ANIRIUM_SERVICE_SECRET=${ANIRIUM_SERVICE_SECRET:?Configure ANIRIUM_SERVICE_SECRET before starting Core}
+      - DATABASE_URL=${DATABASE_URL:?Configure DATABASE_URL with the encoded database password and verified TLS before starting Core}
+      - ANIRIUM_DB_TLS=required
+      - ANIRIUM_DB_CA_FILE=/run/anirium/db-ca.pem
+      - ANIRIUM_DATA_KEYRING_FILE=/run/anirium/keyring.json
+      - ANIRIUM_IDENTITY_KEYRING_FILE=/run/anirium/identity-keyring.json
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+    depends_on:
+      anirium-db:
+        condition: service_healthy
+    volumes:
+      - anirium_data:/app/data
+      - type: bind
+        source: ${ANIRIUM_DB_CA_HOST_FILE:?Configure external PostgreSQL CA file}
+        target: /run/anirium/db-ca.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ANIRIUM_KEYRING_HOST_FILE:?Configure external restricted data keyring file}
+        target: /run/anirium/keyring.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ANIRIUM_IDENTITY_KEYRING_HOST_FILE:?Configure external restricted identity keyring file distinct from data keys}
+        target: /run/anirium/identity-keyring.json
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      - anirium_network
+      - anirium_db_network
+
+  # [Comunitário] Container Desacoplado: Nyaa P2P Streams & Swarm Resolver
+  anirium-addon-nyaa-p2p:
+    build:
+      context: ./community-plugins/nyaa-p2p-addon
+      dockerfile: Dockerfile
+    container_name: anirium_addon_nyaa
+    restart: unless-stopped
+    logging: *runtime-logging
+    ports:
+      - "4001:4001"
+    environment:
+      - PORT=4001
+      - PROVIDER_PUBLIC_URL=${PROVIDER_PUBLIC_URL:-https://n.anirium.com.br}
+    networks:
+      - anirium_network
+
+  # [Comunitário] Container Desacoplado: Local Video Library & WebDAV Resolver
+  anirium-addon-local-library:
+    build:
+      context: ./community-plugins/local-library-addon
+      dockerfile: Dockerfile
+    container_name: anirium_addon_local
+    restart: unless-stopped
+    logging: *runtime-logging
+    ports:
+      - "4002:4002"
+    environment:
+      - PORT=4002
+    networks:
+      - anirium_network
+
+  # [Comunitário] Container Desacoplado: YouTube Trailers & Teasers
+  anirium-addon-youtube-trailers:
+    build:
+      context: ./community-plugins/youtube-trailers-addon
+      dockerfile: Dockerfile
+    container_name: anirium_addon_trailers
+    restart: unless-stopped
+    logging: *runtime-logging
+    ports:
+      - "4003:4003"
+    environment:
+      - PORT=4003
+    networks:
+      - anirium_network
+
+  # [Oficial Anirium+] O Player Pro agora roda nativamente na máquina do usuário via anirium-service.exe na porta 4004 (P2P real).
+  # anirium-addon-player-pro removido do compose para não colidir com a porta 4004.
+
+  # [Oficial Anirium+] Container Desacoplado: MAL Sync OAuth & Tracking Resolver
+  anirium-addon-mal-sync:
+    build:
+      context: ./community-plugins/mal-sync
+      dockerfile: Dockerfile
+    container_name: anirium_addon_mal_sync
+    restart: unless-stopped
+    logging: *runtime-logging
+    ports:
+      - "4005:4005"
+    environment:
+      - PORT=4005
+    networks:
+      - anirium_network
+
+  # [Comunitário] Container Desacoplado: Watch Party Video Realtime Sync & Chat
+  anirium-addon-watch-party:
+    build:
+      context: ./community-plugins/watch-party
+      dockerfile: Dockerfile
+    container_name: anirium_addon_watch_party
+    restart: unless-stopped
+    logging: *runtime-logging
+    ports:
+      - "4006:4006"
+    environment:
+      - PORT=4006
+    networks:
+      - anirium_network
+
+  # [Infraestrutura] Container PostgreSQL Canônico Oficial do Anirium
+  anirium-db:
+    image: postgres:16-alpine
+    command: ["postgres", "-c", "ssl=on", "-c", "ssl_min_protocol_version=TLSv1.2", "-c", "ssl_cert_file=/run/anirium/server.pem", "-c", "ssl_key_file=/run/anirium/server.key", "-c", "hba_file=/run/anirium/pg_hba.conf", "-c", "password_encryption=scram-sha-256"]
+    container_name: anirium_db
+    restart: unless-stopped
+    logging: *runtime-logging
+    ports:
+      - "127.0.0.1:5435:5432"
+    environment:
+      - POSTGRES_USER=anirium
+      - POSTGRES_PASSWORD=${ANIRIUM_POSTGRES_PASSWORD:?Configure ANIRIUM_POSTGRES_PASSWORD before starting PostgreSQL}
+      - POSTGRES_DB=anirium_canonical
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - type: bind
+        source: ${ANIRIUM_DB_CERT_HOST_FILE:?Configure external PostgreSQL server certificate}
+        target: /run/anirium/server.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ANIRIUM_DB_KEY_HOST_FILE:?Configure external restricted PostgreSQL private key}
+        target: /run/anirium/server.key
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./infra/postgres/pg_hba.conf
+        target: /run/anirium/pg_hba.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      - anirium_db_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anirium -d anirium_canonical"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # [Infraestrutura] Container Embutido: Cloudflare Tunnel Oficial para anirium.com.br
+  anirium-cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: anirium_cloudflared
+    restart: unless-stopped
+    logging: *runtime-logging
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-${TUNNEL_TOKEN}}
+    depends_on:
+      - anirium-core
+    networks:
+      - anirium_network
+volumes:
+  anirium_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  anirium_network:
+    driver: bridge
+  anirium_db_network:
+    driver: bridge
+    internal: true

@@ -1,0 +1,40 @@
+{
+  "name": "anirium-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "node scripts/verify-media-boundaries.mjs && node scripts/verify-addon-gateway.mjs && node scripts/verify-subtitle-gateway.mjs && node scripts/verify-player-loader.mjs && node scripts/verify-service-tokens.mjs && node scripts/verify-official-sources.mjs && next build",
+    "verify:architecture": "node scripts/verify-media-boundaries.mjs",
+    "verify:service-leases": "node scripts/verify-service-leases.mjs",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@typesafe-ai/sdk": "^0.6.0",
+    "axios": "^1.20.0",
+    "framer-motion": "^13.4.4",
+    "google-auth-library": "^11.1.0",
+    "hls.js": "^1.7.3",
+    "hyparquet": "^1.31.4",
+    "lucide-react": "^1.48.0",
+    "next": "16.3.6",
+    "pg": "^8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwindcss": "^4",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/xml2js": "^0.4.14",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.6",
+    "puppeteer-core": "^25.12.0",
+    "typescript": "^5"
+  }
+}

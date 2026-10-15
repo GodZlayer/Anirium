@@ -1,0 +1,20 @@
+{
+  "id": "official.cyberpunk.theme",
+  "name": "Anirium Neon Cyberpunk Interface",
+  "version": "1.0.0",
+  "description": "Extensão Oficial Anirium+: Transforma a paleta visual da interface em estética Dark Cyberpunk com acentos neon magenta/cyan e bordas holográficas.",
+  "author": "Anirium Design Labs",
+  "license": "Proprietary",
+  "type": "official-plus",
+  "capabilities": ["ui.theme.apply", "ui.panel.render"],
+  "uiEdits": ["ui.theme.palette", "ui.theme.borders"],
+  "display": ["ui.theme"],
+  "permissions": ["ui.theme.apply"],
+  "enabled": false,
+  "themeConfig": {
+    "accentColor": "#ec4899",
+    "badgeStyle": "border-pink-500/60 bg-pink-950/60 text-pink-300",
+    "cardBorder": "hover:border-pink-500 hover:shadow-pink-500/20",
+    "bannerGradients": "from-[#09090b] via-[#180d1e]/80 to-transparent"
+  }
+}

@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Anirium Design System - Manual de Identidade Visual Oficial */
+:root {
+  /* Conceito TGCode: Base Escura Premium, Dourado & Âmbar Mascote, Marfim e Grafite */
+  --color-bg-base: #0B0B0D;         /* Preto Profundo */
+  --color-surface-graphite: #1A1A1F;/* Grafite */
+  --color-surface-charcoal: #23232A;/* Carvão */
+  --color-border-warm: #3A3A43;     /* Cinza Quente */
+  --color-text-ivory: #FFF9F0;      /* Marfim - Texto Principal */
+  --color-text-beige: #EADCC8;      /* Bege Quente - Texto Secundário */
+  --color-gold: #FFC766;            /* Dourado Mascote - Destaque */
+  --color-amber: #FFB347;           /* Âmbar - Acentos Ativos e CTAs */
+
+  /* Legacy & Semantic Fallbacks */
+  --color-primary: #1E88E5;         /* Anirium Blue */
+  --color-secondary: #E53935;       /* Manga Red */
+  --color-accent: #43A047;          /* Karma Green (Assistido) */
+  --color-highlight: #FDD835;       /* Sunburst Yellow (Parou no Meio) */
+  --color-neutral-dark: #0B0B0D;
+  --color-neutral-light: #FFF9F0;
+  --color-disabled: #9E9E9E;        /* Não lançado / Cinza */
+
+  /* Fontes Oficiais */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Cinzel', serif;
+  --font-mono: 'Source Code Pro', monospace;
+  --font-logo: 'Cinzel', serif;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+/* Global resets */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-ivory);
+}
+
+a { color: var(--color-gold); text-decoration: none; }
+
+button {
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+/* Utility classes - Design Manual Oficial */
+.bg-anirium-base { background-color: var(--color-bg-base); }
+.bg-anirium-surface { background-color: var(--color-surface-graphite); }
+.bg-anirium-charcoal { background-color: var(--color-surface-charcoal); }
+.border-anirium-warm { border-color: var(--color-border-warm); }
+.text-anirium-ivory { color: var(--color-text-ivory); }
+.text-anirium-beige { color: var(--color-text-beige); }
+.text-anirium-gold { color: var(--color-gold); }
+.text-anirium-amber { color: var(--color-amber); }
+
+/* Episode Status & Semantic badges */
+.bg-primary { background-color: var(--color-primary); color: white; }
+.bg-secondary { background-color: var(--color-secondary); color: white; }
+.bg-success { background-color: var(--color-accent); color: white; }
+.bg-warning { background-color: var(--color-highlight); color: black; }
+.bg-muted { background-color: var(--color-disabled); color: white; }
+
+.text-primary { color: var(--color-primary); }
+.text-secondary { color: var(--color-secondary); }
+.text-accent { color: var(--color-accent); }
+.text-highlight { color: var(--color-highlight); }
+
+/* Layout helpers */
+.container { max-width: 1280px; margin: 0 auto; padding: 0 1rem; }
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}

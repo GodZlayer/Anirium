@@ -1,0 +1,550 @@
+{
+  "id": 171110,
+  "idMal": 57466,
+  "title": {
+    "romaji": "Honzuki no Gekokujou: Ryoushu no Youjo",
+    "english": "Ascendance of a Bookworm: Adopted Daughter of an Archduke",
+    "native": "本好きの下剋上 領主の養女"
+  },
+  "synonyms": [
+    "Ascendance of a Bookworm Season 4",
+    "本好きの下剋上 司書になるためには手段を選んでいられません 第4期",
+    "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen 4th Season"
+  ],
+  "description": "Following a disastrous encounter with a noble, Myne finally resolves to say goodbye to her family and friends in the lower city, changing her name to “Rozemyne” and beginning her new life as the adopted daughter of Ehrenfest’s archduke. However, her days as an archnoble in noble society are brutal, as she is put through rigorous etiquette and magic training on top of her duties as High Bishop and forewoman. It all proves too much for a weak little seven-year-old girl... Or it would have, had the High Priest not offered her the keys to the temple’s book room as a reward. If she could get her hands on those, she’d be able to read all sorts of precious books! Her name may have changed, but Rozemyne’s passion for books remains the same as she charges into a whole new world! The detailed setting expands as the printing industry grows in size. Here begins Part 3 of this biblio-fantasy for book lovers everywhere!<br>\n<br>\n(Source: J-Novel Club)",
+  "format": "TV",
+  "bannerImage": "https://s4.anilist.co/file/anilistcdn/media/anime/banner/171110-lgtmKokpevUM.jpg",
+  "coverImage": {
+    "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx171110-7zOdInS6DQNL.jpg",
+    "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171110-7zOdInS6DQNL.jpg",
+    "medium": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/small/bx171110-7zOdInS6DQNL.jpg"
+  },
+  "episodes": 24,
+  "averageScore": 76,
+  "status": "RELEASING",
+  "isAdult": false,
+  "seasonYear": 2026,
+  "startDate": {
+    "year": 2026
+  },
+  "genres": [
+    "Drama",
+    "Fantasy",
+    "Slice of Life"
+  ],
+  "studios": {
+    "nodes": [
+      {
+        "name": "WIT STUDIO"
+      }
+    ]
+  },
+  "externalLinks": [
+    {
+      "id": 104496,
+      "site": "Official Site",
+      "url": "http://booklove-anime.jp/",
+      "type": "INFO",
+      "language": "Japanese",
+      "icon": null
+    },
+    {
+      "id": 104497,
+      "site": "Twitter",
+      "url": "https://twitter.com/anime_booklove",
+      "type": "SOCIAL",
+      "language": "Japanese",
+      "icon": "https://s4.anilist.co/file/anilistcdn/link/icon/17-R0tMgOvwvhsS.png"
+    },
+    {
+      "id": 153359,
+      "site": "Crunchyroll",
+      "url": "https://www.crunchyroll.com/series/G6793XKZY/ascendance-of-a-bookworm",
+      "type": "STREAMING",
+      "language": null,
+      "icon": "https://s4.anilist.co/file/anilistcdn/link/icon/5-AWN2pVlluCOO.png"
+    }
+  ],
+  "relations": {
+    "edges": [
+      {
+        "relationType": "ADAPTATION",
+        "node": {
+          "id": 110801,
+          "idMal": null,
+          "title": {
+            "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 3-bu - Ryoushu no Youjo",
+            "english": "Ascendance of a Bookworm: Part 3"
+          },
+          "format": "NOVEL",
+          "type": "MANGA",
+          "episodes": null,
+          "seasonYear": null,
+          "startDate": {
+            "year": 2016
+          },
+          "status": "FINISHED",
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx110801-P0va1ehMlNcL.jpg"
+          },
+          "relations": {
+            "edges": [
+              {
+                "relationType": "PREQUEL",
+                "node": {
+                  "id": 110800,
+                  "idMal": null,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 2-bu - Shinden no Miko Minarai",
+                    "english": "Ascendance of a Bookworm: Part 2"
+                  },
+                  "format": "NOVEL",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2015
+                  },
+                  "status": "FINISHED",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx110800-buaDMQpwzfds.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "SEQUEL",
+                "node": {
+                  "id": 110802,
+                  "idMal": null,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 4-bu - Kizoku-in no Jishou Tosho Iin",
+                    "english": "Ascendance of a Bookworm: Part 4"
+                  },
+                  "format": "NOVEL",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2017
+                  },
+                  "status": "FINISHED",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx110802-fWMPC3swaE7w.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "ADAPTATION",
+                "node": {
+                  "id": 113811,
+                  "idMal": 40841,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen OVA",
+                    "english": "Ascendance of a Bookworm Side Story"
+                  },
+                  "format": "OVA",
+                  "type": "ANIME",
+                  "episodes": 1,
+                  "seasonYear": 2020,
+                  "startDate": {
+                    "year": 2020
+                  },
+                  "status": "FINISHED",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx113811-DxnS7eOL5zfn.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "SIDE_STORY",
+                "node": {
+                  "id": 113868,
+                  "idMal": 123434,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen - Tanpenshuu",
+                    "english": "Ascendance of a Bookworm: Short Story Collection"
+                  },
+                  "format": "NOVEL",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2019
+                  },
+                  "status": "RELEASING",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx113868-K3cWcA5laTb5.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "ADAPTATION",
+                "node": {
+                  "id": 110805,
+                  "idMal": 122851,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 3-bu - Ryouchi ni Hon wo Hirogeyou!",
+                    "english": "Ascendance of a Bookworm ~I'll do anything to become a librarian!~ Part 3 Let's spread books through the duchy!"
+                  },
+                  "format": "MANGA",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2018
+                  },
+                  "status": "RELEASING",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx110805-ezAnlE1UWQjm.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "ADAPTATION",
+                "node": {
+                  "id": 171110,
+                  "idMal": 57466,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Ryoushu no Youjo",
+                    "english": "Ascendance of a Bookworm: Adopted Daughter of an Archduke"
+                  },
+                  "format": "TV",
+                  "type": "ANIME",
+                  "episodes": 24,
+                  "seasonYear": 2026,
+                  "startDate": {
+                    "year": 2026
+                  },
+                  "status": "RELEASING",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171110-7zOdInS6DQNL.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "relationType": "PREQUEL",
+        "node": {
+          "id": 121176,
+          "idMal": 42429,
+          "title": {
+            "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen 3rd Season",
+            "english": "Ascendance of a Bookworm Season 3"
+          },
+          "format": "TV",
+          "type": "ANIME",
+          "episodes": 10,
+          "seasonYear": 2022,
+          "startDate": {
+            "year": 2022
+          },
+          "status": "FINISHED",
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx121176-qWobMmSf761W.jpg"
+          },
+          "relations": {
+            "edges": [
+              {
+                "relationType": "PREQUEL",
+                "node": {
+                  "id": 113693,
+                  "idMal": 40815,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen 2nd Season",
+                    "english": "Ascendance of a Bookworm Part 2"
+                  },
+                  "format": "TV",
+                  "type": "ANIME",
+                  "episodes": 12,
+                  "seasonYear": 2020,
+                  "startDate": {
+                    "year": 2020
+                  },
+                  "status": "FINISHED",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx113693-3tHbslFxD47R.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "ALTERNATIVE",
+                "node": {
+                  "id": 110804,
+                  "idMal": 122830,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 2-bu - Hon no Tamenara Miko ni Naru!",
+                    "english": "Ascendance of a Bookworm ~I'll do anything to become a librarian!~ Part 2 I'll even join the temple to read books!"
+                  },
+                  "format": "MANGA",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2018
+                  },
+                  "status": "FINISHED",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx110804-BDS7xCQIb3w1.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "ADAPTATION",
+                "node": {
+                  "id": 110800,
+                  "idMal": null,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 2-bu - Shinden no Miko Minarai",
+                    "english": "Ascendance of a Bookworm: Part 2"
+                  },
+                  "format": "NOVEL",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2015
+                  },
+                  "status": "FINISHED",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx110800-buaDMQpwzfds.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "SEQUEL",
+                "node": {
+                  "id": 171110,
+                  "idMal": 57466,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Ryoushu no Youjo",
+                    "english": "Ascendance of a Bookworm: Adopted Daughter of an Archduke"
+                  },
+                  "format": "TV",
+                  "type": "ANIME",
+                  "episodes": 24,
+                  "seasonYear": 2026,
+                  "startDate": {
+                    "year": 2026
+                  },
+                  "status": "RELEASING",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171110-7zOdInS6DQNL.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "relationType": "ALTERNATIVE",
+        "node": {
+          "id": 110805,
+          "idMal": 122851,
+          "title": {
+            "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 3-bu - Ryouchi ni Hon wo Hirogeyou!",
+            "english": "Ascendance of a Bookworm ~I'll do anything to become a librarian!~ Part 3 Let's spread books through the duchy!"
+          },
+          "format": "MANGA",
+          "type": "MANGA",
+          "episodes": null,
+          "seasonYear": null,
+          "startDate": {
+            "year": 2018
+          },
+          "status": "RELEASING",
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx110805-ezAnlE1UWQjm.jpg"
+          },
+          "relations": {
+            "edges": [
+              {
+                "relationType": "PREQUEL",
+                "node": {
+                  "id": 110804,
+                  "idMal": 122830,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 2-bu - Hon no Tamenara Miko ni Naru!",
+                    "english": "Ascendance of a Bookworm ~I'll do anything to become a librarian!~ Part 2 I'll even join the temple to read books!"
+                  },
+                  "format": "MANGA",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2018
+                  },
+                  "status": "FINISHED",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx110804-BDS7xCQIb3w1.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "ADAPTATION",
+                "node": {
+                  "id": 110801,
+                  "idMal": null,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 3-bu - Ryoushu no Youjo",
+                    "english": "Ascendance of a Bookworm: Part 3"
+                  },
+                  "format": "NOVEL",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2016
+                  },
+                  "status": "FINISHED",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx110801-P0va1ehMlNcL.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "ALTERNATIVE",
+                "node": {
+                  "id": 113811,
+                  "idMal": 40841,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen OVA",
+                    "english": "Ascendance of a Bookworm Side Story"
+                  },
+                  "format": "OVA",
+                  "type": "ANIME",
+                  "episodes": 1,
+                  "seasonYear": 2020,
+                  "startDate": {
+                    "year": 2020
+                  },
+                  "status": "FINISHED",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx113811-DxnS7eOL5zfn.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "SEQUEL",
+                "node": {
+                  "id": 127249,
+                  "idMal": 134812,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen Dai 4-bu - Kizoku-in no Toshokan wo Sukuitai!",
+                    "english": "Ascendance of a Bookworm ~I'll do anything to become a librarian!~ Part 4 I want to save the Royal Academy's library!"
+                  },
+                  "format": "MANGA",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2020
+                  },
+                  "status": "RELEASING",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx127249-q0pQlj3RmcMn.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "ALTERNATIVE",
+                "node": {
+                  "id": 171110,
+                  "idMal": 57466,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Ryoushu no Youjo",
+                    "english": "Ascendance of a Bookworm: Adopted Daughter of an Archduke"
+                  },
+                  "format": "TV",
+                  "type": "ANIME",
+                  "episodes": 24,
+                  "seasonYear": 2026,
+                  "startDate": {
+                    "year": 2026
+                  },
+                  "status": "RELEASING",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171110-7zOdInS6DQNL.jpg"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              },
+              {
+                "relationType": "SIDE_STORY",
+                "node": {
+                  "id": 208509,
+                  "idMal": null,
+                  "title": {
+                    "romaji": "Honzuki no Gekokujou: Ferdinand no Yakata ni Te",
+                    "english": null
+                  },
+                  "format": "MANGA",
+                  "type": "MANGA",
+                  "episodes": null,
+                  "seasonYear": null,
+                  "startDate": {
+                    "year": 2026
+                  },
+                  "status": "RELEASING",
+                  "coverImage": {
+                    "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/medium/bx208509-2RIg4ZRXwo9h.png"
+                  },
+                  "relations": {
+                    "edges": []
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "anirium-addon-player-pro",
+  "version": "1.0.0",
+  "description": "Anirium Official Plus Addon: Player Pro & Video Torrent Orchestration Service",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

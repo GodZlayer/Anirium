@@ -1,0 +1,12 @@
+{
+  "id": "community.local.library",
+  "name": "Local Video Library & WebDAV Resolver",
+  "version": "1.0.0",
+  "description": "Addon Comunitário Desacoplado: Permite indexar e reproduzir episódios armazenados no disco rígido local do usuário ou em servidores de rede doméstica (WebDAV/DLNA).",
+  "author": "Open Home Media Contributors",
+  "license": "MIT",
+  "type": "community",
+  "capabilities": ["playback.source.provide"],
+  "permissions": ["playback.source.provide"],
+  "enabled": false
+}

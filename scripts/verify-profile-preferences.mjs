@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';import ts from 'typescript';
+const source=fs.readFileSync('src/components/UserProfileModal.tsx','utf8'),tree=ts.createSourceFile('UserProfileModal.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);let fn;
+function visit(n){if(ts.isVariableDeclaration(n)&&n.name.getText(tree)==='handleTogglePref')fn=n.initializer;ts.forEachChild(n,visit);}visit(tree);assert.ok(fn);
+const code=ts.transpileModule('('+fn.getText(tree)+')',{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
+function fixture(update){const states=[],requests=[],preferencePending={current:false};const action=vm.runInNewContext(code,{preferencePending,setPreferenceState:x=>states.push(x),updateProfile:async payload=>{requests.push(JSON.parse(JSON.stringify(payload)));return update();}});return{action,states,requests,preferencePending};}
+const failed=fixture(async()=>{throw new Error('Private fixture');});await failed.action('preferredAudio','English');assert.deepEqual(failed.states,['saving','error']);assert.deepEqual(failed.requests,[{settings:{preferredAudio:'English'}}]);assert.equal(failed.preferencePending.current,false);
+const success=fixture(async()=>{});await success.action('autoNextEpisode',true);assert.deepEqual(success.states,['saving','saved']);
+let release;const pending=fixture(()=>new Promise(resolve=>release=resolve));const first=pending.action('autoSkipIntro',true);await pending.action('autoNextEpisode',true);assert.equal(pending.requests.length,1);release();await first;assert.equal(pending.preferencePending.current,false);
+for(const name of ['Áudio preferencial','Legendas preferenciais','Auto próximo episódio','Pular introdução ou abertura','Usar reprodutor nos episódios'])assert.ok(source.includes('aria-label="'+name+'"'));
+console.log('Actual preference handler preserves payload, distinguishes saving/success/failure and blocks concurrent writes; controls are named. Player application remains pending.');

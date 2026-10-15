@@ -1,0 +1,14 @@
+{
+  "id": "official.dev.inspector",
+  "name": "Anirium Addon DevStudio & Scraper Inspector",
+  "version": "1.0.0",
+  "description": "Ferramenta Oficial do Nível 3 (Arquiteto): Painel integrado de depuração de queries de fontes, telemetria de latência, inspetor de manifestos remotos e simulador de scrapers.",
+  "author": "Anirium Platform Architect",
+  "license": "Proprietary",
+  "type": "official-plus",
+  "capabilities": ["ui.panel.render", "network.external.fetch", "data.debug"],
+  "uiEdits": ["ui.devtools.panel"],
+  "display": ["data.debug"],
+  "permissions": ["network.external.fetch"],
+  "enabled": false
+}

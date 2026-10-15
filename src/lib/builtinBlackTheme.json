@@ -1,0 +1,20 @@
+{
+  "key": "anirium:black",
+  "version": "1.0.0",
+  "tokenSchemaVersion": 1,
+  "tokens": {
+    "background.base": "#0B0B0D",
+    "surface.base": "#1A1A1F",
+    "surface.raised": "#23232A",
+    "border.default": "#3A3A43",
+    "text.primary": "#FFF9F0",
+    "text.secondary": "#EADCC8",
+    "action.primary": "#FFC766",
+    "action.active": "#FFB347",
+    "state.primary": "#1E88E5",
+    "state.error": "#E53935",
+    "state.success": "#43A047",
+    "state.warning": "#FDD835",
+    "state.disabled": "#9E9E9E"
+  }
+}

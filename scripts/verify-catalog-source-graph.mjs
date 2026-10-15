@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+
+const graphModule={exports:{}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/catalogSourceGraph.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,graphModule);
+const collect=graphModule.exports.collectCatalogSourceRelations;
+const b={id:2,type:'ANIME',title:{romaji:'B'},format:'TV',relations:{edges:[]}};
+const manga={id:3,type:'MANGA',title:{romaji:'Source'},format:'MANGA',relations:{edges:[{relationType:'ADAPTATION',node:b}]}};
+const root={id:1,type:'ANIME',title:{romaji:'A'},format:'TV',relations:{edges:[{relationType:'ADAPTATION',node:manga},{relationType:'SIDE_STORY',node:b},{relationType:'SIDE_STORY',node:b}]}};
+b.relations.edges.push({relationType:'PREQUEL',node:root});
+const relations=collect(root);
+assert.equal(relations.length,4,'cycle terminates and duplicate edges collapse');
+assert.ok(relations.some(edge=>edge.fromId==='3'&&edge.fromType==='MANGA'&&edge.toId==='2'&&edge.relationType==='ADAPTATION'),'nested edge retains actual origin');
+assert.ok(relations.some(edge=>edge.fromId==='1'&&edge.toId==='2'&&edge.relationType==='SIDE_STORY'));
+assert.ok(relations.every(edge=>edge.namespace==='anilist:media'&&typeof edge.fromId==='string'&&typeof edge.toId==='string'));
+assert.throws(()=>collect({id:0,type:'ANIME'}));
+assert.throws(()=>collect({id:1,type:'ANIME',relations:{edges:[{relationType:'SEQUEL',node:{id:2}}]}}));
+const source=fs.readFileSync('src/lib/catalog.ts','utf8'),ast=ts.createSourceFile('catalog.ts',source,ts.ScriptTarget.Latest,true);
+const functions=ast.statements.filter(node=>ts.isFunctionDeclaration(node)&&['mapAniListToAnime','normalizeFormat'].includes(node.name?.text));
+assert.equal(functions.length,2);
+const context={PORTUGUESE_TITLE_MAP:{Known:'Título conhecido'},collectCatalogSourceRelations:collect,collectCatalogSourceSnapshot:graphModule.exports.collectCatalogSourceSnapshot,filterOfficialStreamingLinks:links=>links||[],resolvePortugueseTitle:()=>undefined,extractFranchiseName:value=>value};
+vm.runInNewContext(ts.transpileModule(functions.map(node=>node.getText(ast)).join('\n'),{compilerOptions:{module:ts.ModuleKind.None,target:ts.ScriptTarget.ES2022}}).outputText,context);
+// Keep the mapper's display traversal acyclic; the graph collector above proves
+// cycle handling independently of external JSON response traversal.
+b.relations.edges=[];
+const mapped=context.mapAniListToAnime(root);
+assert.equal(mapped.episodes,null);assert.equal(mapped.status,'UNKNOWN');
+assert.ok(mapped.seasons.every(season=>season.episodes===null&&season.status==='UNKNOWN'));
+assert.ok(mapped.sourceRelations.some(edge=>edge.fromId==='3'&&edge.toId==='2'));
+const movie=context.mapAniListToAnime({id:10,title:{romaji:'Movie'},format:'MOVIE'});
+assert.equal(movie.episodes,null);assert.equal(movie.seasons[0].episodes,null,'movie format alone does not fabricate a count');
+const known=context.mapAniListToAnime({id:11,title:{romaji:'Known'},format:'TV',episodes:26,status:'FINISHED'});
+assert.equal(known.textVariants.find(v=>v.locale==='pt-br').value,'Título conhecido');
+assert.equal(movie.textVariants.some(v=>v.locale==='pt-br'),false,'fallback title is not an observed Portuguese translation');
+assert.equal(known.episodes,26);assert.equal(known.seasons[0].episodes,26);assert.equal(known.status,'FINISHED');
+console.log('PASS: actual mapper preserves source graph origins/types and unknown counts/status without inventing episodes');
+
+const snapshot=graphModule.exports.collectCatalogSourceSnapshot(root);
+assert.equal(snapshot.nodes.length,3);
+assert.equal(snapshot.nodes.find(n=>n.id==='3').format,'MANGA');
+assert.equal(movie.sourceNodes[0].format,'MOVIE');
+assert.equal(movie.sourceNodes[0].episodes,undefined);
+assert.equal(context.mapAniListToAnime({id:12,title:{romaji:'Unknown'}}).sourceNodes[0].format,undefined);
+assert.throws(()=>graphModule.exports.collectCatalogSourceSnapshot({id:1,type:'ANIME',episodes:-1}));
+assert.throws(()=>graphModule.exports.collectCatalogSourceSnapshot({id:1,type:'ANIME',format:'TV',relations:{edges:[{relationType:'SEQUEL',node:{id:1,type:'ANIME',format:'MOVIE'}}]}}),/Conflicting/);
+const repeated=graphModule.exports.collectCatalogSourceSnapshot({id:1,type:'ANIME',relations:{edges:[{relationType:'SEQUEL',node:{id:2,type:'ANIME'}},{relationType:'SEQUEL',node:{id:2,type:'ANIME',format:'TV',episodes:0}}]}});
+assert.equal(repeated.nodes.length,2);assert.equal(repeated.nodes.find(n=>n.id==='2').episodes,0);
+console.log('PASS: observed source nodes preserve raw formats, unknown values, zero and reject conflicting identities');
