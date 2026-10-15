@@ -32,12 +32,22 @@ export default function AnimeCard({
 }: AnimeCardProps) {
   const { strings } = useDesignTheme();
 
+  const seasonCover = anime.seasons?.[0]?.cover;
   const imageUrl =
-    anime.images.webp?.large_image_url ||
-    anime.images.jpg?.large_image_url ||
-    anime.images.jpg?.image_url;
+    anime.images?.webp?.large_image_url ||
+    anime.images?.jpg?.large_image_url ||
+    anime.images?.jpg?.image_url ||
+    seasonCover ||
+    "/assets/logos/Anirium-Persona-LogoArtistica.png";
 
-  const displayTitle = anime.title_portuguese || anime.title_english || anime.title;
+  const displayTitle =
+    anime.title_portuguese ||
+    anime.title_english ||
+    anime.title ||
+    anime.synonyms?.[0] ||
+    anime.franchise_root ||
+    anime.seasons?.[0]?.title ||
+    "Obra Canônica";
   const isAiring = anime.status?.toLowerCase().includes("airing") || anime.status?.toLowerCase().includes("releasing");
 
   return (

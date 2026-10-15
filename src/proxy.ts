@@ -21,11 +21,31 @@ export function proxy(request: NextRequest) {
     response.headers.set("Cache-Control", "private, no-store");
     return response;
   }
+  // Handle CORS Preflight for API
+  const origin = request.headers.get("origin") || "";
+  const allowedOrigin = (origin === "https://anirium.com.br" || origin === "http://localhost:3000") ? origin : "https://anirium.com.br";
+
+  if (request.method === "OPTIONS") {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": allowedOrigin,
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-requested-with",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }
+
   const failure = checkApiRequest(request, process.env.NODE_ENV === "production",
     process.env.ANIRIUM_PUBLIC_ORIGIN || "https://anirium.com.br");
   const response = failure
     ? NextResponse.json({ error: failure.reason }, { status: failure.status })
     : NextResponse.next();
+
+  response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-requested-with");
   response.headers.set("Cache-Control", "private, no-store");
   response.headers.set("X-Content-Type-Options", "nosniff");
   return response;

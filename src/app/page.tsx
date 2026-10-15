@@ -54,7 +54,8 @@ export default function LobbyDashboard() {
       } catch (err) {
         console.warn("[Lobby] Carregando catálogo via API fallback:", err);
         const res = await aniriumFetch("/api/catalog");
-        const json = await res.json();
+        const text = await res.text();
+        const json = JSON.parse(text.replace(/^\uFEFF/, ""));
         if (json.popular) setPopular(json.popular);
         if (json.seasonal) setSeasonal(json.seasonal);
         if (json.upcoming) setUpcoming(json.upcoming);

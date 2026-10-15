@@ -28,11 +28,22 @@ export default function HeroBanner({
 }: HeroBannerProps) {
   const { strings } = useDesignTheme();
 
-  const title = anime?.title_portuguese || anime?.title_english || anime?.title || strings.global.appName;
+  const seasonCover = anime?.seasons?.[0]?.cover;
+  const title =
+    anime?.title_portuguese ||
+    anime?.title_english ||
+    anime?.title ||
+    anime?.synonyms?.[0] ||
+    anime?.franchise_root ||
+    anime?.seasons?.[0]?.title ||
+    strings.global.appName;
+
   const posterUrl =
     anime?.images?.webp?.large_image_url ||
     anime?.images?.jpg?.large_image_url ||
-    anime?.images?.jpg?.image_url;
+    anime?.images?.jpg?.image_url ||
+    seasonCover ||
+    "/assets/logos/Anirium-Persona-LogoArtistica.png";
 
   return (
     <section className="relative w-full pt-20 pb-8 sm:pt-24 sm:pb-10 md:pt-28 md:pb-12 px-4 md:px-8 select-none overflow-hidden">
