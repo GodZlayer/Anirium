@@ -11,7 +11,15 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const nonce = (await headers()).get("x-nonce") || undefined;
+  const isExport = process.env.NEXT_EXPORT === "true";
+  let nonce: string | undefined = undefined;
+  if (!isExport) {
+    try {
+      nonce = (await headers()).get("x-nonce") || undefined;
+    } catch {
+      // In static export or missing request context, nonce is undefined
+    }
+  }
   return (
     <html lang="pt-BR">
       <head>
