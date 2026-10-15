@@ -27,7 +27,12 @@ export default function ModularVitrine({
   viewMode = "grid",
 }: ModularVitrineProps) {
   if (!items || items.length === 0) {
-    return null;
+    return (
+      <div className="my-8 flex flex-col items-center justify-center py-12 text-zinc-500 border border-zinc-800/40 rounded-2xl bg-black/20">
+        <div className="w-8 h-8 border-2 border-amber-500/40 border-t-amber-400 rounded-full animate-spin mb-3"></div>
+        <p className="text-xs font-mono tracking-wider">CARREGANDO CATÁLOGO CANÔNICO...</p>
+      </div>
+    );
   }
 
   return (
