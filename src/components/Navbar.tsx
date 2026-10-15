@@ -6,6 +6,8 @@ import { Search, Bell, Film, Puzzle, ShieldCheck, UserCheck, Zap, Terminal, Spar
 import LevelSwitcher from "./LevelSwitcher";
 import AddonDevStudio from "./AddonDevStudio";
 import { useUser } from "@/context/UserContext";
+import { useDesignTheme } from "@/context/ThemeContext";
+import Tooltip from "./Tooltip";
 import { redirectGoogleLogin } from "@/lib/googleLoginClient";
 
 import UserProfileModal from "./UserProfileModal";
@@ -28,6 +30,7 @@ export default function Navbar({
   onClearSearch,
 }: NavbarProps) {
   const { user, level, isDevStudioOpen, setIsDevStudioOpen } = useUser();
+  const { tokens, strings } = useDesignTheme();
   const [isScrolled, setIsScrolled] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -76,69 +79,89 @@ export default function Navbar({
       </div>
 
       {/* 2. Centro: Cápsula de Navegação Canônica (Sem abas abertas ou poluídas) */}
-      <nav className="flex items-center bg-[#1A1A1F]/90 backdrop-blur-md border border-[#3A3A43]/80 p-0.5 sm:p-1 rounded-full text-xs font-medium text-[#EADCC8] shadow-md flex-shrink min-w-0">
-        <button
-          onClick={() => onTabChange && onTabChange("inicio")}
-          className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap ${
-            !isSearching && activeTab === "inicio"
-              ? "bg-[#FFC766] text-[#0B0B0D] font-bold shadow-sm shadow-[#FFC766]/20"
-              : "text-[#EADCC8] hover:text-[#FFF9F0] hover:bg-[#23232A]/50"
-          }`}
-          title="Início"
-        >
-          <Home className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="hidden sm:inline">Início</span>
-        </button>
+      <nav 
+        className="flex items-center backdrop-blur-md p-0.5 sm:p-1 rounded-full text-xs font-medium shadow-md flex-shrink min-w-0"
+        style={{
+          backgroundColor: tokens.colors.bgSurface,
+          border: `1px solid ${tokens.colors.borderDefault}`,
+          color: tokens.colors.textSecondary,
+        }}
+      >
+        <Tooltip text="Visão principal da plataforma com lançamentos e recomendações" position="bottom">
+          <button
+            onClick={() => onTabChange && onTabChange("inicio")}
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap"
+            style={{
+              backgroundColor: !isSearching && activeTab === "inicio" ? tokens.colors.accentGold : "transparent",
+              color: !isSearching && activeTab === "inicio" ? tokens.colors.bgBase : tokens.colors.textSecondary,
+              fontWeight: !isSearching && activeTab === "inicio" ? 700 : 500,
+            }}
+          >
+            <Home className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="hidden sm:inline">{strings.navigation.home}</span>
+          </button>
+        </Tooltip>
 
-        <button
-          onClick={() => onTabChange && onTabChange("explorar")}
-          className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap ${
-            !isSearching && activeTab === "explorar"
-              ? "bg-[#FFC766] text-[#0B0B0D] font-bold shadow-sm shadow-[#FFC766]/20"
-              : "text-[#EADCC8] hover:text-[#FFF9F0] hover:bg-[#23232A]/50"
-          }`}
-          title="Explorar Catálogo"
-        >
-          <Compass className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="hidden sm:inline">Explorar</span>
-        </button>
+        <Tooltip text="Explorar catálogo completo particionado por fatias Parquet" position="bottom">
+          <button
+            onClick={() => onTabChange && onTabChange("explorar")}
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap"
+            style={{
+              backgroundColor: !isSearching && activeTab === "explorar" ? tokens.colors.accentGold : "transparent",
+              color: !isSearching && activeTab === "explorar" ? tokens.colors.bgBase : tokens.colors.textSecondary,
+              fontWeight: !isSearching && activeTab === "explorar" ? 700 : 500,
+            }}
+          >
+            <Compass className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="hidden sm:inline">{strings.navigation.explore}</span>
+          </button>
+        </Tooltip>
 
-        <button
-          onClick={() => onTabChange && onTabChange("calendario")}
-          className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap ${
-            !isSearching && activeTab === "calendario"
-              ? "bg-[#FFC766] text-[#0B0B0D] font-bold shadow-sm shadow-[#FFC766]/20"
-              : "text-[#EADCC8] hover:text-[#FFF9F0] hover:bg-[#23232A]/50"
-          }`}
-          title="Grade de Lançamentos"
-        >
-          <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="hidden md:inline">Calendário</span>
-        </button>
+        <Tooltip text="Agenda diária de transmissão e horários canônicos de exibição" position="bottom">
+          <button
+            onClick={() => onTabChange && onTabChange("calendario")}
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap"
+            style={{
+              backgroundColor: !isSearching && activeTab === "calendario" ? tokens.colors.accentGold : "transparent",
+              color: !isSearching && activeTab === "calendario" ? tokens.colors.bgBase : tokens.colors.textSecondary,
+              fontWeight: !isSearching && activeTab === "calendario" ? 700 : 500,
+            }}
+          >
+            <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="hidden md:inline">{strings.navigation.calendar}</span>
+          </button>
+        </Tooltip>
 
-        <button
-          onClick={() => onTabChange && onTabChange("franquias")}
-          className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap ${
-            !isSearching && activeTab === "franquias"
-              ? "bg-[#FFC766] text-[#0B0B0D] font-bold shadow-sm shadow-[#FFC766]/20"
-              : "text-[#EADCC8] hover:text-[#FFF9F0] hover:bg-[#23232A]/50"
-          }`}
-          title="Universo de Franquias"
-        >
-          <Network className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="hidden lg:inline">Franquias</span>
-        </button>
+        <Tooltip text="Genealogia e ordem cronológica estruturada de franquias" position="bottom">
+          <button
+            onClick={() => onTabChange && onTabChange("franquias")}
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap"
+            style={{
+              backgroundColor: !isSearching && activeTab === "franquias" ? tokens.colors.accentGold : "transparent",
+              color: !isSearching && activeTab === "franquias" ? tokens.colors.bgBase : tokens.colors.textSecondary,
+              fontWeight: !isSearching && activeTab === "franquias" ? 700 : 500,
+            }}
+          >
+            <Network className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="hidden lg:inline">{strings.navigation.franchises}</span>
+          </button>
+        </Tooltip>
 
         {isSearching && (
-          <button
-            onClick={() => onClearSearch && onClearSearch()}
-            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap bg-[#FFC766] text-[#0B0B0D] font-bold shadow-sm shadow-[#FFC766]/30 animate-in fade-in zoom-in-95"
-            title="Resultados da Busca Ativa (Clique para fechar)"
-          >
-            <Search className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>Busca</span>
-            <span className="ml-1 text-[10px] bg-[#0B0B0D]/20 px-1.5 py-0.2 rounded-full font-mono">×</span>
-          </button>
+          <Tooltip text="Encerrar filtro de busca e retornar ao lobby principal" position="bottom">
+            <button
+              onClick={() => onClearSearch && onClearSearch()}
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 md:px-4 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap shadow-sm font-bold animate-in fade-in zoom-in-95"
+              style={{
+                backgroundColor: tokens.colors.accentGold,
+                color: tokens.colors.bgBase,
+              }}
+            >
+              <Search className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Busca</span>
+              <span className="ml-1 text-[10px] bg-black/20 px-1.5 py-0.2 rounded-full font-mono">×</span>
+            </button>
+          </Tooltip>
         )}
       </nav>
 

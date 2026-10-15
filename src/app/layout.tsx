@@ -3,6 +3,8 @@ import "@/app/globals.css";
 import { UserProvider } from "@/context/UserContext";
 import { headers } from "next/headers";
 
+import { ThemeProvider } from "@/context/ThemeContext";
+
 export const metadata = {
   title: "Anirium • Plataforma Canônica de Animes e Genealogia",
   description: "Descubra. Conecte. Acompanhe. O universo conectado e a genealogia canônica de animes.",
@@ -19,10 +21,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700;800&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet" />
         <script nonce={nonce} src="https://accounts.google.com/gsi/client" async defer></script>
       </head>
-      <body className="min-h-screen bg-[#0B0B0D] text-[#FFF9F0] antialiased selection:bg-[#FFC766]/30 selection:text-[#FFC766]">
-        <UserProvider>
-          {children}
-        </UserProvider>
+      <body className="min-h-screen bg-[var(--color-bg-base,#0B0B0D)] text-[var(--color-text-primary,#FFF9F0)] antialiased selection:bg-[#FFC766]/30 selection:text-[#FFC766]">
+        <ThemeProvider>
+          <UserProvider>
+            {children}
+          </UserProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

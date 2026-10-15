@@ -5,6 +5,7 @@ import { UserProfile, ExperienceLevel, WatchHistoryItem, BookmarkItem } from "@/
 import { loadAccountPlugins } from "@/lib/extensions/pluginLoader";
 import { addonRegistry } from "@/lib/extensions/addonRegistry";
 import { themeCssProperties } from "@/lib/themeTokens";
+import { resolveApiUrl } from "@/lib/apiConfig";
 
 interface UserContextType {
   user: UserProfile | null;
@@ -55,7 +56,8 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
   if (typeof window !== "undefined") {
     window.localStorage.removeItem("anirium_device_session");
   }
-  return fetch(input, {
+  const url = typeof input === "string" ? resolveApiUrl(input) : input;
+  return fetch(url, {
     ...init,
     credentials: "include",
   });

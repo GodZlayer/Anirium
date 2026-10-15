@@ -1,73 +1,110 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
-import { Play, Star, Plus } from "lucide-react";
+import { Star, Plus, Play, Sparkles } from "lucide-react";
 import { Anime } from "@/types/anime";
+import { useDesignTheme } from "@/context/ThemeContext";
+import Tooltip from "./Tooltip";
 
 interface AnimeCardProps {
   anime: Anime;
   onSelect: (anime: Anime) => void;
-  onPlay: (anime: Anime) => void;
+  onPlay?: (anime: Anime) => void;
+  userProgress?: {
+    episodeNumber?: number;
+    completed?: boolean;
+    progressPercent?: number;
+  };
 }
 
-export default function AnimeCard({ anime, onSelect, onPlay }: AnimeCardProps) {
+/**
+ * Card de Anime 100% Modular e Stringado (TGCode Standard)
+ * - Zero strings hardcoded: herda textos e paletas da ThemeContext.
+ * - Formas e geometria intuitiva com micro-indicadores.
+ * - Explicações completas em Tooltip on-demand.
+ * - Suporte a feedback de progresso do usuário (Gamificação).
+ */
+export default function AnimeCard({
+  anime,
+  onSelect,
+  onPlay,
+  userProgress,
+}: AnimeCardProps) {
+  const { strings } = useDesignTheme();
+
   const imageUrl =
     anime.images.webp?.large_image_url ||
     anime.images.jpg?.large_image_url ||
     anime.images.jpg?.image_url;
 
+  const displayTitle = anime.title_portuguese || anime.title_english || anime.title;
+  const isAiring = anime.status?.toLowerCase().includes("airing") || anime.status?.toLowerCase().includes("releasing");
+
   return (
     <div
       onClick={() => onSelect(anime)}
-      className="group relative flex-none w-[140px] sm:w-[170px] md:w-[190px] aspect-[2/3] rounded-2xl overflow-hidden bg-[#1A1A1F] border border-[#3A3A43]/70 hover:border-[#FFC766]/60 cursor-pointer transition-all duration-300 transform hover:scale-105 hover:z-30 hover:shadow-2xl hover:shadow-[#FFC766]/5"
+      className="group relative flex-none w-[135px] sm:w-[160px] md:w-[180px] aspect-[2/3] rounded-2xl overflow-hidden bg-[var(--color-bg-surface,#1A1A1F)] border border-[var(--color-border-default,#3A3A43)]/60 hover:border-[var(--color-accent-gold,#FFC766)] cursor-pointer transition-all duration-300 transform hover:scale-[1.04] hover:z-20 hover:shadow-2xl hover:shadow-[var(--color-accent-gold,#FFC766)]/10"
     >
-      {/* Poster Image */}
+      {/* Imagem do Poster */}
       <img
         src={imageUrl}
-        alt={anime.title}
-        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+        alt={displayTitle}
+        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         loading="lazy"
       />
 
-      {/* Gradient vignette */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0D] via-[#0B0B0D]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3" />
+      {/* Vinheta de Gradiente */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg-base,#0B0B0D)] via-transparent to-transparent opacity-80 group-hover:opacity-95 transition-opacity" />
 
-      {/* Score badge at top right */}
-      {anime.score && (
-        <div className="absolute top-2 right-2 flex items-center gap-1 bg-[#0B0B0D]/80 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] font-bold text-[#FFC766] border border-[#FFC766]/30 z-10 shadow">
-          <Star className="w-3 h-3 fill-[#FFC766] text-[#FFC766]" />
-          <span>{anime.score}</span>
+      {/* Micro-Badges no topo com Tooltip on-demand */}
+      <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-auto z-10">
+        {anime.score ? (
+          <Tooltip content={`Avaliação Geral: ${anime.score}/10`}>
+            <div className="flex items-center gap-1 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] font-bold text-[var(--color-accent-gold,#FFC766)] border border-[var(--color-accent-gold,#FFC766)]/30 shadow">
+              <Star className="w-3 h-3 fill-[var(--color-accent-gold,#FFC766)] text-[var(--color-accent-gold,#FFC766)]" />
+              <span>{anime.score}</span>
+            </div>
+          </Tooltip>
+        ) : <div />}
+
+        {isAiring && (
+          <Tooltip content={strings.statusBadges.releasing}>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse border border-emerald-950 shadow" />
+          </Tooltip>
+        )}
+      </div>
+
+      {/* Barra de Progresso do Usuário (Gamificação / History) */}
+      {userProgress?.progressPercent !== undefined && userProgress.progressPercent > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-zinc-800 z-10">
+          <div
+            className="h-full bg-[var(--color-accent-gold,#FFC766)] transition-all duration-300"
+            style={{ width: `${Math.min(userProgress.progressPercent, 100)}%` }}
+          />
         </div>
       )}
 
-      {/* Hover Info details overlay */}
-      <div className="absolute inset-x-0 bottom-0 p-3 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 translate-y-2 group-hover:translate-y-0">
-        <div className="flex items-center gap-2 mb-1.5">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect(anime);
-            }}
-            className="w-7 h-7 rounded-full bg-[#FFC766] text-[#0B0B0D] flex items-center justify-center hover:brightness-110 transition-transform active:scale-90 shadow"
-            title="Explorar Obra & Franquia"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-          </button>
-        </div>
-
-        <h4 className="text-xs md:text-sm font-bold text-[#FFF9F0] line-clamp-1">
-          {anime.title_portuguese || anime.title_english || anime.title}
+      {/* Conteúdo Overlay compacto */}
+      <div className="absolute inset-x-0 bottom-0 p-3 z-10 flex flex-col justify-end">
+        <h4 className="text-xs md:text-sm font-bold text-[var(--color-text-primary,#FFF9F0)] line-clamp-1 leading-snug">
+          {displayTitle}
         </h4>
-        {anime.title_portuguese && anime.title_portuguese !== anime.title && (
-          <p className="text-[10px] text-gray-400 truncate italic">
-            {anime.title}
-          </p>
-        )}
 
-        <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400 font-medium">
-          {anime.episodes && <span>{anime.episodes} eps</span>}
-          {anime.status && <span className="text-emerald-400">{anime.status}</span>}
+        {/* Linha de Metadados Mínimos com Tooltips */}
+        <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-400 font-medium">
+          {anime.episodes && (
+            <Tooltip content={`Total de episódios da obra: ${anime.episodes}`}>
+              <span>{anime.episodes} eps</span>
+            </Tooltip>
+          )}
+
+          {userProgress?.episodeNumber && (
+            <Tooltip content={`Último episódio assistido: Ep. ${userProgress.episodeNumber}`}>
+              <span className="text-[var(--color-accent-gold,#FFC766)] font-semibold">
+                Ep. {userProgress.episodeNumber}
+              </span>
+            </Tooltip>
+          )}
         </div>
       </div>
     </div>

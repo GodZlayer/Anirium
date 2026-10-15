@@ -3,6 +3,8 @@
 import React from "react";
 import { Play, Clock } from "lucide-react";
 import { useUser } from "@/context/UserContext";
+import { useDesignTheme } from "@/context/ThemeContext";
+import Tooltip from "./Tooltip";
 import { Anime } from "@/types/anime";
 import { isReleaseUuid } from "../lib/profilePlaybackIdentity";
 
@@ -16,6 +18,7 @@ export default function ContinueWatchingRow({
   onOpenAnime,
 }: ContinueWatchingRowProps) {
   const { watchHistory, level } = useUser();
+  const { tokens, strings } = useDesignTheme();
 
   // Nível 0 é canônico/anônimo; não renderiza histórico pessoal
   if (level === 0 || !watchHistory || watchHistory.length === 0) {
@@ -25,13 +28,25 @@ export default function ContinueWatchingRow({
   return (
     <div className="px-4 md:px-12 my-6">
       <div className="flex items-center gap-2 mb-3">
-        <Clock className="w-5 h-5 text-red-500" />
-        <h2 className="text-lg md:text-xl font-bold text-white tracking-wide">
-          Continuar Assistindo
+        <Clock className="w-5 h-5" style={{ color: tokens.colors.accentGold }} />
+        <h2 
+          className="text-lg md:text-xl font-bold tracking-wide"
+          style={{ color: tokens.colors.textPrimary }}
+        >
+          {strings.sections.continueWatching}
         </h2>
-        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded-full border border-zinc-700/50">
-          Nível {level} • Histórico Ativo
-        </span>
+        <Tooltip text="Sincronização contínua do progresso do usuário via API segura" position="top">
+          <span 
+            className="text-[10px] font-mono px-2 py-0.5 rounded-full border"
+            style={{
+              backgroundColor: tokens.colors.bgSurface,
+              borderColor: tokens.colors.borderDefault,
+              color: tokens.colors.textMuted,
+            }}
+          >
+            Nível {level} • {strings.badges.resumed}
+          </span>
+        </Tooltip>
       </div>
 
       <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
