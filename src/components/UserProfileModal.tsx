@@ -36,6 +36,7 @@ import {
 import { useUser } from "@/context/UserContext";
 import { ExperienceLevel } from "@/lib/userProfiles";
 import LevelSwitcher from "./LevelSwitcher";
+import { resolveApiUrl, aniriumFetch } from "@/lib/apiConfig";
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -161,7 +162,7 @@ export default function UserProfileModal({
     try {
       const param = statusProDegree !== "ALL" ? `&entity_type=${statusProDegree}` : "";
       const cursor = statusCursor ? `&cursor=${encodeURIComponent(statusCursor)}` : "";
-      const res = await fetch(`/api/user?action=get_all_statuses&limit=1${param}${cursor}`);
+      const res = await aniriumFetch(`/api/user?action=get_all_statuses&limit=1${param}${cursor}`);
       const data = await res.json();
       if (!res.ok || !isStatusPage(data) || (statusCursor && data.nextCursor === statusCursor)) throw new Error("Status unavailable");
       if (sequence !== statusRequestSequence.current || identity !== statusIdentityRef.current) return;
@@ -181,7 +182,7 @@ export default function UserProfileModal({
     const sequence = ++addonRequestSequence.current;
     setIsLoadingAddons(true); setAddonListError(false);
     try {
-      const res = await fetch("/api/sources?action=list_addons");
+      const res = await aniriumFetch("/api/sources?action=list_addons");
       const data = await res.json();
       if (!res.ok || data.success !== true || !Array.isArray(data.addons)) throw new Error("Addon list rejected");
       if (sequence !== addonRequestSequence.current || identity !== addonIdentityRef.current) return false;
@@ -205,7 +206,7 @@ export default function UserProfileModal({
     addonRequestSequence.current++;
     setChangingAddon(target); setAddonActionError(null);
     try {
-      const response = await fetch(payload.action === "toggle_addon" ? "/api/user" : "/api/sources", {
+      const response = await aniriumFetch(payload.action === "toggle_addon" ? "/api/user" : "/api/sources", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const data = await response.json();
@@ -285,7 +286,7 @@ export default function UserProfileModal({
     const sequence = ++adminRequestSequence.current;
     setIsLoadingAdmin(true); setAdminError("");
     try {
-      const res = await fetch("/api/admin/users");
+      const res = await aniriumFetch("/api/admin/users");
       const data = await res.json();
       if (!res.ok || data.success !== true || !Array.isArray(data.users)) throw new Error("Admin list rejected");
       if (identity !== adminIdentityRef.current || sequence !== adminRequestSequence.current) return;
@@ -307,7 +308,7 @@ export default function UserProfileModal({
     adminRequestSequence.current++;
     setAdminPendingUser(targetUserId); setAdminError("");
     try {
-      const res = await fetch("/api/admin/users", {
+      const res = await aniriumFetch("/api/admin/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "toggle_anirium_plus", targetUserId, newTier, plan }),
       });

@@ -30,6 +30,9 @@ import {
 } from "lucide-react";
 import { Anime } from "@/types/anime";
 import { useUser } from "@/context/UserContext";
+import { useDesignTheme } from "@/context/ThemeContext";
+import Tooltip from "./Tooltip";
+import { resolveApiUrl } from "@/lib/apiConfig";
 
 interface AnimeModalProps {
   anime: Anime | null;
@@ -102,7 +105,7 @@ export default function AnimeModal({ anime, onClose, onPlayEpisode, onResumeEpis
       return;
     }
     params.set("seasonEntityId",seasonId);
-    fetch(`/api/progress?${params}`,{signal:controller.signal})
+    fetch(resolveApiUrl(`/api/progress?${params}`),{signal:controller.signal, credentials: "include"})
       .then((res) => { if (!res.ok) throw new Error("Progress unavailable"); return res.json(); })
       .then((data) => {
         if (!controller.signal.aborted && data.userId === user?.id && data.success && Array.isArray(data.episodes)) {

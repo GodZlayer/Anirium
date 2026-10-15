@@ -36,9 +36,9 @@ import {
   Award,
   ShieldCheck,
   ExternalLink,
-} from "lucide-react";
 import { buildFranchisesFromCatalog, extractFranchiseRoot, FranchiseGroup } from "@/lib/franchiseUtils";
 import { getModularCatalogFromParquet } from "@/lib/parquetCatalog";
+import { aniriumFetch, resolveApiUrl } from "@/lib/apiConfig";
 
 const POPULAR_FRANCHISES = [
   {
@@ -212,7 +212,7 @@ export default function Home() {
           console.warn("[Parquet] Fallback para API do Core:", parquetErr);
         }
 
-        const res = await fetch("/api/catalog");
+        const res = await aniriumFetch("/api/catalog");
         const data = await res.json();
         if (data.seasonal) setSeasonalAnimes(data.seasonal);
         if (data.popular) setPopularAnimes(data.popular);
@@ -227,7 +227,7 @@ export default function Home() {
     loadData();
 
     // 1. Programação semanal para a aba Calendário
-    fetch("/api/schedule")
+    aniriumFetch("/api/schedule")
       .then((res) => res.json())
       .then((data) => {
         if (data.schedule) setSchedule(data.schedule);
@@ -235,7 +235,7 @@ export default function Home() {
       .catch(() => {});
 
     // 2. Exatos últimos episódios lançados para o Hero da Home
-    fetch("/api/schedule?type=latest")
+    aniriumFetch("/api/schedule?type=latest")
       .then((res) => res.json())
       .then((data) => {
         if (data.schedule) setLatestEpisodes(data.schedule);
@@ -277,7 +277,7 @@ export default function Home() {
     }
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      const res = await aniriumFetch(`/api/search?q=${encodeURIComponent(query)}`);
       const data = await res.json();
       if (revision === searchRevisionRef.current) setSearchResults(data.results || []);
     } catch (err) {

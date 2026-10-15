@@ -1,17 +1,21 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { THEME_PALETTES, UI_STRINGS, DesignTokens } from "./designStrings";
+import { THEME_PALETTES, UI_STRINGS, DesignTokens } from "@/lib/designStrings";
 
 interface ThemeContextType {
   theme: DesignTokens;
+  tokens: DesignTokens;
   currentThemeId: string;
   setThemeId: (id: string) => void;
   strings: typeof UI_STRINGS;
 }
 
+const defaultTheme = THEME_PALETTES.black;
+
 const ThemeContext = createContext<ThemeContextType>({
-  theme: THEME_PALETTES.black,
+  theme: defaultTheme,
+  tokens: defaultTheme,
   currentThemeId: "black",
   setThemeId: () => {},
   strings: UI_STRINGS,
@@ -20,9 +24,10 @@ const ThemeContext = createContext<ThemeContextType>({
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeId, setThemeId] = useState<string>("black");
 
+  const selected = THEME_PALETTES[themeId] || THEME_PALETTES.black;
+
   useEffect(() => {
     // Aplica as variáveis CSS globais no :root para que Tailwind e componentes herdem os tokens
-    const selected = THEME_PALETTES[themeId] || THEME_PALETTES.black;
     const root = document.documentElement;
 
     root.style.setProperty("--color-bg-base", selected.colors.bgBase);
@@ -34,12 +39,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty("--color-text-secondary", selected.colors.textSecondary);
     root.style.setProperty("--color-accent-gold", selected.colors.accentGold);
     root.style.setProperty("--color-accent-amber", selected.colors.accentAmber);
-  }, [themeId]);
+  }, [selected]);
 
   return (
     <ThemeContext.Provider
       value={{
-        theme: THEME_PALETTES[themeId] || THEME_PALETTES.black,
+        theme: selected,
+        tokens: selected,
         currentThemeId: themeId,
         setThemeId,
         strings: UI_STRINGS,
