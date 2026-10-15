@@ -28,24 +28,33 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Diretriz lógica permanente definida pelo usuário para todas as telas, componentes e funções:
 
-1. **Tudo Stringado (String-Centric Architecture)**:
-   - Textos, links de imagens, paletas de cores, identificadores, metadados e módulos de contexto são 100% stringados/tokenizados.
-   - Nada de valores 'hardcoded' soltos nos componentes.
-   - Permite troca instantânea de temas (Dark/Light/AMOLED/Cyberpunk), suporte trivial a i18n/localização e reaproveitamento modular uniforme (ex: o mesmo card de anime é um módulo reaproveitado N vezes recebendo apenas o payload de strings).
+1. **Casca Branca (Whitecontent Architecture)**:
+   - A interface não tem conteúdo intrínseco.
+   - Cada componente é um molde puramente geométrico, responsivo e acelerado por hardware: `ElementoVisual = F(Tokens, Strings, Payload)`.
+   - O mesmo card serve para anime, episódio, busca, franquia genealógica ou quest.
 
-2. **Lobby Sempre Visível (No-Scroll Viewport First)**:
-   - Toda a composição primária e controles essenciais devem estar visíveis na viewport sem exigir rolagem cega da página.
-   - Design enxuto, minimalista e direto ao ponto.
+2. **Tudo Stringado (String-Centric & Parquet Localized)**:
+   - Zero hardcode no código-fonte.
+   - Dicionários de strings particionados por idioma (ex.: `pt-BR.parquet`, `en-US.parquet`) carregados em milissegundos sem inchar o bundle JS.
+   - Troca instantânea de tema (Dark/AMOLED/Cyberpunk) e idioma sem reprocessar regras lógicas.
 
-3. **Densidade Textual Reduzida ao Limite da Razão**:
-   - Menor quantidade possível de caracteres/textos expostos diretamente na interface.
-   - Uso intensivo de formas visuais limpas: ícones expressivos, imagens, status gráficos e geometria intuitiva.
+3. **Anti-Monólito Rigoroso (Micro-Módulos Puros)**:
+   - Proibidos arquivos com centenas de linhas. Componentes de casca visual devem possuir entre 30 e 60 linhas de código limpo.
+   - Separação estrita: Componentes visuais apenas renderizam geometria; orquestradores apenas coordenam; dados ficam no cliente/Parquet.
 
-4. **Explicações Completas On-Demand (Tooltip / Popover)**:
-   - Toda e qualquer informação detalhada, contextual ou explicativa fica acessível sob demanda através de tooltips instantâneos ao hover/foco.
-   - A interface respira visualmente sem perder profundidade funcional.
+4. **Lobby Sempre Visível (No-Scroll Viewport / Dashboard First)**:
+   - Toda a composição primária, navegação e controles essenciais visíveis imediatamente na viewport, sem rolagem cega.
+   - Organização estruturada em docks, abas limpas e carrosséis fluidos.
 
-5. **Fluxo de UX Modular e Não-Linear**:
-   - Todas as jornadas são compostas por setups modulares que suportam ramificações, loops de estado e navegação bidirecional contínua.
+5. **Densidade Textual Reduzida ao Mínimo + On-Demand (Tooltip / Popover)**:
+   - Menor quantidade possível de caracteres expostos na interface.
+   - Geometria limpa e ícones universais. Explicações completas aparecem instantaneamente ao hover/foco.
+
+6. **Loop de Estado e Gamificação com Memória**:
+   - A interface reage dinamicamente ao checkpoint do usuário (Níveis 0 a 3, quests ativas, histórico).
+   - O navegador apita diretamente na API para sincronização rápida sem recarregar a tela.
+
+7. **Ultra-Leveza e Desempenho Extremo**:
+   - O consumo de CPU e RAM no navegador deve ser mínimo para que qualquer PC modesto que rode torrent execute a interface em taxa máxima (60/120 FPS).
 <!-- DESIGN-FOUNDATIONS:END -->
 
