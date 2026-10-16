@@ -53,8 +53,18 @@ export function CinematicArena({
           className="w-full h-full object-cover object-center filter brightness-90 contrast-105"
         />
         {/* Degradê Canônico Multi-Camadas com Abertura para Tokens */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0D] via-[#0B0B0D]/70 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0B0B0D] via-transparent to-[#0B0B0D]/40" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to top, ${tokens.colors.bgSurface} 0%, ${tokens.colors.bgSurface}B3 55%, transparent 100%)`,
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to right, ${tokens.colors.bgSurface}E6 0%, transparent 60%, ${tokens.colors.bgSurface}66 100%)`,
+          }}
+        />
       </div>
 
       {/* Conteúdo Overlay */}

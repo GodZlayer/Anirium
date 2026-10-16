@@ -344,7 +344,7 @@ export default function LobbyPage({ auth }: LobbyProps) {
                 {strings.labels.exploreTitle}
               </h2>
               <p className="text-xs" style={{ color: tokens.colors.textMuted }}>
-                Filtro em tempo real sobre a Base Única ({universalCatalog.length} obras indexadas na memória).
+                {strings.labels.exploreDescription} ({universalCatalog.length} {strings.labels.worksCount})
               </p>
             </div>
             <ModularHubTrack
@@ -375,11 +375,11 @@ export default function LobbyPage({ auth }: LobbyProps) {
                 </h2>
               </div>
               <p className="text-xs" style={{ color: tokens.colors.textMuted }}>
-                Filtro cronológico derivado do catálogo universal por ano e temporadas de transmissão.
+                {strings.labels.calendarDescription}
               </p>
             </div>
             <ModularHubTrack
-              title="Transmissões e Lançamentos Ordenados"
+              title={strings.labels.calendarTrackTitle}
               animes={filterCatalog(universalCatalog, "calendar", searchQuery).slice(0, 24)}
               activeAnimeId={selectedAnime?.id}
               onSelectAnime={(a) => setSelectedAnime(a)}

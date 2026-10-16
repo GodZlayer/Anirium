@@ -22,7 +22,7 @@ export function ModularHubTrack({
   onToggleBookmark,
   bookmarkedIds = [],
 }: ModularHubTrackProps) {
-  const { tokens } = useDesignTheme();
+  const { tokens, strings } = useDesignTheme();
 
   return (
     <div className="flex flex-col gap-3 w-full">
@@ -39,7 +39,7 @@ export function ModularHubTrack({
           className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
           style={{ color: tokens.colors.textMuted }}
         >
-          {animes.length} Obras
+          {animes.length} {strings.labels.worksCount}
           <ChevronRight className="w-3 h-3" />
         </span>
       </div>

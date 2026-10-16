@@ -45,7 +45,7 @@ export function OrbitalFranchiseMap() {
             color: tokens.colors.accentGold,
           }}
         >
-          Grafo Genealógico Reativo
+          {strings.labels.franchiseSubheader}
         </span>
       </div>
 
@@ -102,7 +102,7 @@ export function OrbitalFranchiseMap() {
       </div>
 
       <div className="flex items-center justify-between text-[10px] z-10" style={{ color: tokens.colors.textMuted }}>
-        <span>Navegação contínua sem recarregar páginas</span>
+        <span>{strings.labels.franchiseFooterNote}</span>
         <span className="font-mono">Genealogia Shonen V2</span>
       </div>
     </div>

@@ -33,6 +33,59 @@ export interface ParquetAnime {
 let universalCatalogCache: ParquetAnime[] | null = null;
 let catalogLoadingPromise: Promise<ParquetAnime[]> | null = null;
 
+// Dicionário canônico para mapping imediato de títulos em português
+const PORTUGUESE_TITLE_MAP: Record<string, string> = {
+  "Shingeki no Kyojin": "Ataque dos Titãs",
+  "Attack on Titan": "Ataque dos Titãs",
+  "Kimetsu no Yaiba": "Demon Slayer: Caçador de Demônios",
+  "Demon Slayer: Kimetsu no Yaiba": "Demon Slayer: Caçador de Demônios",
+  "Boku no Hero Academia": "My Hero Academia",
+  "My Hero Academia": "My Hero Academia",
+  "One Punch Man": "One-Punch Man: Homem de Um Soco Só",
+  "Nanatsu no Taizai": "Os Sete Pecados Capitais",
+  "The Seven Deadly Sins": "Os Sete Pecados Capitais",
+  "Tensei shitara Slime Datta Ken": "Aquela Vez que Reencarnei como um Slime",
+  "That Time I Got Reincarnated as a Slime": "Aquela Vez que Reencarnei como um Slime",
+  "Kanojo, Okarishimasu": "Alugue uma Namorada",
+  "Rent-a-Girlfriend": "Alugue uma Namorada",
+  "Tate no Yuusha no Nariagari": "A Ascensão do Herói do Escudo",
+  "The Rising of the Shield Hero": "A Ascensão do Herói do Escudo",
+  "Enen no Shouboutai": "Fire Force",
+  "Fire Force": "Fire Force",
+  "Yakusoku no Neverland": "O Prometido Neverland",
+  "The Promised Neverland": "O Prometido Neverland",
+  "Kiseijuu: Sei no Kakuritsu": "Parasyte",
+  "Parasyte -the maxim-": "Parasyte",
+  "Kaguya-sama wa Kokurasetai: Tensai-tachi no Renai Zunousen": "Kaguya-sama: Love Is War",
+  "Kaguya-sama: Love is War": "Kaguya-sama: Love Is War",
+  "Sousou no Frieren": "Frieren e a Jornada para o Além",
+  "Frieren: Beyond Journey's End": "Frieren e a Jornada para o Além",
+  "Kusuriya no Hitorigoto": "Diários de uma Apotecária",
+  "The Apothecary Diaries": "Diários de uma Apotecária",
+  "Jujutsu Kaisen": "Jujutsu Kaisen: Batalha de Feiticeiros",
+  "Death Note": "Death Note: Caderno da Morte",
+  "Hunter x Hunter": "Hunter x Hunter: Caçador vs Caçador",
+  "Fullmetal Alchemist: Brotherhood": "Fullmetal Alchemist: O Alquimista de Aço",
+  "Haikyuu!!": "Haikyu!! Os Ases do Vôlei",
+  "Chainsaw Man": "Homem Motosserra",
+  "Black Clover": "Trevo Negro",
+  "Tokyo Revengers": "Vingadores de Tóquio",
+  "Mushoku Tensei: Isekai Ittara Honki Dasu": "Mushoku Tensei: Reencarnação no Outro Mundo",
+  "Dr. STONE": "Dr. Stone",
+  "Vinland Saga": "Saga de Vinland",
+  "Solo Leveling": "Solo Leveling: Subindo de Nível Sozinho",
+  "Ore dake Level Up na Ken": "Solo Leveling: Subindo de Nível Sozinho",
+  "Kaiju No. 8": "Kaiju Número 8",
+  "SPY x FAMILY": "Spy x Family: Família de Espiões",
+  "Bleach": "Bleach: Sociedade das Almas",
+  "Naruto": "Naruto",
+  "Naruto: Shippuuden": "Naruto Shippuden",
+  "One Piece": "One Piece",
+  "Dragon Ball Z": "Dragon Ball Z",
+  "JoJo no Kimyou na Bouken": "As Aventuras Bizarras de JoJo",
+  "JoJo's Bizarre Adventure": "As Aventuras Bizarras de JoJo",
+};
+
 function normalizeAnime(record: any): ParquetAnime {
   let images = record.images || {};
   if (typeof record.images_json === "string") {
@@ -65,14 +118,17 @@ function normalizeAnime(record: any): ParquetAnime {
   }
 
   const mal_id = Number(record.mal_id || record.id || Math.floor(Math.random() * 100000));
+  const rawTitle = String(record.title || "");
+  const rawEng = record.title_english ? String(record.title_english) : undefined;
+  const mappedPt = PORTUGUESE_TITLE_MAP[rawTitle] || (rawEng ? PORTUGUESE_TITLE_MAP[rawEng] : undefined);
 
   return {
     id: mal_id,
     mal_id,
-    title: String(record.title || ""),
-    title_english: record.title_english ? String(record.title_english) : undefined,
+    title: rawTitle,
+    title_english: rawEng,
     title_japanese: record.title_japanese ? String(record.title_japanese) : undefined,
-    title_portuguese: record.title_portuguese ? String(record.title_portuguese) : undefined,
+    title_portuguese: record.title_portuguese ? String(record.title_portuguese) : mappedPt,
     title_spanish: record.title_spanish ? String(record.title_spanish) : undefined,
     title_french: record.title_french ? String(record.title_french) : undefined,
     title_german: record.title_german ? String(record.title_german) : undefined,

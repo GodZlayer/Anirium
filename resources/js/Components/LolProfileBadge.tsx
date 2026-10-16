@@ -79,7 +79,7 @@ export function LolProfileBadge({
             className="text-xs font-black tracking-wide"
             style={{ color: tokens.colors.textPrimary }}
           >
-            Entrar com Google
+            {strings.actions.loginWithGoogle}
           </span>
 
           <span
@@ -181,7 +181,7 @@ export function LolProfileBadge({
         onClick={() => router.post("/logout")}
         className="p-1 rounded-full opacity-60 hover:opacity-100 hover:scale-110 transition-all cursor-pointer"
         style={{ color: tokens.colors.textMuted }}
-        title="Sair da Conta"
+        title={strings.actions.logout}
       >
         <LogOut className="w-3.5 h-3.5" />
       </button>

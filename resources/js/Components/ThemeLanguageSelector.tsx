@@ -82,7 +82,7 @@ export function ThemeLanguageSelector() {
                     setIsLangOpen(false);
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
-                    isSelected ? "shadow-sm" : "hover:bg-white/5"
+                    isSelected ? "shadow-sm" : "hover:opacity-80"
                   }`}
                   style={{
                     backgroundColor: isSelected ? `${tokens.colors.accentGold}25` : "transparent",
@@ -148,7 +148,7 @@ export function ThemeLanguageSelector() {
                     setIsThemeOpen(false);
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
-                    isSelected ? "shadow-sm" : "hover:bg-white/5"
+                    isSelected ? "shadow-sm" : "hover:opacity-80"
                   }`}
                   style={{
                     backgroundColor: isSelected ? `${pal.colors.accentGold}25` : "transparent",
