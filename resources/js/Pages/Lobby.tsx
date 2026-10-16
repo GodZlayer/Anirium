@@ -163,8 +163,19 @@ export default function LobbyPage({ auth }: LobbyProps) {
         setSelectedAnime(catalog[0]);
       }
     });
+
+    const handleCatalogExpanded = (e: any) => {
+      if (!mounted) return;
+      if (e.detail && Array.isArray(e.detail)) {
+        setUniversalCatalog(e.detail);
+      }
+    };
+
+    window.addEventListener("anirium_catalog_expanded", handleCatalogExpanded);
+
     return () => {
       mounted = false;
+      window.removeEventListener("anirium_catalog_expanded", handleCatalogExpanded);
     };
   }, []);
 
@@ -321,7 +332,7 @@ export default function LobbyPage({ auth }: LobbyProps) {
             />
             <ModularHubTrack
               title={searchQuery ? `${strings.navigation.searchResults} (${filterCatalog(universalCatalog, "popular", searchQuery).length})` : strings.labels.highlightTitle}
-              animes={filterCatalog(universalCatalog, "popular", searchQuery).slice(0, 24)}
+              animes={filterCatalog(universalCatalog, "popular", searchQuery)}
               activeAnimeId={selectedAnime?.id}
               onSelectAnime={(a) => setSelectedAnime(a)}
               onPlayAnime={handlePlayAnime}
@@ -349,7 +360,7 @@ export default function LobbyPage({ auth }: LobbyProps) {
             </div>
             <ModularHubTrack
               title={strings.labels.releasing}
-              animes={filterCatalog(universalCatalog, "releasing", searchQuery).slice(0, 24)}
+              animes={filterCatalog(universalCatalog, "releasing", searchQuery)}
               activeAnimeId={selectedAnime?.id}
               onSelectAnime={(a) => setSelectedAnime(a)}
               onPlayAnime={handlePlayAnime}
@@ -380,7 +391,7 @@ export default function LobbyPage({ auth }: LobbyProps) {
             </div>
             <ModularHubTrack
               title={strings.labels.calendarTrackTitle}
-              animes={filterCatalog(universalCatalog, "calendar", searchQuery).slice(0, 24)}
+              animes={filterCatalog(universalCatalog, "calendar", searchQuery)}
               activeAnimeId={selectedAnime?.id}
               onSelectAnime={(a) => setSelectedAnime(a)}
               onPlayAnime={handlePlayAnime}

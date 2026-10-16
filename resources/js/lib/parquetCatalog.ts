@@ -196,8 +196,8 @@ export async function getUniversalCatalog(): Promise<ParquetAnime[]> {
   }
 
   catalogLoadingPromise = (async () => {
-    // Carrega as fatias da base em paralelo e funde pelo mal_id
-    const slices = await Promise.all([
+    // 1. Carrega as fatias prioritárias imediatas (Popular, Seasonal, Upcoming)
+    const prioritySlices = await Promise.all([
       loadSliceData("catalog-popular"),
       loadSliceData("catalog-seasonal"),
       loadSliceData("catalog-upcoming"),
@@ -205,20 +205,36 @@ export async function getUniversalCatalog(): Promise<ParquetAnime[]> {
 
     const animeMap = new Map<number, ParquetAnime>();
 
-    for (const slice of slices) {
+    for (const slice of prioritySlices) {
       for (const item of slice) {
         if (!animeMap.has(item.mal_id)) {
           animeMap.set(item.mal_id, item);
         } else {
-          // Atualiza dados caso a fatia mais recente tenha campos adicionais
           animeMap.set(item.mal_id, { ...animeMap.get(item.mal_id)!, ...item });
         }
       }
     }
 
-    const merged = Array.from(animeMap.values());
-    universalCatalogCache = merged;
-    return merged;
+    // Define cache inicial imediato para renderizar em milissegundos
+    universalCatalogCache = Array.from(animeMap.values());
+
+    // 2. Carrega em background o Arquivo Completo com as 30.000+ obras
+    loadSliceData("catalog-diff").then((fullArchive) => {
+      if (fullArchive && fullArchive.length > 0) {
+        for (const item of fullArchive) {
+          if (!animeMap.has(item.mal_id)) {
+            animeMap.set(item.mal_id, item);
+          }
+        }
+        universalCatalogCache = Array.from(animeMap.values());
+        // Dispara evento reativo para que todas as telas atualizem para as 30.000+ obras
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("anirium_catalog_expanded", { detail: universalCatalogCache }));
+        }
+      }
+    });
+
+    return universalCatalogCache;
   })();
 
   return catalogLoadingPromise;
