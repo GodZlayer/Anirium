@@ -218,14 +218,32 @@ export async function getUniversalCatalog(): Promise<ParquetAnime[]> {
     // Define cache inicial imediato para renderizar em milissegundos
     universalCatalogCache = Array.from(animeMap.values());
 
-    // 2. Carrega em background o Arquivo Completo com as 30.000+ obras
-    loadSliceData("catalog-diff").then((fullArchive) => {
+    // 2. Carrega em background o Arquivo Completo com as 30.000+ obras e os Mangás
+    Promise.all([
+      loadSliceData("catalog-diff"),
+      loadSliceData("catalog-manga"),
+    ]).then(([fullArchive, mangaArchive]) => {
+      let updated = false;
+
       if (fullArchive && fullArchive.length > 0) {
         for (const item of fullArchive) {
           if (!animeMap.has(item.mal_id)) {
             animeMap.set(item.mal_id, item);
+            updated = true;
           }
         }
+      }
+
+      if (mangaArchive && mangaArchive.length > 0) {
+        for (const item of mangaArchive) {
+          if (!animeMap.has(item.mal_id)) {
+            animeMap.set(item.mal_id, item);
+            updated = true;
+          }
+        }
+      }
+
+      if (updated) {
         universalCatalogCache = Array.from(animeMap.values());
         // Dispara evento reativo para que todas as telas atualizem para as 30.000+ obras
         if (typeof window !== "undefined") {
