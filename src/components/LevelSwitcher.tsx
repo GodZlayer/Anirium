@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { redirectGoogleLogin } from "@/lib/googleLoginClient";
-import { ExperienceLevel } from "@/lib/userProfiles";
+import { ExperienceLevel } from "@/lib/userProfileTypes";
 
 interface LevelOption {
   level: ExperienceLevel;
@@ -119,14 +119,18 @@ export default function LevelSwitcher({ isOpen, onClose }: { isOpen: boolean; on
   const Icon = option.icon;
   const featurePages = Math.ceil(option.features.length / 2);
   const isCurrent = level === selectedLevel;
-  const restricted = selectedLevel === 3 && level < 3 ? "Restrito Admin" : selectedLevel === 2 && level < 2 ? "Requer Anirium+" : "";
   const busy = activating || isLoading;
   const activate = async () => {
-    if (activationPending.current || busy || restricted || isCurrent) return;
+    if (activationPending.current || busy || isCurrent) return;
     activationPending.current = true; setActivating(true); setActionError(false);
-    try { if (await switchLevel(selectedLevel)) onClose(); else setActionError(true); }
-    catch { setActionError(true); }
-    finally { activationPending.current = false; setActivating(false); }
+    try {
+      await switchLevel(selectedLevel);
+      onClose();
+    } catch {
+      setActionError(true);
+    } finally {
+      activationPending.current = false; setActivating(false);
+    }
   };
   return (
     <ModalDialog label="Níveis do Anirium" onClose={onClose} onClick={onClose}
@@ -152,7 +156,7 @@ export default function LevelSwitcher({ isOpen, onClose }: { isOpen: boolean; on
             {option.disabledNotice && <p className="text-xs text-zinc-400">{option.disabledNotice}</p>}
             {actionError && <p role="alert" className="text-sm text-rose-400">Não foi possível alterar o nível. Tente novamente.</p>}
             <div className="mt-auto flex flex-wrap gap-2 items-center">
-              {isCurrent ? <span className="text-sm text-emerald-400">Modo atual</span> : restricted ? <span className="text-sm text-[#FFC766]">{restricted}</span> :
+              {isCurrent ? <span className="text-sm text-emerald-400">Modo atual</span> :
                 <button type="button" disabled={busy} onClick={activate} className="px-4 py-2 rounded-xl border border-[#FFC766] text-sm text-[#FFC766] disabled:opacity-50">{activating ? "Ativando…" : "Ativar este nível"}</button>}
             </div>
           </>}

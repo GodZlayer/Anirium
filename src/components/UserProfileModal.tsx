@@ -34,7 +34,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
-import { ExperienceLevel } from "@/lib/userProfiles";
+import { ExperienceLevel } from "@/lib/userProfileTypes";
 import LevelSwitcher from "./LevelSwitcher";
 import { resolveApiUrl, aniriumFetch } from "@/lib/apiConfig";
 
@@ -430,16 +430,14 @@ export default function UserProfileModal({
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
-            {level === 3 && (
-              <button
-                onClick={() => setShowLevelModal(true)}
-                className="px-3.5 py-1.5 rounded-full bg-[#1A1A1F] hover:bg-[#23232A] border border-[#FFC766]/40 text-[#FFC766] text-xs font-semibold flex items-center gap-1.5 shadow transition"
-                title="Matriz de Níveis"
-              >
-                <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>Níveis</span>
-              </button>
-            )}
+            <button
+              onClick={() => setShowLevelModal(true)}
+              className="px-3.5 py-1.5 rounded-full bg-[#1A1A1F] hover:bg-[#23232A] border border-[#FFC766]/40 text-[#FFC766] text-xs font-semibold flex items-center gap-1.5 shadow transition"
+              title="Matriz de Níveis"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>Níveis</span>
+            </button>
 
             {user && (
               <button

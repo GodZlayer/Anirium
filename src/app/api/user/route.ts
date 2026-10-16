@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
     // Suspenso ou sem Anirium+: Desativa addons oficiais do usuário e limpa do runtime
     if (activeUser.level_tier < 2) {
       const nonOfficialAddons = (activeUser.enabledAddons || []).filter(
-        (id) => id !== "player-pro" && !id.startsWith("official-")
+        (id: string) => id !== "player-pro" && !id.startsWith("official-")
       );
       addonRegistry.syncUserAddons(nonOfficialAddons);
     } else if (activeUser.enabledAddons) {

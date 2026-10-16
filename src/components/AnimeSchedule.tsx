@@ -17,13 +17,15 @@ const DAYS_OF_WEEK = [
   { key: "week", label: "Esta Semana" },
 ];
 
+import { aniriumFetch } from "@/lib/apiConfig";
+
 export default function AnimeSchedule({ onSelectAnime, onPlayAnime }: AnimeScheduleProps) {
   const [schedule, setSchedule] = useState<AiringSchedule[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>("today");
 
   useEffect(() => {
-    fetch("/api/schedule")
+    aniriumFetch("/api/schedule")
       .then((res) => res.json())
       .then((data) => {
         if (data.schedule) {

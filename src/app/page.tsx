@@ -7,6 +7,8 @@ import ContinueWatchingRow from "@/components/ContinueWatchingRow";
 import GamificationHUD from "@/components/GamificationHUD";
 import CatalogDock from "@/components/CatalogDock";
 import ModularVitrine from "@/components/ModularVitrine";
+import AnimeSchedule from "@/components/AnimeSchedule";
+import ScheduleFranchisePanel from "@/components/ScheduleFranchisePanel";
 import AnimeModal from "@/components/AnimeModal";
 import FranchiseModal from "@/components/FranchiseModal";
 import PluginPlayerHost from "@/components/PluginPlayerHost";
@@ -15,18 +17,25 @@ import { Anime, AiringSchedule } from "@/types/anime";
 import { useUser } from "@/context/UserContext";
 import { getModularCatalogFromParquet } from "@/lib/parquetCatalog";
 import { aniriumFetch } from "@/lib/apiConfig";
+import { buildFranchisesFromCatalog, FranchiseGroup } from "@/lib/franchiseUtils";
+import { Sparkles, Compass, Calendar as CalendarIcon, Network, Flame, Layers, ChevronRight, Star } from "lucide-react";
 
 /**
  * Lobby Master Dashboard (TGCode Standard)
  * Arquitetura Ultra-Leve e Anti-Monólito:
- * Orquestrador limpo de ~120 linhas que apenas coordena os micro-módulos puros.
+ * - O scroll e os cliques chaveiam estados determinísticos do Mundo.
+ * - Suporta as 4 abas mestres: "inicio", "explorar", "calendario", "franquias".
+ * - Integração completa com o Core, Login Google / Níveis, Player e Modais.
  */
 export default function LobbyDashboard() {
   const { user, level } = useUser();
 
+  // Navegação Global de Mundos
+  const [navTab, setNavTab] = useState<string>("inicio");
+
   // Estados dos Modais
   const [selectedAnime, setSelectedAnime] = useState<Anime | null>(null);
-  const [selectedFranchiseRoot, setSelectedFranchiseRoot] = useState<string | null>(null);
+  const [selectedFranchiseGroup, setSelectedFranchiseGroup] = useState<FranchiseGroup | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [playerTarget, setPlayerTarget] = useState<{ anime: Anime; episodeNum: number; seasonIdx: number } | null>(null);
 
@@ -94,9 +103,23 @@ export default function LobbyDashboard() {
     return list;
   }, [activeTab, selectedFormat, selectedGenre, isSearching, searchResults, popular, seasonal, upcoming]);
 
+  // Universo de Franquias Agregadas a partir do catálogo carregado
+  const allFranchises = useMemo(() => {
+    const combined = [...popular, ...seasonal];
+    return buildFranchisesFromCatalog(combined);
+  }, [popular, seasonal]);
+
   return (
     <div className="min-h-screen bg-[var(--color-bg-base,#0B0B0D)] text-[var(--color-text-primary,#FFF9F0)] pb-16">
       <Navbar
+        activeTab={navTab}
+        onTabChange={(tab) => {
+          setNavTab(tab);
+          if (isSearching) {
+            setIsSearching(false);
+            setSearchResults([]);
+          }
+        }}
         onSearch={handleSearch}
         isSearching={isSearching}
         onClearSearch={() => { setIsSearching(false); setSearchResults([]); }}
@@ -104,53 +127,191 @@ export default function LobbyDashboard() {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 space-y-6">
-        {/* 1. Hero Showcase */}
-        {!isSearching && popular.length > 0 && (
-          <HeroBanner
-            anime={popular[0]}
-            onPlay={(anime) => setPlayerTarget({ anime, episodeNum: 1, seasonIdx: 0 })}
-            onMoreInfo={setSelectedAnime}
-            userLevel={level}
-          />
+        {/* ==================== MUNDO 1: BUSCA ATIVA ==================== */}
+        {isSearching && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between border-b border-[#3A3A43]/60 pb-3">
+              <h2 className="text-sm font-mono uppercase tracking-wider text-[#FFC766] flex items-center gap-2">
+                <span>Resultados da Busca</span>
+                <span className="text-xs text-[#EADCC8]/60 font-sans">({searchResults.length} obras encontradas)</span>
+              </h2>
+            </div>
+            <ModularVitrine
+              items={searchResults}
+              onSelect={setSelectedAnime}
+              onPlay={(anime) => setPlayerTarget({ anime, episodeNum: 1, seasonIdx: 0 })}
+            />
+          </div>
         )}
 
-        {/* 2. HUD de Gamificação & Nível da Conta */}
-        <div className="flex items-center justify-between">
-          <GamificationHUD level={level} userCompletedQuests={["quest_canon_scout"]} />
-        </div>
+        {/* ==================== MUNDO 2: INÍCIO (DASHBOARD LOBBY) ==================== */}
+        {!isSearching && navTab === "inicio" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* 1. Hero Showcase */}
+            {popular.length > 0 && (
+              <HeroBanner
+                anime={popular[0]}
+                onPlay={(anime) => setPlayerTarget({ anime, episodeNum: 1, seasonIdx: 0 })}
+                onMoreInfo={setSelectedAnime}
+                userLevel={level}
+              />
+            )}
 
-        {/* 3. Retomada Rápida de Histórico */}
-        <ContinueWatchingRow
-          onPlayResume={(animeId, seasonIdx, epNum) => {
-            const anime = popular.find((a) => a.mal_id === animeId);
-            if (anime) setPlayerTarget({ anime, episodeNum: epNum, seasonIdx });
-          }}
-          onOpenAnime={(animeId) => {
-            const anime = popular.find((a) => a.mal_id === animeId);
-            if (anime) setSelectedAnime(anime);
-          }}
-        />
+            {/* 2. HUD de Gamificação & Nível da Conta */}
+            <div className="flex items-center justify-between">
+              <GamificationHUD level={level} userCompletedQuests={["quest_canon_scout"]} />
+            </div>
 
-        {/* 4. Dock de Filtros & Seleção de Fatias */}
-        <CatalogDock
-          activeTab={activeTab}
-          onTabChange={(tab) => {
-            if (tab === "franchises") setSelectedFranchiseRoot("One Piece");
-            else setActiveTab(tab);
-          }}
-          selectedFormat={selectedFormat}
-          onSelectFormat={setSelectedFormat}
-          selectedGenre={selectedGenre}
-          onSelectGenre={setSelectedGenre}
-          totalCount={currentCollection.length}
-        />
+            {/* 3. Retomada Rápida de Histórico */}
+            <ContinueWatchingRow
+              onPlayResume={(animeId, seasonIdx, epNum) => {
+                const anime = popular.find((a) => a.mal_id === animeId);
+                if (anime) setPlayerTarget({ anime, episodeNum: epNum, seasonIdx });
+              }}
+              onOpenAnime={(animeId) => {
+                const anime = popular.find((a) => a.mal_id === animeId);
+                if (anime) setSelectedAnime(anime);
+              }}
+            />
 
-        {/* 5. Vitrine Modular Universal */}
-        <ModularVitrine
-          items={currentCollection}
-          onSelect={setSelectedAnime}
-          onPlay={(anime) => setPlayerTarget({ anime, episodeNum: 1, seasonIdx: 0 })}
-        />
+            {/* 4. Dock de Filtros & Seleção de Fatias */}
+            <CatalogDock
+              activeTab={activeTab}
+              onTabChange={(tab) => {
+                if (tab === "franchises") setNavTab("franquias");
+                else setActiveTab(tab);
+              }}
+              selectedFormat={selectedFormat}
+              onSelectFormat={setSelectedFormat}
+              selectedGenre={selectedGenre}
+              onSelectGenre={setSelectedGenre}
+              totalCount={currentCollection.length}
+            />
+
+            {/* 5. Vitrine Modular Universal */}
+            <ModularVitrine
+              items={currentCollection}
+              onSelect={setSelectedAnime}
+              onPlay={(anime) => setPlayerTarget({ anime, episodeNum: 1, seasonIdx: 0 })}
+            />
+          </div>
+        )}
+
+        {/* ==================== MUNDO 3: EXPLORAR CATÁLOGO ==================== */}
+        {!isSearching && navTab === "explorar" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between border-b border-[#3A3A43]/60 pb-3">
+              <div className="flex items-center gap-2">
+                <Compass className="w-5 h-5 text-[#FFC766]" />
+                <h1 className="font-serif text-xl sm:text-2xl font-bold text-[#FFF9F0]">
+                  Explorar Catálogo Canônico
+                </h1>
+              </div>
+              <span className="text-xs font-mono text-[#EADCC8]/60">
+                Fatias locais Parquet • Latência zero
+              </span>
+            </div>
+
+            <CatalogDock
+              activeTab={activeTab}
+              onTabChange={(tab) => {
+                if (tab === "franchises") setNavTab("franquias");
+                else setActiveTab(tab);
+              }}
+              selectedFormat={selectedFormat}
+              onSelectFormat={setSelectedFormat}
+              selectedGenre={selectedGenre}
+              onSelectGenre={setSelectedGenre}
+              totalCount={currentCollection.length}
+            />
+
+            <ModularVitrine
+              items={currentCollection}
+              onSelect={setSelectedAnime}
+              onPlay={(anime) => setPlayerTarget({ anime, episodeNum: 1, seasonIdx: 0 })}
+            />
+          </div>
+        )}
+
+        {/* ==================== MUNDO 4: CALENDÁRIO ==================== */}
+        {!isSearching && navTab === "calendario" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <ScheduleFranchisePanel
+              onSelectAnime={setSelectedAnime}
+              onPlayAnime={(anime) => setPlayerTarget({ anime, episodeNum: 1, seasonIdx: 0 })}
+            />
+            <AnimeSchedule
+              onSelectAnime={setSelectedAnime}
+              onPlayAnime={(anime) => setPlayerTarget({ anime, episodeNum: 1, seasonIdx: 0 })}
+            />
+          </div>
+        )}
+
+        {/* ==================== MUNDO 5: GENEALOGIA DE FRANQUIAS ==================== */}
+        {!isSearching && navTab === "franquias" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#3A3A43]/60 pb-3">
+              <div className="flex items-center gap-2">
+                <Network className="w-5 h-5 text-[#FFC766]" />
+                <div>
+                  <h1 className="font-serif text-xl sm:text-2xl font-bold text-[#FFF9F0]">
+                    Genealogia de Franquias Canônicas
+                  </h1>
+                  <p className="text-xs text-[#EADCC8]/60 mt-0.5">
+                    Universos consolidados em ordem cronológica de lançamento.
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#1A1A1F] border border-[#3A3A43] text-[#FFC766]">
+                {allFranchises.length} universos estruturados
+              </span>
+            </div>
+
+            {/* Grid de Franquias */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {allFranchises.map((franchise) => {
+                const rep = franchise.representativeAnime;
+                const cover = rep.images?.webp?.large_image_url || rep.images?.jpg?.large_image_url || "/assets/logos/Anirium-favicon.png";
+                return (
+                  <div
+                    key={franchise.id}
+                    onClick={() => setSelectedFranchiseGroup(franchise)}
+                    className="p-4 rounded-2xl bg-[#141418] border border-[#3A3A43] hover:border-[#FFC766] transition-all cursor-pointer group flex items-center gap-4 shadow-md hover:shadow-xl hover:shadow-[#FFC766]/5"
+                  >
+                    <div className="w-16 h-20 rounded-xl overflow-hidden bg-[#0B0B0D] flex-none border border-[#3A3A43]/60">
+                      <img
+                        src={cover}
+                        alt={franchise.rootTitle}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-[#FFC766]/15 text-[#FFC766] border border-[#FFC766]/30">
+                          {franchise.yearsRange}
+                        </span>
+                        {franchise.averageScore > 0 && (
+                          <span className="flex items-center gap-0.5 text-[10px] font-bold text-[#FFC766] font-mono">
+                            <Star className="w-3 h-3 fill-[#FFC766]" />
+                            <span>{franchise.averageScore}</span>
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-serif text-sm font-bold text-[#FFF9F0] truncate group-hover:text-[#FFC766] transition-colors">
+                        {franchise.rootTitle}
+                      </h3>
+                      <p className="text-[11px] text-[#EADCC8]/60 font-mono">
+                        {franchise.worksCount} {franchise.worksCount === 1 ? "produção conectada" : "produções conectadas"}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-[#3A3A43] group-hover:text-[#FFC766] group-hover:translate-x-0.5 transition-all flex-none" />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Modais de Contexto On-Demand */}
@@ -160,28 +321,22 @@ export default function LobbyDashboard() {
           onClose={() => setSelectedAnime(null)}
           onPlayEpisode={(anime, episodeNum, seasonIdx) => setPlayerTarget({ anime, episodeNum, seasonIdx })}
           onResumeEpisode={() => true}
-          onOpenFranchise={(root) => { setSelectedAnime(null); setSelectedFranchiseRoot(root); }}
+          onOpenFranchise={(root) => {
+            setSelectedAnime(null);
+            const found = allFranchises.find((f) => f.rootTitle.toLowerCase() === root.toLowerCase() || f.id.toLowerCase() === root.toLowerCase());
+            if (found) {
+              setSelectedFranchiseGroup(found);
+            } else if (popular.length > 0) {
+              setNavTab("franquias");
+            }
+          }}
         />
       )}
 
-      {selectedFranchiseRoot && popular.length > 0 && (
+      {selectedFranchiseGroup && (
         <FranchiseModal
-          franchise={{
-            id: selectedFranchiseRoot.toLowerCase().replace(/\s+/g, "-"),
-            rootTitle: selectedFranchiseRoot,
-            representativeAnime: popular[0],
-            worksCount: 15,
-            seasonsCount: 5,
-            averageScore: 8.7,
-            maxScore: 9.1,
-            scoreCount: 12,
-            genres: [{ mal_id: 1, name: "Ação" }, { mal_id: 2, name: "Aventura" }],
-            tags: [],
-            formats: ["TV", "MOVIE"],
-            yearsRange: "1999+",
-            memberAnimes: popular.filter((a) => a.title.toLowerCase().includes(selectedFranchiseRoot.toLowerCase())),
-          }}
-          onClose={() => setSelectedFranchiseRoot(null)}
+          franchise={selectedFranchiseGroup}
+          onClose={() => setSelectedFranchiseGroup(null)}
           onSelectAnime={(anime) => setSelectedAnime(anime)}
           onPlayEpisode={(anime, episodeNum, seasonIdx) => setPlayerTarget({ anime, episodeNum, seasonIdx })}
         />

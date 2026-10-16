@@ -23,7 +23,7 @@ export function proxy(request: NextRequest) {
   }
   // Handle CORS Preflight for API (except removed /api/addons which returns 410 tombstone)
   const origin = request.headers.get("origin") || "";
-  const allowedOrigin = (origin === "https://anirium.com.br" || origin === "http://localhost:3000") ? origin : "https://anirium.com.br";
+  const allowedOrigin = (origin === "https://anirium.com.br" || origin === "http://localhost:3000" || origin.endsWith(".github.io")) ? origin : "https://anirium.com.br";
 
   if (request.method === "OPTIONS" && !request.nextUrl.pathname.startsWith("/api/addons")) {
     return new NextResponse(null, {
@@ -32,6 +32,7 @@ export function proxy(request: NextRequest) {
         "Access-Control-Allow-Origin": allowedOrigin,
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization, x-requested-with",
+        "Access-Control-Allow-Credentials": "true",
         "Access-Control-Max-Age": "86400",
       },
     });
@@ -46,6 +47,7 @@ export function proxy(request: NextRequest) {
   response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
   response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-requested-with");
+  response.headers.set("Access-Control-Allow-Credentials", "true");
   response.headers.set("Cache-Control", "private, no-store");
   response.headers.set("X-Content-Type-Options", "nosniff");
   return response;

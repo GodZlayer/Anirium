@@ -10,15 +10,16 @@ export function checkApiRequest(request: Request, production: boolean,
     return { status: 413, reason: "request_body_too_large" };
   }
   if (!mutationMethods.has(request.method)) return null;
-  if (request.headers.get("sec-fetch-site") === "cross-site") {
-    return { status: 403, reason: "cross_site_request" };
-  }
   const origin = request.headers.get("origin");
   if (origin) {
     let expected: string;
     try { expected = new URL(production ? publicOrigin : request.url).origin; }
     catch { return { status: 503, reason: "invalid_public_origin" }; }
-    if (origin !== expected) return { status: 403, reason: "untrusted_origin" };
+    if (origin !== expected && !origin.endsWith(".github.io") && origin !== "http://localhost:3000") {
+      return { status: 403, reason: "untrusted_origin" };
+    }
+  } else if (request.headers.get("sec-fetch-site") === "cross-site") {
+    return { status: 403, reason: "cross_site_request" };
   }
   // JSON cannot be submitted through a cross-origin HTML form. Requests without
   // Origin remain usable by native clients, with normal route authorization.

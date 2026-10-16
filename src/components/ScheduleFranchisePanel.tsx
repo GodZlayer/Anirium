@@ -47,12 +47,14 @@ const POPULAR_FRANCHISES = [
   },
 ];
 
+import { aniriumFetch } from "@/lib/apiConfig";
+
 export default function ScheduleFranchisePanel({ onSelectAnime, onPlayAnime }: ScheduleFranchisePanelProps) {
   const [schedule, setSchedule] = useState<AiringSchedule[]>([]);
   const [activeTab, setActiveTab] = useState<"today" | "tomorrow" | "after" | "week">("today");
 
   useEffect(() => {
-    fetch("/api/schedule")
+    aniriumFetch("/api/schedule")
       .then((res) => res.json())
       .then((data) => {
         if (data.schedule) setSchedule(data.schedule);

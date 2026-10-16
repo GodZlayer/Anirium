@@ -31,26 +31,28 @@ export function getWebSession(request: NextRequest) {
 }
 
 export function attachWebSessionCookie(response: NextResponse, cookieValue: string, request: NextRequest) {
+  const isSecure = process.env.NODE_ENV === "production" || request.nextUrl.protocol === "https:";
   response.cookies.set(WEB_SESSION_COOKIE, cookieValue, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production" || request.nextUrl.protocol === "https:",
-    sameSite: "lax",
+    secure: isSecure,
+    sameSite: isSecure ? "none" : "lax",
     path: "/",
     maxAge: WEB_SESSION_MAX_AGE_SECONDS,
   });
   // The legacy bearer was readable by scripts. Never upgrade it into a trusted
   // session; require normal login again and remove the old browser cookie.
   response.cookies.set("anirium_session", "", { httpOnly: true,
-    secure: process.env.NODE_ENV === "production" || request.nextUrl.protocol === "https:",
-    sameSite: "lax", path: "/", maxAge: 0 });
+    secure: isSecure,
+    sameSite: isSecure ? "none" : "lax", path: "/", maxAge: 0 });
   response.headers.set("Cache-Control", "private, no-store");
   return response;
 }
 
 export function clearWebSessionCookie(response: NextResponse, request: NextRequest) {
+  const isSecure = process.env.NODE_ENV === "production" || request.nextUrl.protocol === "https:";
   attachWebSessionCookie(response, "", request);
   response.cookies.set(WEB_SESSION_COOKIE, "", { httpOnly: true,
-    secure: process.env.NODE_ENV === "production" || request.nextUrl.protocol === "https:",
-    sameSite: "lax", path: "/", maxAge: 0 });
+    secure: isSecure,
+    sameSite: isSecure ? "none" : "lax", path: "/", maxAge: 0 });
   return response;
 }

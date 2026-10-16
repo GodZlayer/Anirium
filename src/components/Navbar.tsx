@@ -200,9 +200,17 @@ export default function Navbar({
         {/* Usuário Deslogado vs Logado */}
         {!user ? (
           <button
-            onClick={handleGoogleLogin}
+            onClick={() => {
+              if (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
+                handleGoogleLogin();
+              } else if (onOpenProfile) {
+                onOpenProfile();
+              } else {
+                setShowProfileModal(true);
+              }
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#FFC766]/50 bg-[#1A1A1F] hover:bg-[#FFC766]/10 text-[#FFC766] text-xs font-semibold shadow-sm transition active:scale-95"
-            title="Entrar com Conta Google"
+            title="Entrar ou Selecionar Nível"
           >
             <span className="font-bold text-[11px] w-4 h-4 rounded-full bg-[#FFC766] text-[#0B0B0D] flex items-center justify-center">
               G
