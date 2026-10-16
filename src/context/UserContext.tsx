@@ -117,6 +117,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
               const p = JSON.parse(cached);
               setUser(p);
               setLevel(p.level_tier || 0);
+              const localHistory = window.localStorage.getItem("anirium_local_history");
+              if (localHistory) try { setWatchHistory(JSON.parse(localHistory)); } catch {}
+              const localBookmarks = window.localStorage.getItem("anirium_local_bookmarks");
+              if (localBookmarks) try { setBookmarks(JSON.parse(localBookmarks)); } catch {}
               return true;
             } catch {}
           }
@@ -138,10 +142,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             const p = JSON.parse(cached);
             setUser(p);
             setLevel(p.level_tier || 0);
+            const localHistory = window.localStorage.getItem("anirium_local_history");
+            if (localHistory) try { setWatchHistory(JSON.parse(localHistory)); } catch {}
+            const localBookmarks = window.localStorage.getItem("anirium_local_bookmarks");
+            if (localBookmarks) try { setBookmarks(JSON.parse(localBookmarks)); } catch {}
             return true;
           } catch {}
         }
       }
+
       return false;
     } finally {
       if (sequence === userReadSequence.current && identity === userIdentityRef.current) setIsLoading(false);
@@ -239,6 +248,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     // Apenas persistir histórico se for nível 1, 2 ou 3 (Nível 0 é puramente anônimo/canônico)
     if (level === 0) return;
 
+    setWatchHistory((prev) => {
+      const filtered = prev.filter((item) => !(item.animeId === animeId && item.seasonIdx === seasonIdx && item.episodeNumber === episode));
+      const newItem: WatchHistoryItem = {
+        userId: user?.id || "local-user",
+        animeId,
+        seasonIdx,
+        episodeNumber: episode,
+        progressSeconds,
+        durationSeconds,
+        completed: durationSeconds > 0 && progressSeconds >= durationSeconds * 0.9,
+        resumeAvailable: true,
+        seasonEntityId,
+        updatedAt: Date.now(),
+      };
+      const updated = [newItem, ...filtered];
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("anirium_local_history", JSON.stringify(updated.slice(0, 20)));
+      }
+      return updated;
+    });
+
     try {
       await apiFetch("/api/user", {
         method: "POST",
@@ -254,9 +284,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }),
       });
     } catch (err) {
-      console.error("[UserContext] Erro ao salvar progresso:");
+      console.warn("[UserContext] API offline ao salvar progresso, mantido no cliente");
     }
   };
+
 
   const toggleEntityBookmark = async (
     entityType: "UNIVERSE" | "SERIES" | "SEASON" | "EPISODE",
@@ -266,6 +297,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     episodeNumber?: number,
     seasonEntityId?: string
   ): Promise<boolean> => {
+    let willBeBookmarked = false;
+    if (parentSeriesId) {
+      setBookmarks((prev) => {
+        const exists = prev.includes(parentSeriesId);
+        willBeBookmarked = !exists;
+        const next = exists ? prev.filter((id) => id !== parentSeriesId) : [...prev, parentSeriesId];
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("anirium_local_bookmarks", JSON.stringify(next));
+        }
+        return next;
+      });
+    }
+
     try {
       const res = await apiFetch("/api/user", {
         method: "POST",
@@ -284,15 +328,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (data.success) {
         setBookmarks(data.bookmarks || []);
         if (data.bookmarkItems) setBookmarkItems(data.bookmarkItems);
-        fetchUserData();
         return data.isBookmarked;
       }
-      return false;
+      return willBeBookmarked;
     } catch (err) {
-      console.error("[UserContext] Erro ao alterar favorito da entidade:");
-      return false;
+      console.warn("[UserContext] API offline ao alternar favorito, mantido no cliente");
+      return willBeBookmarked;
     }
   };
+
 
   const removeEntityBookmark = async (entityType: "UNIVERSE" | "ARC" | "SERIES" | "SEASON" | "EPISODE", entityId: string): Promise<boolean> => {
     const identity = userIdentityRef.current;

@@ -63,8 +63,7 @@ export default function AnimeModal({ anime, onClose, onPlayEpisode, onResumeEpis
 
   const isAniriumPlus = Boolean(user && level >= 2);
   const isBookmarked = anime ? (isAniriumPlus && bookmarks.includes(anime.mal_id)) : false;
-  // O switch no perfil do usuário determina se o botão do episódio abre o player ou redireciona
-  const isPlayerEnabledOnEpisodes = Boolean(isAniriumPlus && hasPlayerAddon && user?.settings?.usePlayerOnEpisodes);
+  const isPlayerEnabledOnEpisodes = Boolean(hasPlayerAddon || isAniriumPlus || level >= 1);
 
   // Ponto exato onde o usuário Anirium+ parou na obra
   const resumeEpisodeInfo = useMemo(() => recommendCanonicalResume(anime,watchHistory,progressMap), [anime,watchHistory,progressMap]);
