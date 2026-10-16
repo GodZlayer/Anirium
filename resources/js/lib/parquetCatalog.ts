@@ -259,7 +259,10 @@ export function filterCatalog(
 
     case "upcoming":
       return filtered.filter(
-        (a) => a.status === "UPCOMING" || a.status === "NOT_YET_AIRED"
+        (a) =>
+          a.status === "UPCOMING" ||
+          a.status === "NOT_YET_AIRED" ||
+          a.status === "NOT_YET_RELEASED"
       );
 
     case "calendar":
