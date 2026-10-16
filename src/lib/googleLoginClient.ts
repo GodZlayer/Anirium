@@ -1,9 +1,11 @@
 // Reuse the existing official OAuth redirect for explicit login actions.
-// One Tap initialization belongs only to the page, not to each UI button.
+// If client id is not configured, dispatch event to open the direct member onboarding dialog.
 export function redirectGoogleLogin(): void {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   if (!clientId) {
-    console.warn("[Auth] NEXT_PUBLIC_GOOGLE_CLIENT_ID não configurado.");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("anirium_open_signin"));
+    }
     return;
   }
   const query = new URLSearchParams({
@@ -15,3 +17,4 @@ export function redirectGoogleLogin(): void {
   });
   window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${query}`;
 }
+

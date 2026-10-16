@@ -1,92 +1,125 @@
 "use client";
 
 import React, { useState } from "react";
-import { Palette, Globe, Check } from "lucide-react";
+import { Palette, Check } from "lucide-react";
 import { useDesignTheme } from "@/context/ThemeContext";
+import { THEME_PALETTES, SupportedLanguage } from "@/lib/designStrings";
 import Tooltip from "./Tooltip";
 
 /**
  * Micro-componente puro (Casca Branca ~50 linhas)
  * Seletor de Tema e Idioma alojado exatamente à esquerda do perfil.
- * Chaveamento instantâneo em milissegundos sem recarregar a tela.
+ * Chaveamento instantâneo em milissegundos com 100% de persistência.
  */
 export default function ThemeLanguageSelector() {
-  const { currentThemeId, setThemeId, strings } = useDesignTheme();
+  const { currentThemeId, setThemeId, language, setLanguage, strings, tokens } = useDesignTheme();
   const [isOpen, setIsOpen] = useState(false);
-  const [language, setLanguage] = useState("pt-BR");
 
-  const themes = [
-    { id: "black", label: "Dark Clássico", color: "#FFC766" },
-    { id: "amoled", label: "AMOLED Puro", color: "#38BDF8" },
-    { id: "cyberpunk", label: "Cyberpunk", color: "#00FFCC" },
+  const themeList = Object.values(THEME_PALETTES).map((t) => ({
+    id: t.themeId,
+    label: t.name,
+    color: t.colors.borderHighlight,
+  }));
+
+  const languages: Array<{ code: SupportedLanguage; label: string }> = [
+    { code: "pt-BR", label: "Português" },
+    { code: "en-US", label: "English" },
+    { code: "ja-JP", label: "日本語" },
+    { code: "es-ES", label: "Español" },
+    { code: "fr-FR", label: "Français" },
+    { code: "de-DE", label: "Deutsch" },
   ];
 
   return (
     <div className="relative select-none">
-      <Tooltip text="Personalizar Tema e Idioma do Sistema" position="bottom">
+      <Tooltip text={`${strings.labels.themesLabel} & ${strings.labels.languagesLabel}`} position="bottom">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-[#1A1A1F]/80 hover:bg-[#23232A] border border-[#3A3A43] text-zinc-300 hover:text-white transition shadow-sm"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full transition shadow-sm border"
+          style={{
+            backgroundColor: "var(--color-bg-surface)",
+            borderColor: "var(--color-border-default)",
+            color: "var(--color-text-secondary)",
+          }}
           aria-label="Personalizar Tema e Idioma"
         >
-          <Palette className="w-3.5 h-3.5 text-[#FFC766]" />
-          <span className="text-[10px] font-mono font-bold uppercase">{language.toUpperCase()}</span>
+          <Palette className="w-3.5 h-3.5" style={{ color: "var(--color-accent-gold)" }} />
+          <span className="text-[10px] font-mono font-bold uppercase">{language}</span>
         </button>
       </Tooltip>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 top-11 z-50 w-48 bg-[#141418]/95 backdrop-blur-xl border border-[#3A3A43] rounded-2xl p-2.5 shadow-2xl space-y-2 animate-in fade-in zoom-in-95 duration-150">
+          <div
+            className="absolute right-0 top-11 z-50 w-56 rounded-2xl p-3 shadow-2xl space-y-3 animate-in fade-in zoom-in-95 duration-150 border"
+            style={{
+              backgroundColor: "var(--color-bg-surface)",
+              borderColor: "var(--color-border-default)",
+            }}
+          >
+            {/* Seção de Temas */}
             <div>
-              <p className="text-[10px] font-mono text-zinc-400 px-2 py-1 uppercase tracking-wider">Temas</p>
+              <p
+                className="text-[10px] font-mono px-1 py-1 uppercase tracking-wider font-bold"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                {strings.labels.themesLabel}
+              </p>
               <div className="space-y-1">
-                {themes.map((t) => (
+                {themeList.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => {
                       setThemeId(t.id);
                       setIsOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition ${
-                      currentThemeId === t.id ? "bg-[#23232A] text-white font-bold" : "text-zinc-300 hover:bg-[#1A1A1F]"
-                    }`}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition"
+                    style={{
+                      backgroundColor: currentThemeId === t.id ? "var(--color-bg-raised)" : "transparent",
+                      color: currentThemeId === t.id ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+                      fontWeight: currentThemeId === t.id ? "bold" : "normal",
+                    }}
                   >
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color }} />
                       <span>{t.label}</span>
                     </div>
-                    {currentThemeId === t.id && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                    {currentThemeId === t.id && (
+                      <Check className="w-3.5 h-3.5" style={{ color: "var(--color-accent-gold)" }} />
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-zinc-800">
-              <p className="text-[10px] font-mono text-zinc-400 px-2 py-1 uppercase tracking-wider">Idioma</p>
-              <div className="flex gap-1.5 px-1">
-                <button
-                  onClick={() => {
-                    setLanguage("pt-BR");
-                    setIsOpen(false);
-                  }}
-                  className={`flex-1 py-1 rounded-lg text-xs font-mono font-semibold transition ${
-                    language === "pt-BR" ? "bg-amber-400 text-black font-bold" : "bg-[#1A1A1F] text-zinc-300 hover:text-white"
-                  }`}
-                >
-                  pt-BR
-                </button>
-                <button
-                  onClick={() => {
-                    setLanguage("en-US");
-                    setIsOpen(false);
-                  }}
-                  className={`flex-1 py-1 rounded-lg text-xs font-mono font-semibold transition ${
-                    language === "en-US" ? "bg-amber-400 text-black font-bold" : "bg-[#1A1A1F] text-zinc-300 hover:text-white"
-                  }`}
-                >
-                  en-US
-                </button>
+            {/* Seção de 6 Idiomas */}
+            <div className="pt-2 border-t" style={{ borderColor: "var(--color-border-default)" }}>
+              <p
+                className="text-[10px] font-mono px-1 py-1 uppercase tracking-wider font-bold"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                {strings.labels.languagesLabel}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {languages.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => {
+                      setLanguage(l.code);
+                      setIsOpen(false);
+                    }}
+                    className="px-2 py-1.5 rounded-lg text-xs font-mono transition text-center"
+                    style={{
+                      backgroundColor:
+                        language === l.code ? "var(--color-accent-gold)" : "var(--color-bg-raised)",
+                      color: language === l.code ? "#000000" : "var(--color-text-secondary)",
+                      fontWeight: language === l.code ? "bold" : "normal",
+                    }}
+                  >
+                    {l.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -95,4 +128,3 @@ export default function ThemeLanguageSelector() {
     </div>
   );
 }
-

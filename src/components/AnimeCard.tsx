@@ -30,7 +30,7 @@ export default function AnimeCard({
   onPlay,
   userProgress,
 }: AnimeCardProps) {
-  const { strings } = useDesignTheme();
+  const { strings, getLocalizedTitle } = useDesignTheme();
 
   const seasonCover = anime.seasons?.[0]?.cover;
   const imageUrl =
@@ -40,14 +40,7 @@ export default function AnimeCard({
     seasonCover ||
     "/assets/logos/Anirium-Persona-LogoArtistica.png";
 
-  const displayTitle =
-    anime.title_portuguese ||
-    anime.title_english ||
-    anime.title ||
-    anime.synonyms?.[0] ||
-    anime.franchise_root ||
-    anime.seasons?.[0]?.title ||
-    "Obra Canônica";
+  const displayTitle = getLocalizedTitle(anime);
   const isAiring = anime.status?.toLowerCase().includes("airing") || anime.status?.toLowerCase().includes("releasing");
 
   return (

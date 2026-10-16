@@ -53,7 +53,13 @@ export default function TopCapsuleNav({
   ];
 
   return (
-    <header className="h-14 flex-none px-3 sm:px-6 flex items-center justify-between gap-3 bg-[#0B0B0D]/80 backdrop-blur-xl border-b border-zinc-800/60 z-40 select-none">
+    <header
+      className="h-14 flex-none px-3 sm:px-6 flex items-center justify-between gap-3 backdrop-blur-xl border-b z-40 select-none transition-colors duration-500"
+      style={{
+        backgroundColor: "var(--color-bg-base)",
+        borderColor: "var(--color-border-default)",
+      }}
+    >
       {/* Esquerda: Logo Oficial */}
       <div className="flex items-center flex-shrink-0">
         <Link href="/" className="flex items-center group">
@@ -66,7 +72,13 @@ export default function TopCapsuleNav({
       </div>
 
       {/* Centro: Cápsula Acrílica de Comando de Mundos */}
-      <nav className="flex items-center bg-[#1A1A1F]/80 backdrop-blur-md p-1 rounded-full border border-zinc-800 text-xs shadow-inner">
+      <nav
+        className="flex items-center backdrop-blur-md p-1 rounded-full border text-xs shadow-inner"
+        style={{
+          backgroundColor: "var(--color-bg-surface)",
+          borderColor: "var(--color-border-default)",
+        }}
+      >
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = !isSearching && activeTab === item.id;
@@ -74,9 +86,12 @@ export default function TopCapsuleNav({
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full transition-all duration-300 font-semibold ${
-                isActive ? "bg-amber-400 text-black shadow-md scale-100" : "text-zinc-400 hover:text-white"
-              }`}
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full transition-all duration-300 font-semibold"
+              style={{
+                backgroundColor: isActive ? "var(--color-accent-gold)" : "transparent",
+                color: isActive ? "#000000" : "var(--color-text-secondary)",
+                boxShadow: isActive ? "0 4px 12px rgba(0,0,0,0.3)" : "none",
+              }}
             >
               <Icon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{item.label}</span>
@@ -97,7 +112,12 @@ export default function TopCapsuleNav({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={strings.navigation.searchPlaceholder}
-                className="w-40 sm:w-64 bg-[#141418] border border-amber-400/50 rounded-full py-1 pl-3 pr-7 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+                className="w-40 sm:w-64 rounded-full py-1 pl-3 pr-7 text-xs focus:outline-none border shadow-inner transition-all"
+                style={{
+                  backgroundColor: "var(--color-bg-surface)",
+                  borderColor: "var(--color-border-highlight)",
+                  color: "var(--color-text-primary)",
+                }}
               />
               <button
                 type="button"
@@ -112,10 +132,15 @@ export default function TopCapsuleNav({
               </button>
             </form>
           ) : (
-            <Tooltip text="Buscar no catálogo canônico" position="bottom">
+            <Tooltip text={strings.navigation.searchPlaceholder} position="bottom">
               <button
                 onClick={() => setShowSearch(true)}
-                className="p-2 rounded-full bg-[#1A1A1F]/80 hover:bg-[#23232A] border border-[#3A3A43] text-zinc-300 hover:text-white transition"
+                className="p-2 rounded-full border transition"
+                style={{
+                  backgroundColor: "var(--color-bg-surface)",
+                  borderColor: "var(--color-border-default)",
+                  color: "var(--color-text-secondary)",
+                }}
               >
                 <Search className="w-3.5 h-3.5" />
               </button>

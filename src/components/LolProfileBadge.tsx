@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import { ShieldCheck, Award, Zap } from "lucide-react";
+import React, { useState, useEffect } from "react";
 import { useUser } from "@/context/UserContext";
+import { useDesignTheme } from "@/context/ThemeContext";
+import { loadTelemetryState, TelemetryState } from "@/lib/telemetryXpLoop";
 import Tooltip from "./Tooltip";
 
 interface LolProfileBadgeProps {
@@ -13,24 +14,35 @@ interface LolProfileBadgeProps {
 /**
  * Micro-componente puro (Casca Branca ~50 linhas)
  * Sistema de Identidade Estilo LoL:
- * - Moldura de Nível (0 a infinito) evolutiva
- * - Anel de XP circular pulsante alimentado por telemetria
- * - Título conquistado ativo (ex.: 'Fã Master Bleach')
- * - Badge discreto de Tier (0: Visitante, 1: Membro, 2: Anirium+, 3: Admin)
+ * - Moldura de Nível (0 a infinito) evolutiva conectada à telemetria real
+ * - Anel de XP circular pulsante reativo em tempo real
+ * - Título conquistado dinâmico
+ * - Badge de Tier (Visitante, Membro, Anirium+, Admin)
  */
 export default function LolProfileBadge({ onOpenProfile, onOpenLevelSwitcher }: LolProfileBadgeProps) {
   const { user, level: tier } = useUser();
-  const xp = user?.settings?.telemetryHud ? 78 : 42; // Exemplo de telemetria/XP ativo (0 a 100)
-  const userLevelNumber = user?.created_at ? Math.max(1, Math.floor((Date.now() - user.created_at) / (1000 * 60 * 60 * 24 * 7))) : 1;
-  const userTitle = tier === 3 ? "Admin Geral" : tier === 2 ? "Fã Master Bleach" : tier === 1 ? "Explorador Canônico" : "Visitante";
+  const { strings, tokens } = useDesignTheme();
+  const [telemetry, setTelemetry] = useState<TelemetryState>(() => loadTelemetryState());
 
-  const tierLabels = ["Visitante", "Membro", "Anirium+", "Admin"];
-  const tierColors = ["#8E8E93", "#38BDF8", "#FFC766", "#E5484D"];
+  useEffect(() => {
+    const handleUpdate = (e: CustomEvent<TelemetryState>) => {
+      setTelemetry(e.detail);
+    };
+    window.addEventListener("anirium_xp_update", handleUpdate as EventListener);
+    return () => window.removeEventListener("anirium_xp_update", handleUpdate as EventListener);
+  }, []);
+
+  const xp = telemetry.xp;
+  const userLevelNumber = telemetry.levelNumber;
+  const userTitle = telemetry.title || (tier === 3 ? strings.tiers.admin : tier === 2 ? strings.tiers.plus : tier === 1 ? strings.tiers.member : strings.tiers.guest);
+
+  const tierLabels = [strings.tiers.guest, strings.tiers.member, strings.tiers.plus, strings.tiers.admin];
+  const tierColors = ["#8E8E93", "#38BDF8", "var(--color-accent-gold)", "#E5484D"];
 
   return (
     <div className="flex items-center gap-2 select-none">
       {/* Moldura de Avatar estilo LoL com anel de XP circular */}
-      <Tooltip text={`Nível ${userLevelNumber} • ${xp}% para o próximo nível • Título: ${userTitle}`} position="bottom">
+      <Tooltip text={`${strings.labels.levelLabel} ${userLevelNumber} • ${xp}% ${strings.labels.xpToNext} • ${userTitle}`} position="bottom">
         <div
           onClick={onOpenProfile}
           className="relative group cursor-pointer flex items-center justify-center p-0.5"

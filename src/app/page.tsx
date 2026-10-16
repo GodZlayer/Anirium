@@ -12,6 +12,7 @@ import UserProfileModal from "@/components/UserProfileModal";
 import LevelSwitcher from "@/components/LevelSwitcher";
 import { Anime, AiringSchedule } from "@/types/anime";
 import { useUser } from "@/context/UserContext";
+import { useDesignTheme } from "@/context/ThemeContext";
 import { getModularCatalogFromParquet } from "@/lib/parquetCatalog";
 import { aniriumFetch } from "@/lib/apiConfig";
 import { buildFranchisesFromCatalog, FranchiseGroup } from "@/lib/franchiseUtils";
@@ -44,6 +45,14 @@ export default function LobbyDashboard() {
   const [upcoming, setUpcoming] = useState<Anime[]>([]);
   const [searchResults, setSearchResults] = useState<Anime[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    const handleOpenSignIn = () => {
+      setShowProfileModal(true);
+    };
+    window.addEventListener("anirium_open_signin", handleOpenSignIn);
+    return () => window.removeEventListener("anirium_open_signin", handleOpenSignIn);
+  }, []);
 
   useEffect(() => {
     async function loadCatalog() {
@@ -85,8 +94,16 @@ export default function LobbyDashboard() {
     setPlayerTarget({ anime, episodeNum, seasonIdx });
   };
 
+  const { strings, getLocalizedTitle, tokens } = useDesignTheme();
+
   return (
-    <div className="h-screen max-h-screen w-screen overflow-hidden flex flex-col bg-[#0B0B0D] text-[#FFF9F0] select-none">
+    <div
+      className="h-screen max-h-screen w-screen overflow-hidden flex flex-col select-none transition-colors duration-500"
+      style={{
+        backgroundColor: "var(--color-bg-base)",
+        color: "var(--color-text-primary)",
+      }}
+    >
       {/* 1. Cápsula Flutuante de Comando do Topo (h-14) */}
       <TopCapsuleNav
         activeTab={navTab}
@@ -112,8 +129,11 @@ export default function LobbyDashboard() {
         {/* Caso haja busca ativa */}
         {isSearching ? (
           <div className="flex-1 p-6 overflow-hidden flex flex-col">
-            <h2 className="text-xs font-mono font-bold text-amber-400 mb-3 flex-none">
-              RESULTADOS DA BUSCA ({searchResults.length})
+            <h2
+              className="text-xs font-mono font-bold mb-3 flex-none"
+              style={{ color: "var(--color-accent-gold)" }}
+            >
+              {strings.navigation.searchResults} ({searchResults.length})
             </h2>
             <div className="flex-1 overflow-y-auto no-scrollbar grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 pr-1">
               {searchResults.map((anime) => (
@@ -123,14 +143,20 @@ export default function LobbyDashboard() {
                     setActiveAnime(anime);
                     setIsSearching(false);
                   }}
-                  className="p-2 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-amber-400 transition cursor-pointer"
+                  className="p-2 rounded-2xl border transition cursor-pointer"
+                  style={{
+                    backgroundColor: "var(--color-bg-surface)",
+                    borderColor: "var(--color-border-default)",
+                  }}
                 >
                   <img
                     src={anime.images?.webp?.large_image_url || anime.images?.jpg?.image_url}
-                    alt={anime.title}
+                    alt={getLocalizedTitle(anime)}
                     className="w-full aspect-[2/3] object-cover rounded-xl mb-1.5"
                   />
-                  <h4 className="text-xs font-bold truncate text-white">{anime.title}</h4>
+                  <h4 className="text-xs font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                    {getLocalizedTitle(anime)}
+                  </h4>
                 </div>
               ))}
             </div>
@@ -161,9 +187,14 @@ export default function LobbyDashboard() {
 
             {/* PALCO 2: EXPLORAR (Foco na Coleção Seasonal e Popular) */}
             <div className="w-1/4 h-full flex-none p-6 overflow-hidden flex flex-col">
-              <div className="flex items-center gap-2 mb-3 border-b border-zinc-800/80 pb-2">
-                <Compass className="w-4 h-4 text-amber-400" />
-                <h2 className="text-xs font-mono font-bold text-white tracking-wider">EXPLORAÇÃO DE CATÁLOGO PARQUET</h2>
+              <div
+                className="flex items-center gap-2 mb-3 border-b pb-2"
+                style={{ borderColor: "var(--color-border-default)" }}
+              >
+                <Compass className="w-4 h-4" style={{ color: "var(--color-accent-gold)" }} />
+                <h2 className="text-xs font-mono font-bold tracking-wider" style={{ color: "var(--color-text-primary)" }}>
+                  {strings.labels.exploreTitle}
+                </h2>
               </div>
               <div className="flex-1 overflow-y-auto no-scrollbar grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 pr-1">
                 {popular.map((anime) => (
@@ -173,14 +204,20 @@ export default function LobbyDashboard() {
                       setActiveAnime(anime);
                       setNavTab("inicio");
                     }}
-                    className="p-2 rounded-2xl bg-zinc-900/80 border border-zinc-800 hover:border-amber-400 transition cursor-pointer transform hover:scale-[1.03]"
+                    className="p-2 rounded-2xl border transition cursor-pointer transform hover:scale-[1.03]"
+                    style={{
+                      backgroundColor: "var(--color-bg-surface)",
+                      borderColor: "var(--color-border-default)",
+                    }}
                   >
                     <img
                       src={anime.images?.webp?.large_image_url || anime.images?.jpg?.image_url}
-                      alt={anime.title}
+                      alt={getLocalizedTitle(anime)}
                       className="w-full aspect-[2/3] object-cover rounded-xl mb-1.5"
                     />
-                    <h4 className="text-[11px] font-bold truncate text-white">{anime.title}</h4>
+                    <h4 className="text-[11px] font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                      {getLocalizedTitle(anime)}
+                    </h4>
                   </div>
                 ))}
               </div>
@@ -188,9 +225,14 @@ export default function LobbyDashboard() {
 
             {/* PALCO 3: CALENDÁRIO DE SIMULCASTS */}
             <div className="w-1/4 h-full flex-none p-6 overflow-y-auto no-scrollbar">
-              <div className="flex items-center gap-2 mb-3 border-b border-zinc-800/80 pb-2">
-                <CalendarIcon className="w-4 h-4 text-amber-400" />
-                <h2 className="text-xs font-mono font-bold text-white tracking-wider">AGENDA CANÔNICA DE TRANSMISSÃO</h2>
+              <div
+                className="flex items-center gap-2 mb-3 border-b pb-2"
+                style={{ borderColor: "var(--color-border-default)" }}
+              >
+                <CalendarIcon className="w-4 h-4" style={{ color: "var(--color-accent-gold)" }} />
+                <h2 className="text-xs font-mono font-bold tracking-wider" style={{ color: "var(--color-text-primary)" }}>
+                  {strings.labels.calendarTitle}
+                </h2>
               </div>
               <AnimeSchedule
                 onSelectAnime={(a) => {
@@ -218,7 +260,7 @@ export default function LobbyDashboard() {
       {/* 3. Esteira Horizontal do Hub na Base da Viewport (Apenas na aba Início) */}
       {!isSearching && navTab === "inicio" && (
         <ModularHubTrack
-          title="Destaques Canônicos"
+          title={strings.labels.highlightTitle}
           items={popular}
           activeAnimeId={activeAnime?.mal_id}
           onSelect={setActiveAnime}

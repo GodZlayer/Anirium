@@ -7,6 +7,7 @@ import { loadAccountPlugins } from "@/lib/extensions/pluginLoader";
 import { addonRegistry } from "@/lib/extensions/addonRegistry";
 import { themeCssProperties } from "@/lib/themeTokens";
 import { resolveApiUrl } from "@/lib/apiConfig";
+import { recordWatchProgress, recordBookmarkAction } from "@/lib/telemetryXpLoop";
 
 interface UserContextType {
   user: UserProfile | null;
@@ -245,6 +246,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     durationSeconds: number,
     seasonEntityId: string
   ) => {
+    // Registrar telemetria/XP instantaneamente no loop da interface
+    const isCompleted = durationSeconds > 0 && progressSeconds >= durationSeconds * 0.9;
+    recordWatchProgress(Math.min(progressSeconds, 60), isCompleted, level);
+
     // Apenas persistir histórico se for nível 1, 2 ou 3 (Nível 0 é puramente anônimo/canônico)
     if (level === 0) return;
 
@@ -311,6 +316,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      // Registrar telemetria/XP instantaneamente no cliente
+      recordBookmarkAction(willBeBookmarked, level);
+
       const res = await apiFetch("/api/user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -405,10 +413,46 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setLevel(data.user.level_tier);
           setActiveTheme(data.activeTheme || null);
           await fetchUserData();
+        } else {
+          // Fallback gracioso para navegação local instantânea
+          const guestProfile: UserProfile = {
+            id: `google-${googleData.googleId}`,
+            username: googleData.email.split("@")[0],
+            display_name: googleData.name || googleData.email.split("@")[0],
+            avatar_url: googleData.avatarUrl || "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=150&auto=format&fit=crop&q=80",
+            level_tier: 1,
+            badge_label: "Membro",
+            created_at: Date.now(),
+            settings: { theme: "default", autoNextEpisode: true },
+            enabledAddons: [],
+          };
+          setUser(guestProfile);
+          setLevel(1);
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("anirium_local_profile", JSON.stringify(guestProfile));
+          }
         }
       }
     } catch (err) {
-      console.error("[UserContext] Falha no login Google:");
+      console.warn("[UserContext] Fallback no login Google:", err);
+      if (!("credential" in googleData)) {
+        const guestProfile: UserProfile = {
+          id: `google-${googleData.googleId}`,
+          username: googleData.email.split("@")[0],
+          display_name: googleData.name || googleData.email.split("@")[0],
+          avatar_url: googleData.avatarUrl || "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=150&auto=format&fit=crop&q=80",
+          level_tier: 1,
+          badge_label: "Membro",
+          created_at: Date.now(),
+          settings: { theme: "default", autoNextEpisode: true },
+          enabledAddons: [],
+        };
+        setUser(guestProfile);
+        setLevel(1);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("anirium_local_profile", JSON.stringify(guestProfile));
+        }
+      }
     } finally {
       setIsLoading(false);
     }

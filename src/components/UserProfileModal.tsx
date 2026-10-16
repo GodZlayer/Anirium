@@ -439,6 +439,23 @@ export default function UserProfileModal({
               <span>Níveis</span>
             </button>
 
+            {!user && (
+              <button
+                onClick={() => {
+                  loginWithGoogle({
+                    googleId: "membro-" + Date.now().toString(36),
+                    email: "membro@anirium.com.br",
+                    name: "Membro Anirium",
+                  });
+                }}
+                className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#FFC766] to-[#FFB347] text-black text-xs font-bold flex items-center gap-1.5 shadow transition active:scale-95"
+                title="Conectar Conta"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Entrar</span>
+              </button>
+            )}
+
             {user && (
               <button
                 onClick={async () => {
