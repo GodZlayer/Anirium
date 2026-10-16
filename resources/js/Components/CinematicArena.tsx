@@ -16,7 +16,7 @@ export function CinematicArena({
   onToggleBookmark,
   isBookmarked = false,
 }: CinematicArenaProps) {
-  const { tokens, strings, getLocalizedTitle } = useDesignTheme();
+  const { tokens, strings, getLocalizedTitle, getLocalizedSynopsis } = useDesignTheme();
 
   if (!anime) {
     return (
