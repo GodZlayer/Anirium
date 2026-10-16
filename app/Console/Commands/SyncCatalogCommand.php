@@ -116,9 +116,25 @@ class SyncCatalogCommand extends Command
 
                 if ($response->successful()) {
                     $data = $response->json('data.Page.media') ?? [];
+                    if (empty($data)) {
+                        $this->info("Fim dos registros de mangás retornado pela API.");
+                        break;
+                    }
+
+                    $mangaFile = $dataPath . '/catalog-manga.json';
+                    $existingMap = [];
+                    if (File::exists($mangaFile)) {
+                        try {
+                            $raw = json_decode(File::get($mangaFile), true) ?: [];
+                            foreach ($raw as $item) {
+                                $existingMap[$item['mal_id']] = $item;
+                            }
+                        } catch (\Exception $e) {}
+                    }
+
                     foreach ($data as $m) {
                         $mal_id = $m['idMal'] ?? $m['id'];
-                        $mangas[] = [
+                        $existingMap[$mal_id] = [
                             'id' => $mal_id,
                             'mal_id' => $mal_id,
                             'anilist_id' => $m['id'],
@@ -140,33 +156,16 @@ class SyncCatalogCommand extends Command
                             'updated_at' => now()->timestamp * 1000,
                         ];
                     }
+
+                    File::put($mangaFile, json_encode(array_values($existingMap), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                    $this->info("Página {$p} gravada com sucesso! Total acumulado de mangás: " . count($existingMap));
                 }
-                usleep(500000); // 500ms
+
+                usleep(600000); // 600ms para rate limit amigável
             } catch (\Exception $e) {
-                $this->warn("Erro na página {$p} de mangás: " . $e->getMessage());
-                break;
+                $this->warn("Aviso na página {$p} de mangás: " . $e->getMessage());
+                sleep(2);
             }
-        }
-
-        if (!empty($mangas)) {
-            $mangaFile = $dataPath . '/catalog-manga.json';
-            $existing = [];
-            if (File::exists($mangaFile)) {
-                try {
-                    $existing = json_decode(File::get($mangaFile), true) ?: [];
-                } catch (\Exception $e) {}
-            }
-
-            $map = [];
-            foreach ($existing as $item) {
-                $map[$item['mal_id']] = $item;
-            }
-            foreach ($mangas as $item) {
-                $map[$item['mal_id']] = $item;
-            }
-
-            File::put($mangaFile, json_encode(array_values($map), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-            $this->info("Base de Mangás atualizada em {$mangaFile} com " . count($map) . " obras indexadas.");
         }
     }
 }

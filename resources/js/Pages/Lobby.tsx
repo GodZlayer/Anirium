@@ -145,9 +145,19 @@ export default function LobbyPage({ auth }: LobbyProps) {
   
   // O Catálogo Universal Único
   const [universalCatalog, setUniversalCatalog] = useState<AnimeRecord[]>(INITIAL_ANIMES);
+  const [rollIdx, setRollIdx] = useState(0); // 0: Último, 1: Penúltimo, 2: Antepenúltimo
   const [selectedAnime, setSelectedAnime] = useState<AnimeRecord | null>(INITIAL_ANIMES[0]);
   const [bookmarkedIds, setBookmarkedIds] = useState<number[]>([1]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Os 3 últimos lançamentos canônicos ordenados para o Roll do Cinema
+  const rollAnimes = React.useMemo(() => {
+    const releasing = filterCatalog(universalCatalog, "releasing");
+    if (releasing.length >= 3) {
+      return releasing.slice(0, 3);
+    }
+    return universalCatalog.slice(0, 3);
+  }, [universalCatalog]);
 
   // Telemetria Contínua Desacoplada de Tier
   const [telemetry, setTelemetry] = useState<TelemetryState>(() => loadTelemetryState());
@@ -210,79 +220,57 @@ export default function LobbyPage({ auth }: LobbyProps) {
 
       {/* TOPBAR FLUTUANTE (No-Scroll Viewport) */}
       <header
-        className="w-full h-16 flex items-center justify-between px-6 z-40 border-b backdrop-blur-xl"
+        className="w-full h-14 flex-none px-6 z-40 border-b backdrop-blur-xl flex items-center justify-between gap-4"
         style={{
           backgroundColor: tokens.colors.bgOverlay,
           borderColor: tokens.colors.borderDefault,
         }}
       >
-        {/* Identidade Visual */}
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 cursor-pointer">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shadow-md"
-              style={{
-                backgroundColor: tokens.colors.accentGold,
-                color: tokens.colors.bgBase,
-              }}
-            >
-              A
-            </div>
-            <span className="font-black text-base tracking-wider" style={{ color: tokens.colors.textPrimary }}>
-              ANIRIUM
-            </span>
+        {/* Identidade Visual Canônica */}
+        <div className="flex items-center gap-6 flex-shrink-0">
+          <div
+            onClick={() => setActiveTab("home")}
+            className="flex items-center gap-2 cursor-pointer group"
+          >
+            <img
+              src="/assets/logos/Anirium-Textlogo.png"
+              alt="Anirium"
+              className="h-7 w-auto object-contain drop-shadow-[0_2px_8px_rgba(255,199,102,0.25)] group-hover:scale-105 transition-transform"
+            />
           </div>
 
-          {/* DOCK DE NAVEGAÇÃO DE MUNDOS */}
-          <nav className="flex items-center gap-1 p-1 rounded-full border bg-black/20" style={{ borderColor: tokens.colors.borderDefault }}>
-            <button
-              onClick={() => setActiveTab("home")}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
-                activeTab === "home" ? "shadow-sm" : "opacity-60 hover:opacity-100"
-              }`}
-              style={{
-                backgroundColor: activeTab === "home" ? tokens.colors.accentGold : "transparent",
-                color: activeTab === "home" ? tokens.colors.bgBase : tokens.colors.textPrimary,
-              }}
-            >
-              {strings.navigation.home}
-            </button>
-            <button
-              onClick={() => setActiveTab("explore")}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
-                activeTab === "explore" ? "shadow-sm" : "opacity-60 hover:opacity-100"
-              }`}
-              style={{
-                backgroundColor: activeTab === "explore" ? tokens.colors.accentGold : "transparent",
-                color: activeTab === "explore" ? tokens.colors.bgBase : tokens.colors.textPrimary,
-              }}
-            >
-              {strings.navigation.explore}
-            </button>
-            <button
-              onClick={() => setActiveTab("calendar")}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
-                activeTab === "calendar" ? "shadow-sm" : "opacity-60 hover:opacity-100"
-              }`}
-              style={{
-                backgroundColor: activeTab === "calendar" ? tokens.colors.accentGold : "transparent",
-                color: activeTab === "calendar" ? tokens.colors.bgBase : tokens.colors.textPrimary,
-              }}
-            >
-              {strings.navigation.calendar}
-            </button>
-            <button
-              onClick={() => setActiveTab("franchises")}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
-                activeTab === "franchises" ? "shadow-sm" : "opacity-60 hover:opacity-100"
-              }`}
-              style={{
-                backgroundColor: activeTab === "franchises" ? tokens.colors.accentGold : "transparent",
-                color: activeTab === "franchises" ? tokens.colors.bgBase : tokens.colors.textPrimary,
-              }}
-            >
-              {strings.navigation.franchises}
-            </button>
+          {/* DOCK CÁPSULA ACRÍLICA DE NAVEGAÇÃO DE MUNDOS */}
+          <nav
+            className="flex items-center backdrop-blur-md p-1 rounded-full border text-xs shadow-inner"
+            style={{
+              backgroundColor: tokens.colors.bgSurface,
+              borderColor: tokens.colors.borderDefault,
+            }}
+          >
+            {[
+              { id: "home", label: strings.navigation.home, icon: Tv },
+              { id: "explore", label: strings.navigation.explore, icon: Compass },
+              { id: "calendar", label: strings.navigation.calendar, icon: Calendar },
+              { id: "franchises", label: strings.navigation.franchises, icon: Layers },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all duration-300 font-semibold cursor-pointer"
+                  style={{
+                    backgroundColor: isActive ? tokens.colors.accentGold : "transparent",
+                    color: isActive ? tokens.colors.bgBase : tokens.colors.textSecondary,
+                    boxShadow: isActive ? "0 2px 10px rgba(0,0,0,0.2)" : "none",
+                  }}
+                >
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
 
@@ -321,25 +309,18 @@ export default function LobbyPage({ auth }: LobbyProps) {
       </header>
 
       {/* VIEWPORT DINÂMICA DE MUNDOS (100vh Sem Rolagem Cega) */}
-      <main className="flex-1 overflow-hidden p-6 flex flex-col justify-between gap-4">
+      <main className="flex-1 overflow-hidden p-0 flex flex-col justify-between relative">
         {activeTab === "home" && (
-          <>
+          <div className="w-full h-full relative">
             <CinematicArena
-              anime={selectedAnime}
+              rollAnimes={rollAnimes}
+              activeIdx={rollIdx}
+              onSelectIdx={setRollIdx}
               onPlay={handlePlayAnime}
               onToggleBookmark={handleToggleBookmark}
-              isBookmarked={selectedAnime ? bookmarkedIds.includes(selectedAnime.id) : false}
+              isBookmarked={rollAnimes[rollIdx] ? bookmarkedIds.includes(rollAnimes[rollIdx].id) : false}
             />
-            <ModularHubTrack
-              title={searchQuery ? `${strings.navigation.searchResults} (${filterCatalog(universalCatalog, "popular", searchQuery).length})` : strings.labels.highlightTitle}
-              animes={filterCatalog(universalCatalog, "popular", searchQuery)}
-              activeAnimeId={selectedAnime?.id}
-              onSelectAnime={(a) => setSelectedAnime(a)}
-              onPlayAnime={handlePlayAnime}
-              onToggleBookmark={handleToggleBookmark}
-              bookmarkedIds={bookmarkedIds}
-            />
-          </>
+          </div>
         )}
 
         {activeTab === "explore" && (
