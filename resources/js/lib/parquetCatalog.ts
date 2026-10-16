@@ -287,9 +287,9 @@ export function filterCatalog(
       return [...filtered].sort((a, b) => (b.score || 0) - (a.score || 0));
 
     case "releasing":
-      return filtered.filter(
-        (a) => a.status === "RELEASING" || a.status === "AIRING" || a.status === "CURRENT"
-      );
+      return [...filtered]
+        .filter((a) => a.status === "RELEASING" || a.status === "AIRING" || a.status === "CURRENT")
+        .sort((a, b) => (Number(b.updated_at) || 0) - (Number(a.updated_at) || 0) || (b.year || 0) - (a.year || 0));
 
     case "upcoming":
       return filtered.filter(

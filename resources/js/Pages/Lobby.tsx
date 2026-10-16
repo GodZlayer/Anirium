@@ -319,6 +319,8 @@ export default function LobbyPage({ auth }: LobbyProps) {
               onPlay={handlePlayAnime}
               onToggleBookmark={handleToggleBookmark}
               isBookmarked={rollAnimes[rollIdx] ? bookmarkedIds.includes(rollAnimes[rollIdx].id) : false}
+              isAuthenticated={Boolean(auth?.user)}
+              hasPlayerAddon={Boolean(auth?.user && effectiveTier >= 2)}
             />
           </div>
         )}

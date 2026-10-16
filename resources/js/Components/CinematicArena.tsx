@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Play, Star, Calendar, ChevronRight, ChevronLeft, Bookmark, Sparkles, X, Clock, Layers } from "lucide-react";
+import { Play, ChevronRight, ChevronLeft, Bookmark, X, Clock, Layers, ExternalLink } from "lucide-react";
 import { AnimeRecord } from "./AnimeCard";
 import { useDesignTheme } from "../context/ThemeContext";
 
@@ -10,6 +10,8 @@ interface CinematicArenaProps {
   onPlay?: (anime: AnimeRecord) => void;
   onToggleBookmark?: (anime: AnimeRecord) => void;
   isBookmarked?: boolean;
+  isAuthenticated?: boolean;
+  hasPlayerAddon?: boolean;
 }
 
 export function CinematicArena({
@@ -19,6 +21,8 @@ export function CinematicArena({
   onPlay,
   onToggleBookmark,
   isBookmarked = false,
+  isAuthenticated = false,
+  hasPlayerAddon = false,
 }: CinematicArenaProps) {
   const { tokens, strings, getLocalizedTitle, getLocalizedSynopsis } = useDesignTheme();
   const [isSplitMode, setIsSplitMode] = useState(false);
@@ -76,53 +80,7 @@ export function CinematicArena({
             isSplitMode ? "w-full md:w-5/12" : "w-full max-w-2xl"
           }`}
         >
-          {/* Badges de Lançamento e Formato */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-md border shadow-sm"
-              style={{
-                backgroundColor: `${tokens.colors.accentGold}20`,
-                borderColor: tokens.colors.accentGold,
-                color: tokens.colors.accentGold,
-              }}
-            >
-              <Sparkles className="w-3 h-3 fill-current" />
-              <span>
-                {activeIdx === 0
-                  ? "ÚLTIMO LANÇAMENTO"
-                  : activeIdx === 1
-                  ? "PENÚLTIMO LANÇAMENTO"
-                  : "ANTEPENÚLTIMO LANÇAMENTO"}
-              </span>
-            </span>
-
-            {anime.score && (
-              <span
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold backdrop-blur-md border"
-                style={{
-                  backgroundColor: tokens.colors.bgSurface,
-                  borderColor: tokens.colors.borderDefault,
-                  color: tokens.colors.accentGold,
-                }}
-              >
-                <Star className="w-3 h-3 fill-current" />
-                <span>{anime.score.toFixed(1)}</span>
-              </span>
-            )}
-
-            <span
-              className="text-[11px] font-mono uppercase px-2.5 py-1 rounded-full border backdrop-blur-md"
-              style={{
-                backgroundColor: tokens.colors.bgSurface,
-                borderColor: tokens.colors.borderDefault,
-                color: tokens.colors.textMuted,
-              }}
-            >
-              {anime.format || strings.labels.format} • {anime.year || strings.labels.year}
-            </span>
-          </div>
-
-          {/* Título Monumental Serifado */}
+          {/* Título Monumental Serifado (Zero tags artificiais no cabeçalho) */}
           <h1
             className="text-3xl sm:text-5xl lg:text-6xl font-black font-serif tracking-tight leading-[1.08] drop-shadow-xl"
             style={{ color: tokens.colors.textPrimary }}
@@ -139,18 +97,36 @@ export function CinematicArena({
           </p>
 
           {/* Ações Cinemáticas do Cinema */}
-          <div className="flex items-center gap-3 pt-3 flex-wrap">
-            <button
-              onClick={() => onPlay?.(anime)}
-              className="flex items-center gap-2.5 px-7 py-3 rounded-xl font-black text-xs uppercase tracking-wider shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
-              style={{
-                backgroundColor: tokens.colors.accentGold,
-                color: tokens.colors.bgBase,
-              }}
-            >
-              <Play className="w-4 h-4 fill-current" />
-              <span>{strings.actions.play}</span>
-            </button>
+          <div className="flex items-center gap-3 pt-2 flex-wrap">
+            {isAuthenticated && hasPlayerAddon ? (
+              <button
+                onClick={() => onPlay?.(anime)}
+                className="flex items-center gap-2.5 px-7 py-3 rounded-xl font-black text-xs uppercase tracking-wider shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+                style={{
+                  backgroundColor: tokens.colors.accentGold,
+                  color: tokens.colors.bgBase,
+                }}
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>{strings.actions.play}</span>
+              </button>
+            ) : (
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent((anime.title_english || anime.title) + " assistir oficial")}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2.5 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+                style={{
+                  backgroundColor: tokens.colors.bgSurface,
+                  borderColor: tokens.colors.accentGold,
+                  borderWidth: 1,
+                  color: tokens.colors.accentGold,
+                }}
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Ver no Canal Oficial</span>
+              </a>
+            )}
 
             <button
               onClick={() => setIsSplitMode(!isSplitMode)}
@@ -168,18 +144,20 @@ export function CinematicArena({
               />
             </button>
 
-            <button
-              onClick={() => onToggleBookmark?.(anime)}
-              className="p-3 rounded-xl border backdrop-blur-md transition-all duration-200 hover:scale-105 cursor-pointer"
-              style={{
-                backgroundColor: tokens.colors.bgSurface,
-                borderColor: isBookmarked ? tokens.colors.accentGold : tokens.colors.borderDefault,
-                color: isBookmarked ? tokens.colors.accentGold : tokens.colors.textMuted,
-              }}
-              title={isBookmarked ? strings.actions.removeFromFavorites : strings.actions.addToFavorites}
-            >
-              <Bookmark className={`w-4 h-4 ${isBookmarked ? "fill-current" : ""}`} />
-            </button>
+            {isAuthenticated && (
+              <button
+                onClick={() => onToggleBookmark?.(anime)}
+                className="p-3 rounded-xl border backdrop-blur-md transition-all duration-200 hover:scale-105 cursor-pointer"
+                style={{
+                  backgroundColor: tokens.colors.bgSurface,
+                  borderColor: isBookmarked ? tokens.colors.accentGold : tokens.colors.borderDefault,
+                  color: isBookmarked ? tokens.colors.accentGold : tokens.colors.textMuted,
+                }}
+                title={isBookmarked ? strings.actions.removeFromFavorites : strings.actions.addToFavorites}
+              >
+                <Bookmark className={`w-4 h-4 ${isBookmarked ? "fill-current" : ""}`} />
+              </button>
+            )}
           </div>
 
           {/* Indicadores do Roll de 3 Lançamentos (Último, Penúltimo, Antepenúltimo) */}
@@ -305,10 +283,31 @@ export function CinematicArena({
               <div className="flex-1 overflow-y-auto py-3 grid grid-cols-4 gap-2.5 no-scrollbar">
                 {Array.from({ length: totalEps }).map((_, idx) => {
                   const epNum = idx + 1;
+                  if (isAuthenticated && hasPlayerAddon) {
+                    return (
+                      <button
+                        key={epNum}
+                        onClick={() => onPlay?.(anime)}
+                        className="flex flex-col items-center justify-center py-3 rounded-xl border text-xs font-bold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                        style={{
+                          backgroundColor: tokens.colors.bgSurface,
+                          borderColor: tokens.colors.borderDefault,
+                          color: tokens.colors.textPrimary,
+                        }}
+                      >
+                        <span className="text-[9px] font-mono opacity-50 uppercase">{strings.labels.episode}</span>
+                        <span className="text-sm font-black" style={{ color: tokens.colors.accentGold }}>
+                          {epNum}
+                        </span>
+                      </button>
+                    );
+                  }
                   return (
-                    <button
+                    <a
                       key={epNum}
-                      onClick={() => onPlay?.(anime)}
+                      href={`https://www.google.com/search?q=${encodeURIComponent((anime.title_english || anime.title) + " episodio " + epNum + " oficial")}`}
+                      target="_blank"
+                      rel="noreferrer"
                       className="flex flex-col items-center justify-center py-3 rounded-xl border text-xs font-bold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
                       style={{
                         backgroundColor: tokens.colors.bgSurface,
@@ -320,7 +319,7 @@ export function CinematicArena({
                       <span className="text-sm font-black" style={{ color: tokens.colors.accentGold }}>
                         {epNum}
                       </span>
-                    </button>
+                    </a>
                   );
                 })}
               </div>
