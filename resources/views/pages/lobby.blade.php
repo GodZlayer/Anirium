@@ -1123,8 +1123,19 @@ if (window.i18n) window.i18n.applyToDOM();
                     const html = await res.text();
                     window.entityHtmlCache.set(cacheKey, html);
                     container.innerHTML = html;
+                    // Executa scripts contidos no HTML injetado
+                    container.querySelectorAll('script').forEach(s => {
+                        try {
+                            const newScript = document.createElement('script');
+                            Array.from(s.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+                            newScript.appendChild(document.createTextNode(s.innerHTML));
+                            s.parentNode.replaceChild(newScript, s);
+                        } catch (err) {
+                            console.warn('[Lobby Script Exec Error]', err);
+                        }
+                    });
                     window.renderDynamicBreadcrumb();
-if (window.i18n) window.i18n.applyToDOM();
+                    if (window.i18n) window.i18n.applyToDOM();
                 } else {
                     container.innerHTML = `<div class="p-8 text-center text-red-400 font-mono text-xs" data-i18n="state.error_partial">Erro ao compilar parcial Blade para esta obra.</div>`;
                 }

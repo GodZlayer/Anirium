@@ -182,7 +182,7 @@ class CatalogGraphController extends Controller
         $realId = $this->resolveUuid($id, 'universe');
         $allowAdult = (bool) ($request->user()?->adult_content_enabled || $request->query('adult') === '1');
 
-        $cacheKey = "catalog:universe:graph:payload:v3:{$realId}:" . ($allowAdult ? '1' : '0');
+        $cacheKey = "catalog:universe:graph:payload:v4:{$realId}:" . ($allowAdult ? '1' : '0');
         $data = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($realId, $allowAdult) {
             $universe = DB::table('catalog_universes')->where('id', $realId)->first();
             if (!$universe) return null;
@@ -208,24 +208,44 @@ class CatalogGraphController extends Controller
 
             $universe->name = $canonicalTitle ?: ($universe->name ?? ($works[0]->title ?? 'Universo Canônico'));
 
-            // Buscar criadores principais da franquia (autores, diretores, etc.)
+            // Buscar criadores principais da franquia com contagem de produções
             $creators = DB::table('catalog_work_creators as wc')
                 ->join('catalog_creators as c', 'wc.creator_id', '=', 'c.id')
-                ->join('catalog_roles as r', 'wc.role_id', '=', 'r.id')
+                ->leftJoin('catalog_roles as r', 'wc.role_id', '=', 'r.id')
                 ->whereIn('wc.work_id', $allWorkIds)
-                ->select('c.id', 'c.name', 'c.image_url', 'r.token as role')
-                ->distinct()
-                ->orderByRaw("CASE WHEN r.token IN ('author', 'original_creator') THEN 1 WHEN r.token = 'director' THEN 2 ELSE 3 END")
-                ->take(8)
+                ->select(
+                    'c.id',
+                    'c.name',
+                    'c.image_url',
+                    'r.token as role',
+                    DB::raw('COUNT(wc.work_id) as total_works')
+                )
+                ->groupBy('c.id', 'c.name', 'r.token')
+                ->orderByDesc('total_works')
+                ->take(6)
                 ->get();
 
-            // Buscar estúdios de animação da franquia
+            // Buscar estúdios de animação da franquia com contagem de produções
             $studios = DB::table('catalog_work_studios as ws')
                 ->join('catalog_studios as s', 'ws.studio_id', '=', 's.id')
                 ->whereIn('ws.work_id', $allWorkIds)
-                ->select('s.id', 's.name', 's.image_url')
-                ->distinct()
-                ->take(6)
+                ->select(
+                    's.id',
+                    's.name',
+                    's.image_url',
+                    DB::raw('COUNT(ws.work_id) as total_works')
+                )
+                ->groupBy('s.id', 's.name')
+                ->orderByDesc('total_works')
+                ->take(4)
+                ->get();
+
+            // Formatos presentes no universo
+            $formats = DB::table('catalog_works')
+                ->whereIn('id', $allWorkIds)
+                ->select('format', DB::raw('COUNT(*) as total'))
+                ->groupBy('format')
+                ->orderByDesc('total')
                 ->get();
 
             // Buscar trilhas sonoras em destaque
@@ -235,7 +255,7 @@ class CatalogGraphController extends Controller
                 ->whereIn('wt.work_id', $allWorkIds)
                 ->select('t.id', 't.title', 't.track_type', 'w.title as work_title')
                 ->distinct()
-                ->take(6)
+                ->take(5)
                 ->get();
 
             // Total consolidado de episódios
@@ -323,6 +343,7 @@ class CatalogGraphController extends Controller
                 'creators' => $creators->map(fn($c) => (array)$c)->toArray(),
                 'studios' => $studios->map(fn($s) => (array)$s)->toArray(),
                 'tracks' => $tracks->map(fn($t) => (array)$t)->toArray(),
+                'formats' => $formats->map(fn($f) => (array)$f)->toArray(),
                 'totalEpisodes' => $totalEpisodes,
                 'visibleWorkIds' => $visibleWorkIds,
             ];
@@ -340,6 +361,7 @@ class CatalogGraphController extends Controller
         $creators = collect($data['creators'])->map(fn($c) => (object)$c);
         $studios = collect($data['studios'])->map(fn($s) => (object)$s);
         $tracks = collect($data['tracks'])->map(fn($t) => (object)$t);
+        $formats = collect($data['formats'] ?? [])->map(fn($f) => (object)$f);
         $totalEpisodes = $data['totalEpisodes'];
         $visibleWorkIds = $data['visibleWorkIds'];
 
@@ -362,6 +384,7 @@ class CatalogGraphController extends Controller
                 'creators' => $creators,
                 'studios' => $studios,
                 'tracks' => $tracks,
+                'formats' => $formats,
                 'totalEpisodes' => $totalEpisodes,
                 'isLiked' => (bool) ($pref->liked ?? false),
                 'isBookmarked' => (bool) ($pref->bookmarked ?? false),
