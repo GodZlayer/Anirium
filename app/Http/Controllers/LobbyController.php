@@ -1,0 +1,70 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\Cache\InMemoryCatalogService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use Illuminate\Http\Response;
+
+class LobbyController extends Controller
+{
+    public function __construct(
+        private readonly InMemoryCatalogService $catalogService
+    ) {}
+
+    public function index(Request $request): View|Response
+    {
+        // Se for requisição AJAX de filtragem do Explorar, compila e retorna apenas a parcial Blade da grade
+        if ($request->query('explore_filter') === '1' || $request->header('HX-Explore')) {
+            $format = (string) $request->query('format', 'all');
+            $status = (string) $request->query('status', 'all');
+            $sort = (string) $request->query('sort', 'title');
+            $page = max(1, (int) $request->query('page', 1));
+
+            $exploreData = $this->catalogService->getExploreFeed('all', $format, $page, 24, $status, $sort);
+
+            return response()->view('partials.explore-grid', [
+                'items' => $exploreData['items'],
+                'total' => $exploreData['total'],
+                'page' => $exploreData['page'],
+                'lastPage' => $exploreData['last_page'],
+            ]);
+        }
+
+        // 1. Os 3 lançamentos reais do horário atual para a Arena
+        $featuredRoll = $this->catalogService->getHeroFeatured();
+        $hero = $featuredRoll[0] ?? null;
+
+        // 2. Obras organizadas pelo Calendário semanal real
+        $calendar = $this->catalogService->getCalendarByDay();
+
+        // 3. Catálogo inicial ultraleve (apenas 24 itens para preencher a primeira viewport)
+        // O restante do acervo é mantido no IndexedDB local do cliente a partir de shards colunares
+        $explore = $this->catalogService->getExploreFeed('all', 'all', 1, 24);
+
+        // 4. Usuário autenticado e suas preferências no banco de dados SQLite
+        $user = Auth::user();
+        $userPreferences = [];
+        if ($user) {
+            $userPreferences = DB::table('user_entity_preferences')
+                ->where('user_id', $user->id)
+                ->get()
+                ->keyBy('target_id')
+                ->toArray();
+        }
+
+        return view('pages.lobby', [
+            'hero' => $hero,
+            'featuredRoll' => $featuredRoll,
+            'calendar' => $calendar,
+            'explore' => $explore,
+            'user' => $user,
+            'userPreferences' => $userPreferences,
+            'activeTheme' => 'black',
+            'locale' => app()->getLocale(),
+        ]);
+    }
+}

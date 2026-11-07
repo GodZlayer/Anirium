@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Palette, ChevronDown } from "lucide-react";
 import { useDesignTheme } from "../context/ThemeContext";
 import { SupportedLanguage, THEME_PALETTES } from "../lib/designStrings";
+import { FlagIcon } from "./FlagIcon";
 
 // Mapeamento de bandeiras canônicas e rótulos
 const LANGUAGE_CONFIG: Record<SupportedLanguage, { flag: string; label: string; nativeName: string }> = {
@@ -40,7 +41,7 @@ export function ThemeLanguageSelector() {
   const activePalette = THEME_PALETTES[currentThemeId] || THEME_PALETTES.black;
 
   return (
-    <div className="flex items-center gap-2 relative">
+    <div className="flex items-center gap-1 sm:gap-2 relative">
       {/* 1. SELETOR DE IDIOMAS (Apenas a bandeira antes de abrir) */}
       <div ref={langRef} className="relative">
         <button
@@ -48,14 +49,20 @@ export function ThemeLanguageSelector() {
             setIsLangOpen(!isLangOpen);
             setIsThemeOpen(false);
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 hover:scale-105 cursor-pointer backdrop-blur-md"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border transition-all duration-200 hover:scale-105 cursor-pointer backdrop-blur-md"
           style={{
             backgroundColor: tokens.colors.bgSurface,
             borderColor: isLangOpen ? tokens.colors.accentGold : tokens.colors.borderDefault,
           }}
           title={strings.labels.languagesLabel}
         >
-          <span className="text-base leading-none select-none">{currentFlag}</span>
+          <FlagIcon code={language} className="w-4.5 h-3" />
+          <span
+            className="hidden sm:inline text-[10px] font-mono font-bold uppercase"
+            style={{ color: tokens.colors.textSecondary }}
+          >
+            {language}
+          </span>
           <ChevronDown
             className={`w-3 h-3 transition-transform duration-200 ${isLangOpen ? "rotate-180" : ""}`}
             style={{ color: tokens.colors.textMuted }}
@@ -90,7 +97,7 @@ export function ThemeLanguageSelector() {
                   }}
                 >
                   <span className="flex items-center gap-2">
-                    <span className="text-base leading-none">{item.flag}</span>
+                    <FlagIcon code={langKey} className="w-5 h-3.5" />
                     <span>{item.nativeName}</span>
                   </span>
                   <span className="text-[10px] font-mono opacity-60 uppercase">{item.label}</span>
@@ -108,7 +115,7 @@ export function ThemeLanguageSelector() {
             setIsThemeOpen(!isThemeOpen);
             setIsLangOpen(false);
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 hover:scale-105 cursor-pointer backdrop-blur-md"
+          className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-full border transition-all duration-200 hover:scale-105 cursor-pointer backdrop-blur-md"
           style={{
             backgroundColor: tokens.colors.bgSurface,
             borderColor: isThemeOpen ? tokens.colors.accentGold : tokens.colors.borderDefault,
@@ -117,14 +124,14 @@ export function ThemeLanguageSelector() {
         >
           <Palette className="w-3.5 h-3.5" style={{ color: tokens.colors.accentGold }} />
           <span
-            className="w-2.5 h-2.5 rounded-full border"
+            className="hidden sm:block w-2.5 h-2.5 rounded-full border"
             style={{
               backgroundColor: activePalette.colors.accentGold,
               borderColor: activePalette.colors.borderHighlight,
             }}
           />
           <ChevronDown
-            className={`w-3 h-3 transition-transform duration-200 ${isThemeOpen ? "rotate-180" : ""}`}
+            className={`hidden sm:block w-3 h-3 transition-transform duration-200 ${isThemeOpen ? "rotate-180" : ""}`}
             style={{ color: tokens.colors.textMuted }}
           />
         </button>

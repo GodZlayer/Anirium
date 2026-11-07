@@ -1,0 +1,11 @@
+{
+  "achievement.admin": {"condition":{"field":"tier","operator":"eq","value":3},"labels":{"pt-BR":"Admin Supremo","en-US":"Supreme Admin","ja-JP":"最高管理者","es-ES":"Administrador supremo","fr-FR":"Administrateur suprême","de-DE":"Oberster Administrator"}},
+  "achievement.universe-master": {"condition":{"field":"universes","operator":"gte","value":1},"labels":{"pt-BR":"Fã Master","en-US":"Master Fan","ja-JP":"マスターファン","es-ES":"Fan maestro","fr-FR":"Fan expert","de-DE":"Meisterfan"}},
+  "achievement.episodes-100": {"condition":{"field":"episodes","operator":"gte","value":100},"labels":{"pt-BR":"Lenda Shonen","en-US":"Shonen Legend","ja-JP":"少年アニメの伝説","es-ES":"Leyenda shonen","fr-FR":"Légende shōnen","de-DE":"Shōnen-Legende"}},
+  "achievement.episodes-30": {"condition":{"field":"episodes","operator":"gte","value":30},"labels":{"pt-BR":"Membro Sênior","en-US":"Senior Member","ja-JP":"上級メンバー","es-ES":"Miembro veterano","fr-FR":"Membre confirmé","de-DE":"Erfahrenes Mitglied"}},
+  "achievement.episodes-10": {"condition":{"field":"episodes","operator":"gte","value":10},"labels":{"pt-BR":"Veterano de Simulcast","en-US":"Simulcast Veteran","ja-JP":"同時配信のベテラン","es-ES":"Veterano del simulcast","fr-FR":"Vétéran du simulcast","de-DE":"Simulcast-Veteran"}},
+  "achievement.level-5": {"condition":{"field":"level","operator":"gte","value":5},"labels":{"pt-BR":"Explorador de Universos","en-US":"Universe Explorer","ja-JP":"ユニバースの探検家","es-ES":"Explorador de universos","fr-FR":"Explorateur d’univers","de-DE":"Universenentdecker"}},
+  "achievement.plus": {"condition":{"field":"tier","operator":"eq","value":2},"labels":{"pt-BR":"Anirium+ Pro","en-US":"Anirium+ Pro","ja-JP":"Anirium+ Pro","es-ES":"Anirium+ Pro","fr-FR":"Anirium+ Pro","de-DE":"Anirium+ Pro"}},
+  "achievement.member": {"condition":{"field":"tier","operator":"gte","value":1},"labels":{"pt-BR":"Membro Conectado","en-US":"Connected Member","ja-JP":"接続中のメンバー","es-ES":"Miembro conectado","fr-FR":"Membre connecté","de-DE":"Angemeldetes Mitglied"}},
+  "achievement.guest": {"condition":{"field":"tier","operator":"eq","value":0},"labels":{"pt-BR":"Visitante","en-US":"Guest","ja-JP":"ゲスト","es-ES":"Invitado","fr-FR":"Visiteur","de-DE":"Gast"}}
+}

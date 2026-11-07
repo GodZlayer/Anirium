@@ -1,0 +1,1 @@
+{"name":"anirium-refactor-tools","private":true,"type":"module","dependencies":{"@babel/parser":"7.28.5","@rolldown/binding-win32-x64-msvc":"^1.2.14","@tailwindcss/oxide-win32-x64-msvc":"^4.3.3"}}

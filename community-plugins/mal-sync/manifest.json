@@ -1,0 +1,15 @@
+{
+  "id": "mal-sync",
+  "name": "MAL Sync",
+  "version": "1.0.0",
+  "description": "Sincroniza episódios assistidos, notas e status com o MyAnimeList via OAuth.",
+  "author": "Anirium Official",
+  "license": "Proprietary",
+  "type": "official-plus",
+  "capabilities": ["tracking.sync", "network.external.fetch"],
+  "uiEdits": ["ui.profile.panel", "ui.episode.badge"],
+  "display": ["data.tracking"],
+  "permissions": ["network.external.fetch"],
+  "entrypoint": "episodePage.tsx",
+  "enabled": false
+}

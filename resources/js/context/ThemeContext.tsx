@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { setGamificationLanguage } from "../lib/telemetryXpLoop";
 import {
   THEME_PALETTES,
   I18N_DICTIONARY,
@@ -19,6 +20,8 @@ interface ThemeContextType {
   strings: LocaleStrings;
   getLocalizedTitle: (anime: any) => string;
   getLocalizedSynopsis: (anime: any) => string;
+  adultContentEnabled: boolean;
+  setAdultContentEnabled: (enabled: boolean) => void;
 }
 
 const defaultTheme = THEME_PALETTES.black;
@@ -34,6 +37,8 @@ const ThemeContext = createContext<ThemeContextType>({
   strings: defaultStrings,
   getLocalizedTitle: (anime: any) => anime?.title || "",
   getLocalizedSynopsis: (anime: any) => anime?.synopsis || "",
+  adultContentEnabled: false,
+  setAdultContentEnabled: () => {},
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -49,6 +54,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return (localStorage.getItem("anirium_lang") as SupportedLanguage) || "pt-BR";
     }
     return "pt-BR";
+  });
+
+  const [adultContentEnabled, setAdultContentEnabledState] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("anirium_account_adult_24") === "true";
+    }
+    return false;
   });
 
   const selectedTheme = THEME_PALETTES[themeId] || THEME_PALETTES.black;
@@ -68,8 +80,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setAdultContentEnabled = (enabled: boolean) => {
+    setAdultContentEnabledState(enabled);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("anirium_account_adult_24", enabled ? "true" : "false");
+      fetch("/api/account/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({ adult_content_enabled: enabled }),
+      }).catch(() => {});
+    }
+  };
+
   useEffect(() => {
     const root = document.documentElement;
+    root.lang = language;
+    setGamificationLanguage(language);
+  }, [language]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    for (const [key, value] of Object.entries(selectedTheme.colors)) root.style.setProperty(`--wc-${key}`, value);
     root.style.setProperty("--color-bg-base", selectedTheme.colors.bgBase);
     root.style.setProperty("--color-bg-surface", selectedTheme.colors.bgSurface);
     root.style.setProperty("--color-bg-raised", selectedTheme.colors.bgRaised);
@@ -97,6 +131,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         strings: selectedStrings,
         getLocalizedTitle,
         getLocalizedSynopsis,
+        adultContentEnabled,
+        setAdultContentEnabled,
       }}
     >
       {children}

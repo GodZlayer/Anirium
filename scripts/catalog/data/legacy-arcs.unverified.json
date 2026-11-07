@@ -1,0 +1,1094 @@
+{
+  "verification": "unverified",
+  "origin": "resources/js/lib/canonicalArcs.ts",
+  "records": {
+    "bleach": [
+      {
+        "arcId": "bleach-arc-1",
+        "name": "Arco do Shinigami Substituto",
+        "saga": "Introdução ao Seireitei",
+        "startEp": 1,
+        "endEp": 20,
+        "episodesCount": 20,
+        "isFiller": false,
+        "synopsis": "Ichigo Kurosaki recebe os poderes de Shinigami de Rukia Kuchiki para proteger sua família dos Hollows em Karakura Town."
+      },
+      {
+        "arcId": "bleach-arc-2",
+        "name": "Arco da Sociedade das Almas: A Infiltração",
+        "saga": "Soul Society",
+        "startEp": 21,
+        "endEp": 41,
+        "episodesCount": 21,
+        "isFiller": false,
+        "synopsis": "Ichigo e seus amigos invadem a Sociedade das Almas através do Dangai para resgatar Rukia de sua execução iminente."
+      },
+      {
+        "arcId": "bleach-arc-3",
+        "name": "Arco da Sociedade das Almas: O Resgate Crucial",
+        "saga": "Soul Society",
+        "startEp": 42,
+        "endEp": 63,
+        "episodesCount": 22,
+        "isFiller": false,
+        "synopsis": "Batalhas contra os Capitães do Gotei 13, o despertar da Bankai de Ichigo e a chocante revelação da traição de Sosuke Aizen."
+      },
+      {
+        "arcId": "bleach-arc-4",
+        "name": "Arco dos Bounts",
+        "saga": "Bount (Anime Original)",
+        "startEp": 64,
+        "endEp": 91,
+        "episodesCount": 28,
+        "isFiller": true,
+        "synopsis": "Os Bounts, humanos imortais que devoram almas liderados por Jin Kariya, buscam invadir e destruir a Sociedade das Almas."
+      },
+      {
+        "arcId": "bleach-arc-5",
+        "name": "Arco dos Bounts: Assalto ao Seireitei",
+        "saga": "Bount (Anime Original)",
+        "startEp": 92,
+        "endEp": 109,
+        "episodesCount": 18,
+        "isFiller": true,
+        "synopsis": "Os Bounts invadem o Seireitei forçando os Capitães e Ichigo a combaterem a tecnologia das Marionetes ancestrais."
+      },
+      {
+        "arcId": "bleach-arc-6",
+        "name": "Arco dos Arrancars: A Chegada",
+        "saga": "Arrancar",
+        "startEp": 110,
+        "endEp": 131,
+        "episodesCount": 22,
+        "isFiller": false,
+        "synopsis": "Aizen desperta os Arrancars com o Hogyoku; Ulquiorra e Grimmjow chegam ao mundo dos vivos enquanto Ichigo treina com os Visoreds."
+      },
+      {
+        "arcId": "bleach-arc-7",
+        "name": "Arco dos Arrancars: Entrada Furtiva no Hueco Mundo",
+        "saga": "Hueco Mundo",
+        "startEp": 132,
+        "endEp": 151,
+        "episodesCount": 20,
+        "isFiller": false,
+        "synopsis": "Orihime Inoue é sequestrada por Aizen; Ichigo, Chad e Uryuu partem para o palácio de Las Noches no deserto do Hueco Mundo."
+      },
+      {
+        "arcId": "bleach-arc-8",
+        "name": "Arco dos Arrancars: O Combate Feroz",
+        "saga": "Hueco Mundo",
+        "startEp": 152,
+        "endEp": 167,
+        "episodesCount": 16,
+        "isFiller": false,
+        "synopsis": "Batalhas de vida ou morte no Hueco Mundo contra os Espadas e Privaron Espadas dentro de Las Noches."
+      },
+      {
+        "arcId": "bleach-arc-9",
+        "name": "Arco do Novo Capitão Shusuke Amagai",
+        "saga": "Anime Original",
+        "startEp": 168,
+        "endEp": 189,
+        "episodesCount": 22,
+        "isFiller": true,
+        "synopsis": "Um novo capitão é designado para o 3º Esquadrão, escondendo segredos vingativos com a misteriosa lâmina Bakkou-tou."
+      },
+      {
+        "arcId": "bleach-arc-10",
+        "name": "Arco dos Arrancars vs Shinigamis",
+        "saga": "Hueco Mundo",
+        "startEp": 190,
+        "endEp": 205,
+        "episodesCount": 16,
+        "isFiller": false,
+        "synopsis": "Capitães Kenpachi, Byakuya, Mayuri e Unohana chegam ao Hueco Mundo para virar a batalha contra os Espadas mais poderosos."
+      },
+      {
+        "arcId": "bleach-arc-11",
+        "name": "Arco do Passado: Turn Back the Pendulum",
+        "saga": "Pêndulo Ancestral",
+        "startEp": 206,
+        "endEp": 212,
+        "episodesCount": 7,
+        "isFiller": false,
+        "synopsis": "110 anos antes da era atual: como Kisuke Urahara, Yoruichi e Shinji Hirako foram traídos pelos experimentos de Aizen com Hollowficação."
+      },
+      {
+        "arcId": "bleach-arc-12",
+        "name": "Arco da Batalha Decisiva em Karakura Falsa",
+        "saga": "Batalha de Karakura",
+        "startEp": 213,
+        "endEp": 229,
+        "episodesCount": 17,
+        "isFiller": false,
+        "synopsis": "O Gotei 13 enfrenta o Top 3 dos Espadas (Starrk, Baraggan e Harribel) protegidos pelos pilares de teletransporte de Karakura."
+      },
+      {
+        "arcId": "bleach-arc-13",
+        "name": "Arco dos Contos das Zanpakutos Desconhecidas",
+        "saga": "Zanpakuto (Anime Original)",
+        "startEp": 230,
+        "endEp": 265,
+        "episodesCount": 36,
+        "isFiller": true,
+        "synopsis": "Muramasa liberta os espíritos das Zanpakutos de seus mestres, mergulhando o Seireitei em uma rebelião épica de espadas."
+      },
+      {
+        "arcId": "bleach-arc-14",
+        "name": "Arco do Clímax da Batalha de Karakura",
+        "saga": "Clímax de Aizen",
+        "startEp": 266,
+        "endEp": 316,
+        "episodesCount": 51,
+        "isFiller": false,
+        "synopsis": "Aizen transcende em sua forma definitiva com o Hogyoku; Ichigo treina no Dangai e desperta o Getsuga Tensho Final (Mugetsu)."
+      },
+      {
+        "arcId": "bleach-arc-15",
+        "name": "Arco do Exército de Invasão do Gotei 13",
+        "saga": "Reigai (Anime Original)",
+        "startEp": 317,
+        "endEp": 342,
+        "episodesCount": 26,
+        "isFiller": true,
+        "synopsis": "Clones espirituais idênticos chamados Reigai substituem os Capitães enquanto Inaba Kageroza tenta capturar Nozomi Kujo."
+      },
+      {
+        "arcId": "bleach-arc-16",
+        "name": "Arco do Shinigami Substituto Perdido (Fullbringer)",
+        "saga": "Fullbringer",
+        "startEp": 343,
+        "endEp": 366,
+        "episodesCount": 24,
+        "isFiller": false,
+        "synopsis": "17 meses após a derrota de Aizen, Ichigo busca recuperar seus poderes perdidos com Kugo Ginjo e o grupo de humanos Xcution.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 269
+      },
+      {
+        "arcId": "bleach-arc-17",
+        "name": "A Guerra Sangrenta dos Mil Anos (TYBW - Parte 1)",
+        "saga": "A Invasão Quincy",
+        "startEp": 1,
+        "endEp": 13,
+        "episodesCount": 13,
+        "isFiller": false,
+        "synopsis": "Yhwach e o exército do Wandenreich invadem a Sociedade das Almas, dizimando o Seireitei e declarando guerra total.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 41467
+      },
+      {
+        "arcId": "bleach-arc-18",
+        "name": "TYBW: A Separação (Ketsubetsu-tan)",
+        "saga": "Divisão Zero & Treinamento",
+        "startEp": 1,
+        "endEp": 13,
+        "episodesCount": 13,
+        "isFiller": false,
+        "synopsis": "Ichigo reforja Zangetsu no Palácio Real enquanto Uryu Ishida surpreende a todos ao se juntar aos Quincys.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 53998
+      },
+      {
+        "arcId": "bleach-arc-19",
+        "name": "TYBW: O Conflito (Soukoku-tan)",
+        "saga": "Palácio do Rei das Almas",
+        "startEp": 1,
+        "endEp": 13,
+        "episodesCount": 13,
+        "isFiller": false,
+        "synopsis": "Yhwach invade a dimensão do Rei das Almas; os Capitães liberam suas Bankais supremas em defesas desesperadas.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 56784
+      }
+    ],
+    "naruto": [
+      {
+        "arcId": "naruto-arc-1",
+        "name": "Prólogo: País das Ondas",
+        "saga": "Introdução Ninja",
+        "startEp": 1,
+        "endEp": 19,
+        "episodesCount": 19,
+        "isFiller": false,
+        "synopsis": "O Time 7 de Kakashi escolta o construtor Tazuna e enfrenta Zabuza Momochi e Haku na ponte inacabada.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 20
+      },
+      {
+        "arcId": "naruto-arc-2",
+        "name": "Exames Chunin & Floresta da Morte",
+        "saga": "Exames Chunin",
+        "startEp": 20,
+        "endEp": 67,
+        "episodesCount": 48,
+        "isFiller": false,
+        "synopsis": "Ninjas de todas as vilas disputam a promoção na Floresta da Morte até a invasão da marca da maldição de Orochimaru.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 20
+      },
+      {
+        "arcId": "naruto-arc-3",
+        "name": "Destruição de Konoha",
+        "saga": "Crise de Konoha",
+        "startEp": 68,
+        "endEp": 80,
+        "episodesCount": 13,
+        "isFiller": false,
+        "synopsis": "Orochimaru ataca a Vila da Folha, matando o Terceiro Hokage enquanto Naruto enfrenta Gaara e o Shukaku de Uma Cauda.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 20
+      },
+      {
+        "arcId": "naruto-arc-4",
+        "name": "Busca por Tsunade",
+        "saga": "A Quinta Hokage",
+        "startEp": 81,
+        "endEp": 100,
+        "episodesCount": 20,
+        "isFiller": false,
+        "synopsis": "Itachi Uchiha surge em Konoha; Jiraiya leva Naruto para aprender o Rasengan e convencer Tsunade a assumir o título de Hokage.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 20
+      },
+      {
+        "arcId": "naruto-arc-5",
+        "name": "Missão de Resgate de Sasuke",
+        "saga": "O Duelo no Vale do Fim",
+        "startEp": 107,
+        "endEp": 135,
+        "episodesCount": 29,
+        "isFiller": false,
+        "synopsis": "O Quarteto do Som escolta Sasuke até Orochimaru; Naruto e os Genins de Konoha travam combates desesperados até o Vale do Fim.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 20
+      },
+      {
+        "arcId": "naruto-arc-6",
+        "name": "Missões Pré-Shippuden de Konoha",
+        "saga": "Transição de Treinamento",
+        "startEp": 136,
+        "endEp": 220,
+        "episodesCount": 85,
+        "isFiller": true,
+        "synopsis": "Missões e aventuras ao redor das vilas ninja enquanto Naruto se prepara para os três anos de treino com mestre Jiraiya.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 20
+      },
+      {
+        "arcId": "naruto-arc-7",
+        "name": "Shippuden: Resgate do Kazekage",
+        "saga": "Akatsuki em Ação",
+        "startEp": 1,
+        "endEp": 32,
+        "episodesCount": 32,
+        "isFiller": false,
+        "synopsis": "Sasori e Deidara sequestram Gaara; Naruto e o Time Kakashi aliam-se à Vila da Areia para salvar o Kazekage.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 1735
+      },
+      {
+        "arcId": "naruto-arc-8",
+        "name": "Shippuden: Reunião com Sasuke & Hidan/Kakuzu",
+        "saga": "Vingança e Laços",
+        "startEp": 33,
+        "endEp": 88,
+        "episodesCount": 56,
+        "isFiller": false,
+        "synopsis": "A Ponte Tenchi, o treinamento do Rasenshuriken e a morte heroica de Asuma Sarutobi.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 1735
+      },
+      {
+        "arcId": "naruto-arc-9",
+        "name": "Shippuden: Morte de Jiraiya & Invasão de Pain",
+        "saga": "O Deus de Amegakure",
+        "startEp": 113,
+        "endEp": 175,
+        "episodesCount": 63,
+        "isFiller": false,
+        "synopsis": "Jiraiya infiltra-se na Chuva; Pain destrói Konoha e Naruto retorna com o Modo Sábio para proteger seus amigos.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 1735
+      },
+      {
+        "arcId": "naruto-arc-10",
+        "name": "Shippuden: Quarta Grande Guerra Ninja",
+        "saga": "Clímax Mundial",
+        "startEp": 261,
+        "endEp": 479,
+        "episodesCount": 219,
+        "isFiller": false,
+        "synopsis": "A aliança de todas as vilas contra Madara Uchiha, Obito e Kaguya Otsutsuki, terminando no último duelo no Vale do Fim.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 1735
+      },
+      {
+        "arcId": "naruto-arc-11",
+        "name": "The Last: Naruto the Movie (Epílogo Canônico)",
+        "saga": "A Queda da Lua & O Casamento",
+        "startEp": 1,
+        "endEp": 1,
+        "episodesCount": 1,
+        "isFiller": false,
+        "synopsis": "Filme canônico de 112 minutos: Toneri Otsutsuki ameaça derrubar a Lua sobre a Terra; Naruto e Hinata descobrem seus sentimentos.",
+        "arcType": "CANON_MOVIE",
+        "sourceWorkMalId": 16870
+      }
+    ],
+    "hunter-x-hunter": [
+      {
+        "arcId": "hxh-arc-1",
+        "name": "Exame Hunter",
+        "saga": "O Começo da Jornada",
+        "startEp": 1,
+        "endEp": 26,
+        "episodesCount": 26,
+        "isFiller": false,
+        "synopsis": "Gon, Killua, Kurapika e Leorio enfrentam as provações perigosas do Exame para obterem a licença oficial de Hunter."
+      },
+      {
+        "arcId": "hxh-arc-2",
+        "name": "Arena Celestial",
+        "saga": "O Despertar do Nen",
+        "startEp": 27,
+        "endEp": 36,
+        "episodesCount": 10,
+        "isFiller": false,
+        "synopsis": "Gon e Killua sobem os 200 andares da torre de lutas e aprendem os quatro princípios básicos do Nen com mestre Wing."
+      },
+      {
+        "arcId": "hxh-arc-3",
+        "name": "Leilão de Yorknew & Trupe Fantasma",
+        "saga": "Genei Ryodan",
+        "startEp": 37,
+        "endEp": 58,
+        "episodesCount": 22,
+        "isFiller": false,
+        "synopsis": "Kurapika busca vingança contra os Olhos Escarlates de seu clã enfrentando o grupo criminoso liderado por Chrollo Lucilfer."
+      },
+      {
+        "arcId": "hxh-arc-4",
+        "name": "Greed Island",
+        "saga": "O Jogo de Nen Real",
+        "startEp": 59,
+        "endEp": 75,
+        "episodesCount": 17,
+        "isFiller": false,
+        "synopsis": "Gon e Killua entram no jogo virtual materializado deixado por Ging e completam seu treinamento avançado de Nen com Biscuit."
+      },
+      {
+        "arcId": "hxh-arc-5",
+        "name": "Formigas Quimera (Chimera Ants)",
+        "saga": "Guerra Quimera",
+        "startEp": 76,
+        "endEp": 136,
+        "episodesCount": 61,
+        "isFiller": false,
+        "synopsis": "A invasão das Formigas Quimera e o nascimento do Rei Meruem, culminando no sacrifício de Netero e na fúria transcendental de Gon."
+      },
+      {
+        "arcId": "hxh-arc-6",
+        "name": "Eleição do 13º Presidente & Cura de Gon",
+        "saga": "Associação Hunter e Zoldyck",
+        "startEp": 137,
+        "endEp": 148,
+        "episodesCount": 12,
+        "isFiller": false,
+        "synopsis": "Os Zodíacos disputam a liderança da Associação enquanto Killua liberta Alluka e Nanika para salvar a vida de Gon."
+      }
+    ],
+    "shingeki-no-kyojin": [
+      {
+        "arcId": "snk-arc-1",
+        "name": "Queda de Shiganshina & Batalha de Trost",
+        "saga": "Temporada 1 - Parte 1",
+        "startEp": 1,
+        "endEp": 13,
+        "episodesCount": 13,
+        "isFiller": false,
+        "synopsis": "A quebra da Muralha Maria pelo Titã Colossal e o despertar do poder oculto de Eren Jaeger durante a defesa de Trost."
+      },
+      {
+        "arcId": "snk-arc-2",
+        "name": "57ª Expedição & Titã Fêmea",
+        "saga": "Temporada 1 - Parte 2",
+        "startEp": 14,
+        "endEp": 25,
+        "episodesCount": 12,
+        "isFiller": false,
+        "synopsis": "A Tropa de Exploração liderada por Erwin e Levi cerca a Titã Fêmea na floresta de árvores gigantes e em Stohess."
+      },
+      {
+        "arcId": "snk-arc-3",
+        "name": "Investigação da Muralha Rose & Castelo Utgard",
+        "saga": "Temporada 2",
+        "startEp": 26,
+        "endEp": 37,
+        "episodesCount": 12,
+        "isFiller": false,
+        "synopsis": "A revelação dos traidores Reiner e Bertholdt no topo da muralha e o primeiro uso da Coordenada por Eren."
+      },
+      {
+        "arcId": "snk-arc-4",
+        "name": "Revolta Governamental & Retomada de Shiganshina",
+        "saga": "Temporada 3",
+        "startEp": 38,
+        "endEp": 59,
+        "episodesCount": 22,
+        "isFiller": false,
+        "synopsis": "O golpe militar contra os Reiss e a batalha de vida ou morte no retorno à casa de Eren para abrir o porão."
+      },
+      {
+        "arcId": "snk-arc-5",
+        "name": "Guerra de Marley & O Rugido da Terra (Rumbling)",
+        "saga": "Final Season",
+        "startEp": 60,
+        "endEp": 89,
+        "episodesCount": 30,
+        "isFiller": false,
+        "synopsis": "A travessia do oceano para Liberio, a conspiração dos Yeageristas e a marcha dos Titãs Colossais para esmagar o mundo."
+      }
+    ],
+    "one-piece": [
+      {
+        "arcId": "op-arc-1",
+        "name": "Saga do East Blue",
+        "saga": "Reunindo o Bando",
+        "startEp": 1,
+        "endEp": 61,
+        "episodesCount": 61,
+        "isFiller": false,
+        "synopsis": "Luffy parte ao mar, recruta Zoro, Nami, Usopp e Sanji antes de entrar na Montanha Reversa rumo à Grand Line."
+      },
+      {
+        "arcId": "op-arc-2",
+        "name": "Saga de Alabasta",
+        "saga": "Grand Line",
+        "startEp": 62,
+        "endEp": 135,
+        "episodesCount": 74,
+        "isFiller": false,
+        "synopsis": "A princesa Vivi pede ajuda contra Crocodile e a Baroque Works na guerra civil das areias de Alabasta."
+      },
+      {
+        "arcId": "op-arc-3",
+        "name": "Saga de Skypiea (Ilha do Céu)",
+        "saga": "Mar Branco",
+        "startEp": 136,
+        "endEp": 206,
+        "episodesCount": 71,
+        "isFiller": false,
+        "synopsis": "O navio sobe a Knock Up Stream rumo à cidade de ouro de Shandora e enfrenta o deus Enel nas nuvens."
+      },
+      {
+        "arcId": "op-arc-4",
+        "name": "Saga de Water 7 & Enies Lobby",
+        "saga": "Governo Mundial",
+        "startEp": 207,
+        "endEp": 325,
+        "episodesCount": 119,
+        "isFiller": false,
+        "synopsis": "Declaração de guerra ao Governo Mundial na torre de Enies Lobby para resgatar Robin das garras da CP9."
+      },
+      {
+        "arcId": "op-arc-5",
+        "name": "Saga de Thriller Bark",
+        "saga": "Triângulo Florian",
+        "startEp": 326,
+        "endEp": 384,
+        "episodesCount": 59,
+        "isFiller": false,
+        "synopsis": "O navio fantasma gigante de Gecko Moria rouba sombras; Zoro assume a dor insuportável de Luffy contra Bartholomew Kuma."
+      },
+      {
+        "arcId": "op-arc-6",
+        "name": "Saga da Guerra dos Maiorais (Marineford)",
+        "saga": "Cúpula do Poder",
+        "startEp": 385,
+        "endEp": 516,
+        "episodesCount": 132,
+        "isFiller": false,
+        "synopsis": "Arquipélago Sabaody, invasão de Impel Down e a grande batalha de Marineford para salvar Portgas D. Ace."
+      },
+      {
+        "arcId": "op-arc-7",
+        "name": "Saga da Ilha dos Homens-Peixe & Punk Hazard",
+        "saga": "Novo Mundo",
+        "startEp": 517,
+        "endEp": 628,
+        "episodesCount": 112,
+        "isFiller": false,
+        "synopsis": "Reunião de 2 anos, travessia submarina e a aliança com Trafalgar Law no laboratório de Caesar Clown."
+      },
+      {
+        "arcId": "op-arc-8",
+        "name": "Saga de Dressrosa",
+        "saga": "Doflamingo",
+        "startEp": 629,
+        "endEp": 746,
+        "episodesCount": 118,
+        "isFiller": false,
+        "synopsis": "O coliseu de gladiadores, a farsa da família Donquixote e a revelação do Gear Fourth de Luffy."
+      },
+      {
+        "arcId": "op-arc-9",
+        "name": "Saga de Zou & Ilha Whole Cake",
+        "saga": "Quatro Imperadores",
+        "startEp": 747,
+        "endEp": 891,
+        "episodesCount": 145,
+        "isFiller": false,
+        "synopsis": "Infiltração no território da Yonkou Big Mom para impedir o casamento forçado de Sanji e duelo contra Katakuri."
+      },
+      {
+        "arcId": "op-arc-10",
+        "name": "Saga do País de Wano",
+        "saga": "Kaido & O Despertar do Gear 5",
+        "startEp": 892,
+        "endEp": 1085,
+        "episodesCount": 194,
+        "isFiller": false,
+        "synopsis": "A invasão de Onigashima, a libertação de Wano do jugo de Kaido e o lendário despertar do Deus do Sol Nika (Gear 5)."
+      },
+      {
+        "arcId": "op-arc-11",
+        "name": "Saga da Ilha Egghead",
+        "saga": "A Ilha do Futuro",
+        "startEp": 1086,
+        "endEp": 1122,
+        "episodesCount": 37,
+        "isFiller": false,
+        "synopsis": "O laboratório futurista do Dr. Vegapunk, os segredos do Século Perdido e o assalto da marinha com os Cinco Anciãos Gorosei."
+      }
+    ],
+    "keroro": [
+      {
+        "arcId": "keroro-arc-1",
+        "name": "Arco 1: Invasão da Terra & Pelotão Reunido",
+        "saga": "Temporada 1",
+        "startEp": 1,
+        "endEp": 51,
+        "episodesCount": 51,
+        "isFiller": false,
+        "synopsis": "O Sargento Keroro é abandonado na Terra e adotado pela família Hinata; reunião gradual de Tamama, Giroro, Kururu e Dororo."
+      },
+      {
+        "arcId": "keroro-arc-2",
+        "name": "Arco 2: Garuru & A Batalha Decisiva de Pekopon",
+        "saga": "Temporada 2",
+        "startEp": 52,
+        "endEp": 103,
+        "episodesCount": 52,
+        "isFiller": false,
+        "synopsis": "O pelotão de elite do Tenente Garuru invade Pekopon para substituir o Pelotão Keroro por incompetência bélica."
+      },
+      {
+        "arcId": "keroro-arc-3",
+        "name": "Arco 3: Shurara Corps & O Selo Keroniano",
+        "saga": "Temporada 3",
+        "startEp": 104,
+        "endEp": 154,
+        "episodesCount": 51,
+        "isFiller": false,
+        "synopsis": "O misterioso Corpo Shurara e seus assassinos keronianos tentam roubar os bonecos de poder do Pelotão Keroro."
+      },
+      {
+        "arcId": "keroro-arc-4",
+        "name": "Arco 4: Invasões Sazonais & Operações Subterrâneas",
+        "saga": "Temporada 4",
+        "startEp": 155,
+        "endEp": 205,
+        "episodesCount": 51,
+        "isFiller": false,
+        "synopsis": "Planos hilários de dominação mundial e novas invenções científicas malucas de Kururu sob a casa dos Hinata."
+      },
+      {
+        "arcId": "keroro-arc-5",
+        "name": "Arco 5: Crise Dimensional de Keron",
+        "saga": "Temporada 5",
+        "startEp": 206,
+        "endEp": 256,
+        "episodesCount": 51,
+        "isFiller": false,
+        "synopsis": "Anomalias espaciais atraem ameaças de civilizações alienígenas rivais enquanto Keroro tenta montar seus modelos Gunpla."
+      },
+      {
+        "arcId": "keroro-arc-6",
+        "name": "Arco 6: Desafios Galácticos & Invasores Nobres",
+        "saga": "Temporada 6",
+        "startEp": 257,
+        "endEp": 307,
+        "episodesCount": 51,
+        "isFiller": false,
+        "synopsis": "Novos aliados e rivais intergalácticos desafiam o pelotão na Terra com duelos de comédia e estratégias absurdas."
+      },
+      {
+        "arcId": "keroro-arc-7",
+        "name": "Arco 7: A Grande Conclusão de Pekopon",
+        "saga": "Temporada 7",
+        "startEp": 308,
+        "endEp": 358,
+        "episodesCount": 51,
+        "isFiller": false,
+        "synopsis": "O clímax dos 358 episódios: o pelotão precisa provar o valor de sua amizade com Fuyuki e Natsumi diante do alto comando de Keron."
+      }
+    ],
+    "kimetsu": [
+      {
+        "arcId": "kny-arc-1",
+        "name": "Seleção Final & Treinamento",
+        "saga": "Kamado Tanjirou Risshi-hen",
+        "startEp": 1,
+        "endEp": 5,
+        "episodesCount": 5,
+        "isFiller": false,
+        "synopsis": "Tanjirou treina com Urokodaki na montanha Sagiri após o massacre de sua família e sobrevive aos sete dias no Monte Fujikasane.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 38000
+      },
+      {
+        "arcId": "kny-arc-2",
+        "name": "Primeiras Missões & Asakusa (Muzan Kibutsuji)",
+        "saga": "Kamado Tanjirou Risshi-hen",
+        "startEp": 6,
+        "endEp": 14,
+        "episodesCount": 9,
+        "isFiller": false,
+        "synopsis": "Encontro aterrador com Muzan em Tóquio, aliança médica com Tamayo e Yushiro, e combate contra Kyogai na Casa dos Tambores.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 38000
+      },
+      {
+        "arcId": "kny-arc-3",
+        "name": "Montanha Natagumo (Família Aranha de Rui)",
+        "saga": "Kamado Tanjirou Risshi-hen",
+        "startEp": 15,
+        "endEp": 21,
+        "episodesCount": 7,
+        "isFiller": false,
+        "synopsis": "Tanjirou, Zenitsu e Inosuke enfrentam a Lua Inferior Cinco Rui; despertar da Dança do Deus do Fogo (Hinokami Kagura).",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 38000
+      },
+      {
+        "arcId": "kny-arc-4",
+        "name": "Reabilitação na Mansão Borboleta",
+        "saga": "Kamado Tanjirou Risshi-hen",
+        "startEp": 22,
+        "endEp": 26,
+        "episodesCount": 5,
+        "isFiller": false,
+        "synopsis": "Julgamento diante dos Nove Hashiras e treinamento de Respiração Foco Total Constante com Shinobu e Kanao.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 38000
+      },
+      {
+        "arcId": "kny-arc-5",
+        "name": "Trem Infinito (Mugen Train - Filme Canônico)",
+        "saga": "Mugen Ressha-hen",
+        "startEp": 1,
+        "endEp": 1,
+        "episodesCount": 1,
+        "isFiller": false,
+        "synopsis": "Filme canônico de 117 minutos: Tanjirou une-se ao Hashira das Chamas, Kyojuro Rengoku, a bordo do trem contra Enmu e a Lua Superior Três Akaza.",
+        "arcType": "CANON_MOVIE",
+        "sourceWorkMalId": 40456
+      },
+      {
+        "arcId": "kny-arc-6",
+        "name": "Distrito do Entretenimento (Yuukaku-hen)",
+        "saga": "Distrito da Luz Vermelha",
+        "startEp": 1,
+        "endEp": 11,
+        "episodesCount": 11,
+        "isFiller": false,
+        "synopsis": "Infiltração com o Hashira do Som, Tengen Uzui, em Yoshiwara contra os irmãos demoníacos Daki e Gyutaro (Lua Superior Seis).",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 47778
+      },
+      {
+        "arcId": "kny-arc-7",
+        "name": "Vila dos Ferreiros (Katanakaji no Sato-hen)",
+        "saga": "Espadas Nichirin & Marcas",
+        "startEp": 1,
+        "endEp": 11,
+        "episodesCount": 11,
+        "isFiller": false,
+        "synopsis": "Muichiro Tokito e Mitsuri Kanroji despertam a Marca do Caçador contra as Luas Superiores Gyokko e Hantengu.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 51019
+      },
+      {
+        "arcId": "kny-arc-8",
+        "name": "Treinamento dos Hashiras (Hashira Geiko-hen)",
+        "saga": "Preparação para a Guerra",
+        "startEp": 1,
+        "endEp": 8,
+        "episodesCount": 8,
+        "isFiller": false,
+        "synopsis": "Todos os Caçadores passam pelos regimes de treinamento rigoroso dos Pilares antes do assalto repentino de Muzan.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 55701
+      }
+    ],
+    "jujutsu-kaisen": [
+      {
+        "arcId": "jjk-arc-0",
+        "name": "Jujutsu Kaisen 0 (Filme Prólogo Canônico)",
+        "saga": "O Despertar de Yuta Okkotsu",
+        "startEp": 1,
+        "endEp": 1,
+        "episodesCount": 1,
+        "isFiller": false,
+        "synopsis": "Filme canônico de 105 minutos: Yuta Okkotsu entra na Escola Jujutsu com o espírito vingativo de Rika Orimoto e enfrenta Suguru Geto na Parada Noturna dos Cem Demônios.",
+        "arcType": "CANON_MOVIE",
+        "sourceWorkMalId": 48561
+      },
+      {
+        "arcId": "jjk-arc-1",
+        "name": "Feto Amaldiçoado & Morte Temporária de Itadori",
+        "saga": "Introdução Feiticeira",
+        "startEp": 1,
+        "endEp": 8,
+        "episodesCount": 8,
+        "isFiller": false,
+        "synopsis": "Yuji engole o dedo de Sukuna e é admitido na Escola Jujutsu de Tóquio ao lado de Megumi Fushiguro e Nobara Kugisaki.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 40748
+      },
+      {
+        "arcId": "jjk-arc-2",
+        "name": "Treinamento com Nanami vs Mahito",
+        "saga": "O Humano de Remendos",
+        "startEp": 9,
+        "endEp": 13,
+        "episodesCount": 5,
+        "isFiller": false,
+        "synopsis": "Kento Nanami e Yuji investigam os assassinatos no cinema e confrontam a maldição de grau especial Mahito.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 40748
+      },
+      {
+        "arcId": "jjk-arc-3",
+        "name": "Torneio Intercolegial de Kyoto",
+        "saga": "Disputa Entre Escolas",
+        "startEp": 14,
+        "endEp": 21,
+        "episodesCount": 8,
+        "isFiller": false,
+        "synopsis": "Batalhas de feitiçaria entre as escolas de Tóquio e Kyoto, interrompidas pela invasão de Hanami e maldições no pavilhão.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 40748
+      },
+      {
+        "arcId": "jjk-arc-4",
+        "name": "Origem da Obediência Cega (Pinturas da Morte)",
+        "saga": "Irmãos Amaldiçoados",
+        "startEp": 22,
+        "endEp": 24,
+        "episodesCount": 3,
+        "isFiller": false,
+        "synopsis": "Yuji e Nobara enfrentam os irmãos Eso e Kechizu usando o Kokusen (Clarão Negro) sincronizado.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 40748
+      },
+      {
+        "arcId": "jjk-arc-5",
+        "name": "O Passado Oculto de Gojo (Kaigyoku/Gyokusetsu)",
+        "saga": "Juventude de Satoru Gojo",
+        "startEp": 1,
+        "endEp": 5,
+        "episodesCount": 5,
+        "isFiller": false,
+        "synopsis": "Em 2006, Gojo e Geto protegem o Receptáculo de Plasma Estelar Riko Amanai e enfrentam o assassino Toji Fushiguro.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 51009
+      },
+      {
+        "arcId": "jjk-arc-6",
+        "name": "O Incidente de Shibuya (Shibuya Jihen)",
+        "saga": "O Selamento de Satoru Gojo",
+        "startEp": 6,
+        "endEp": 23,
+        "episodesCount": 18,
+        "isFiller": false,
+        "synopsis": "No Halloween em Shibuya, Gojo é preso na Prisão de Confinamento; Sukuna é despertado e devasta a cidade com o Santuário Malevolente.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 51009
+      }
+    ],
+    "fma": [
+      {
+        "arcId": "fma-arc-1",
+        "name": "O Pecado Original & A Busca pela Pedra Filosofal",
+        "saga": "Início da Alquimia",
+        "startEp": 1,
+        "endEp": 14,
+        "episodesCount": 14,
+        "isFiller": false,
+        "synopsis": "A transmutação humana proibida dos irmãos Elric, a tragédia de Nina Tucker e o assassino de Alquimistas Federais Scar.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 5114
+      },
+      {
+        "arcId": "fma-arc-2",
+        "name": "A Conspiração dos Homúnculos & Dublith",
+        "saga": "Segredos Militares",
+        "startEp": 15,
+        "endEp": 30,
+        "episodesCount": 16,
+        "isFiller": false,
+        "synopsis": "A morte do Coronel Hughes, o covil de Ganância e a revelação de que o Rei Bradley é o Homúnculo Ira.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 5114
+      },
+      {
+        "arcId": "fma-arc-3",
+        "name": "A Fortaleza de Briggs no Norte",
+        "saga": "Fronteira Gelada",
+        "startEp": 31,
+        "endEp": 44,
+        "episodesCount": 14,
+        "isFiller": false,
+        "synopsis": "Edward e Alphonse chegam ao posto de Olivier Mira Armstrong e descobrem o túnel circular cavado por Sloth para o Círculo de Transmutação Nacional.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 5114
+      },
+      {
+        "arcId": "fma-arc-4",
+        "name": "O Dia Prometido & O Confronto Final com o Pai",
+        "saga": "Clímax de Amestris",
+        "startEp": 45,
+        "endEp": 64,
+        "episodesCount": 20,
+        "isFiller": false,
+        "synopsis": "Durante o eclipse solar, as forças de Roy Mustang, Briggs e os irmãos Elric combatem o Pai supremo diante do Portão da Verdade.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 5114
+      }
+    ],
+    "dragon ball": [
+      {
+        "arcId": "dbz-arc-1",
+        "name": "Saga dos Saiyajins (Raditz, Nappa & Vegeta)",
+        "saga": "Dragon Ball Z",
+        "startEp": 1,
+        "endEp": 35,
+        "episodesCount": 35,
+        "isFiller": false,
+        "synopsis": "A chegada de Raditz revela a origem Saiyajin de Goku; treinamento no Outro Mundo com Sr. Kaioh e o duelo mortal contra o Príncipe Vegeta.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 813
+      },
+      {
+        "arcId": "dbz-arc-2",
+        "name": "Saga de Namekusei & Imperador Freeza",
+        "saga": "Dragon Ball Z",
+        "startEp": 36,
+        "endEp": 107,
+        "episodesCount": 72,
+        "isFiller": false,
+        "synopsis": "A corrida pelas Esferas do Dragão de Namekusei, as Forças Especiais Ginyu e o lendário despertar do Super Saiyajin contra Freeza.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 813
+      },
+      {
+        "arcId": "dbz-arc-3",
+        "name": "Saga de Garlic Jr. (Retorno da Estrela Makyo)",
+        "saga": "Anime Original",
+        "startEp": 108,
+        "endEp": 117,
+        "episodesCount": 10,
+        "isFiller": true,
+        "synopsis": "Garlic Jr. escapa da Zona Mortal com a Névoa Aqua para dominar os terráqueos enquanto Goku está ausente no espaço.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 813
+      },
+      {
+        "arcId": "dbz-arc-4",
+        "name": "Saga dos Androides & Jogos de Cell",
+        "saga": "Dragon Ball Z",
+        "startEp": 118,
+        "endEp": 194,
+        "episodesCount": 77,
+        "isFiller": false,
+        "synopsis": "Trunks do Futuro alerta sobre os Androides do Dr. Gero; Gohan desperta o Super Saiyajin 2 para destruir Cell Perfeito.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 813
+      },
+      {
+        "arcId": "dbz-arc-5",
+        "name": "Torneio do Outro Mundo (Paikuhan)",
+        "saga": "Anime Original",
+        "startEp": 195,
+        "endEp": 199,
+        "episodesCount": 5,
+        "isFiller": true,
+        "synopsis": "Goku disputa o torneio celestial dos quatro Kaiohs contra o guerreiro Paikuhan da Galáxia do Oeste.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 813
+      },
+      {
+        "arcId": "dbz-arc-6",
+        "name": "Saga de Majin Boo & Fusão Vegetto",
+        "saga": "Dragon Ball Z",
+        "startEp": 200,
+        "endEp": 291,
+        "episodesCount": 92,
+        "isFiller": false,
+        "synopsis": "O despertar de Majin Boo por Babidi, o sacrifício de Majin Vegeta, o Super Saiyajin 3 e a Genki Dama universal no planeta Supremo.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 813
+      }
+    ],
+    "black clover": [
+      {
+        "arcId": "bc-arc-1",
+        "name": "Entrada nos Touros Negros & Masmorra",
+        "saga": "Reino de Clover",
+        "startEp": 1,
+        "endEp": 19,
+        "episodesCount": 19,
+        "isFiller": false,
+        "synopsis": "Asta recebe o grimório de cinco folhas da Anti-Magia e ingressa no esquadrão de Yami Sukehiro junto com Noelle.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 34572
+      },
+      {
+        "arcId": "bc-arc-2",
+        "name": "Olho do Sol da Meia-Noite & Templo Subaquático",
+        "saga": "Pedras Mágicas",
+        "startEp": 20,
+        "endEp": 50,
+        "episodesCount": 31,
+        "isFiller": false,
+        "synopsis": "Confrontos contra Licht e Vetto no Templo Subaquático em busca das pedras mágicas ancestrais.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 34572
+      },
+      {
+        "arcId": "bc-arc-3",
+        "name": "Floresta das Bruxas & Cavaleiros Reais",
+        "saga": "Despertar Demoníaco",
+        "startEp": 51,
+        "endEp": 84,
+        "episodesCount": 34,
+        "isFiller": false,
+        "synopsis": "Asta cura seus braços e desperta a forma Black Asta; torneio de seleção dos Cavaleiros Reais.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 34572
+      },
+      {
+        "arcId": "bc-arc-4",
+        "name": "Reencarnação dos Elfos & Demônio Zagred",
+        "saga": "Palácio das Sombras",
+        "startEp": 85,
+        "endEp": 129,
+        "episodesCount": 45,
+        "isFiller": false,
+        "synopsis": "O feitiço de reencarnação élfica toma o Reino de Clover; Asta, Yuno, Licht e o Primeiro Rei Mago combatem o demônio Zagred.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 34572
+      },
+      {
+        "arcId": "bc-arc-5",
+        "name": "Treinamento no Reino de Heart & Adoradores do Diabo",
+        "saga": "Anime Canon / Transição",
+        "startEp": 130,
+        "endEp": 157,
+        "episodesCount": 28,
+        "isFiller": true,
+        "synopsis": "Seis meses de treinamento supervisionado pelo autor preparando os Cavaleiros Mágicos para a guerra contra Spade.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 34572
+      },
+      {
+        "arcId": "bc-arc-6",
+        "name": "Invasão da Tríade Negra (Reino de Spade)",
+        "saga": "Guerra de Spade",
+        "startEp": 158,
+        "endEp": 170,
+        "episodesCount": 13,
+        "isFiller": false,
+        "synopsis": "Dante, Vanica e Zenon atacam os esquadrões; Yami e Asta unem forças contra Dante e o pacto com Liebe.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 34572
+      }
+    ],
+    "fairy tail": [
+      {
+        "arcId": "ft-arc-1",
+        "name": "Macao, Ilha Galuna & Phantom Lord",
+        "saga": "Fundação do Time Natsu",
+        "startEp": 1,
+        "endEp": 29,
+        "episodesCount": 29,
+        "isFiller": false,
+        "synopsis": "Lucy Heartfilia entra para a Fairy Tail com Natsu, Gray e Erza; guerra aberta contra a guilda rival Phantom Lord.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 6702
+      },
+      {
+        "arcId": "ft-arc-2",
+        "name": "Torre do Paraíso & Batalha da Fairy Tail",
+        "saga": "Passado de Erza & Laxus",
+        "startEp": 30,
+        "endEp": 48,
+        "episodesCount": 19,
+        "isFiller": false,
+        "synopsis": "Confronto contra Jellal Fernandes na Torre do Paraíso e a rebelião interna de Laxus Dreyar em Magnolia.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 6702
+      },
+      {
+        "arcId": "ft-arc-3",
+        "name": "Oración Seis & Edolas",
+        "saga": "Aliança da Luz & Mundo Paralelo",
+        "startEp": 49,
+        "endEp": 95,
+        "episodesCount": 47,
+        "isFiller": false,
+        "synopsis": "Entrada de Wendy Marvell contra a Oración Seis e a viagem interdimensional para o mundo sem magia de Edolas.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 6702
+      },
+      {
+        "arcId": "ft-arc-4",
+        "name": "Ilha Tenrou (Grimoire Heart & Acnologia)",
+        "saga": "Terra Sagrada da Guilda",
+        "startEp": 96,
+        "endEp": 124,
+        "episodesCount": 29,
+        "isFiller": false,
+        "synopsis": "Exame de Classe S interrompido por Hades, Zeref e o ataque devastador do Dragão do Apocalipse Acnologia.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 6702
+      },
+      {
+        "arcId": "ft-arc-5",
+        "name": "Chave do Céu Estrelado (Zentopia)",
+        "saga": "Anime Original",
+        "startEp": 125,
+        "endEp": 150,
+        "episodesCount": 26,
+        "isFiller": true,
+        "synopsis": "Sete anos após Tenroujima, a guilda busca as peças do Relógio Infinito contra a Renascida Oración Seis.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 6702
+      },
+      {
+        "arcId": "ft-arc-6",
+        "name": "Grandes Jogos Mágicos",
+        "saga": "Retorno ao Topo de Fiore",
+        "startEp": 151,
+        "endEp": 175,
+        "episodesCount": 25,
+        "isFiller": false,
+        "synopsis": "A Fairy Tail disputa o torneio de Crocus contra a Sabertooth e descobre o plano do Portão Eclipse.",
+        "arcType": "TV_EPISODES",
+        "sourceWorkMalId": 6702
+      }
+    ]
+  }
+}

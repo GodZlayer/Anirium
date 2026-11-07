@@ -16,6 +16,7 @@ return [
     */
 
     'default' => env('CACHE_STORE', 'database'),
+    'limiter' => env('CACHE_LIMITER_STORE', 'rate_limit'),
 
     /*
     |--------------------------------------------------------------------------
@@ -33,6 +34,12 @@ return [
     */
 
     'stores' => [
+
+        'rate_limit' => [
+            'driver' => 'atomic-file',
+            'path' => storage_path('framework/cache/rate-limit'),
+            'lock_path' => storage_path('framework/cache/rate-limit-locks'),
+        ],
 
         'array' => [
             'driver' => 'array',

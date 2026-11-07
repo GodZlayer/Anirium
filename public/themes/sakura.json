@@ -1,0 +1,25 @@
+{
+  "theme_id": "sakura",
+  "name": "Sakura Night",
+  "mode": "dark",
+  "color_primary": "#FFB7C5",
+  "tokens": {
+    "color.bg.base": "#0F0A15",
+    "color.bg.surface": "#181222",
+    "color.bg.raised": "#221930",
+    "color.bg.overlay": "rgba(15, 10, 21, 0.9)",
+    "color.border.default": "rgba(255, 183, 197, 0.2)",
+    "color.border.highlight": "#FFB7C5",
+    "color.text.primary": "#FFF1F2",
+    "color.text.secondary": "#FECDD3",
+    "color.text.muted": "#F472B6",
+    "color.accent.primary": "#FFB7C5",
+    "color.accent.amber": "#F43F5E",
+    "color.state.canon": "#34D399",
+    "color.state.filler": "#FB7185",
+    "color.state.mixed": "#C084FC",
+    "color.header.bg": "#120B1A",
+    "color.card.bg": "#1C1428",
+    "color.pill.bg": "#281D3A"
+  }
+}

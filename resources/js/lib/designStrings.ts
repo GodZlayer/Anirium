@@ -250,6 +250,16 @@ export interface LocaleStrings {
     franchiseFooterNote: string;
     calendarTrackTitle: string;
     exploreDescription: string;
+    filterAll: string;
+    filterFormat: string;
+    filterGenre: string;
+    filterSort: string;
+    sortPopularity: string;
+    sortScore: string;
+    sortYear: string;
+    sortTitle: string;
+    filterClear: string;
+    noResults: string;
     calendarDescription: string;
   };
   tiers: {
@@ -274,7 +284,7 @@ export const I18N_DICTIONARY: Record<SupportedLanguage, LocaleStrings> = {
     actions: {
       play: "Assistir",
       resume: "Continuar",
-      details: "Detalhes",
+      details: "Explorar",
       viewEpisodes: "Ver Episódios",
       closeEpisodes: "Fechar Episódios",
       addToFavorites: "Favoritar Obra",
@@ -309,6 +319,16 @@ export const I18N_DICTIONARY: Record<SupportedLanguage, LocaleStrings> = {
       franchiseFooterNote: "Navegação contínua sem recarregar páginas",
       calendarTrackTitle: "Transmissões e Lançamentos Ordenados",
       exploreDescription: "Filtro em tempo real sobre o Catálogo Universal indexado.",
+      filterAll: "Todos",
+      filterFormat: "Formato",
+      filterGenre: "Gênero",
+      filterSort: "Ordenar",
+      sortPopularity: "Popularidade",
+      sortScore: "Nota",
+      sortYear: "Ano",
+      sortTitle: "Título",
+      filterClear: "Limpar filtros",
+      noResults: "Nenhuma obra encontrada com esses filtros",
       calendarDescription: "Filtro cronológico derivado do catálogo universal por ano e temporadas de transmissão.",
     },
     tiers: {
@@ -366,6 +386,16 @@ export const I18N_DICTIONARY: Record<SupportedLanguage, LocaleStrings> = {
       franchiseFooterNote: "Seamless continuous navigation without page reloads",
       calendarTrackTitle: "Chronological Airings and Premieres",
       exploreDescription: "Real-time query over the indexed Universal Catalog.",
+      filterAll: "All",
+      filterFormat: "Format",
+      filterGenre: "Genre",
+      filterSort: "Sort by",
+      sortPopularity: "Popularity",
+      sortScore: "Score",
+      sortYear: "Year",
+      sortTitle: "Title",
+      filterClear: "Clear filters",
+      noResults: "No titles match these filters",
       calendarDescription: "Chronological filter projected from universal catalog by broadcast year and season.",
     },
     tiers: {
@@ -423,6 +453,16 @@ export const I18N_DICTIONARY: Record<SupportedLanguage, LocaleStrings> = {
       franchiseFooterNote: "ページ再読込なしのシームレス体験",
       calendarTrackTitle: "放送順・公開順タイムライン",
       exploreDescription: "統合ユニバーサルカタログからのリアルタイム抽出。",
+      filterAll: "すべて",
+      filterFormat: "形式",
+      filterGenre: "ジャンル",
+      filterSort: "並び替え",
+      sortPopularity: "人気",
+      sortScore: "評価",
+      sortYear: "年",
+      sortTitle: "タイトル",
+      filterClear: "フィルターを解除",
+      noResults: "該当する作品がありません",
       calendarDescription: "年度とクール別の時間軸フィルタリング。",
     },
     tiers: {
@@ -480,6 +520,16 @@ export const I18N_DICTIONARY: Record<SupportedLanguage, LocaleStrings> = {
       franchiseFooterNote: "Navegación continua sin recargar página",
       calendarTrackTitle: "Emisiones y Estrenos Ordenados",
       exploreDescription: "Filtro en tiempo real sobre el Catálogo Universal indexado.",
+      filterAll: "Todos",
+      filterFormat: "Formato",
+      filterGenre: "Género",
+      filterSort: "Ordenar",
+      sortPopularity: "Popularidad",
+      sortScore: "Nota",
+      sortYear: "Año",
+      sortTitle: "Título",
+      filterClear: "Limpiar filtros",
+      noResults: "Ninguna obra coincide con estos filtros",
       calendarDescription: "Filtro cronológico proyectado por año y temporada de emisión.",
     },
     tiers: {
@@ -537,6 +587,16 @@ export const I18N_DICTIONARY: Record<SupportedLanguage, LocaleStrings> = {
       franchiseFooterNote: "Navigation continue sans rechargement de page",
       calendarTrackTitle: "Diffusions et Sorties Ordonnées",
       exploreDescription: "Filtrage en temps réel sur le Catalogue Universel indexé.",
+      filterAll: "Tous",
+      filterFormat: "Format",
+      filterGenre: "Genre",
+      filterSort: "Trier",
+      sortPopularity: "Popularité",
+      sortScore: "Note",
+      sortYear: "Année",
+      sortTitle: "Titre",
+      filterClear: "Effacer les filtres",
+      noResults: "Aucune œuvre ne correspond à ces filtres",
       calendarDescription: "Filtre chronologique projeté par année et saisons de diffusion.",
     },
     tiers: {
@@ -594,6 +654,16 @@ export const I18N_DICTIONARY: Record<SupportedLanguage, LocaleStrings> = {
       franchiseFooterNote: "Nahtlose Navigation ohne Neuladen der Seite",
       calendarTrackTitle: "Chronologische Ausstrahlungen und Premieren",
       exploreDescription: "Echtzeit-Filterung über den indizierten universellen Katalog.",
+      filterAll: "Alle",
+      filterFormat: "Format",
+      filterGenre: "Genre",
+      filterSort: "Sortieren",
+      sortPopularity: "Beliebtheit",
+      sortScore: "Bewertung",
+      sortYear: "Jahr",
+      sortTitle: "Titel",
+      filterClear: "Filter zurücksetzen",
+      noResults: "Keine Titel gefunden",
       calendarDescription: "Chronologischer Filter nach Jahr und Ausstrahlungszeiten.",
     },
     tiers: {
@@ -689,6 +759,22 @@ export const LOCALIZED_SYNOPSIS_MAP: Record<string, Record<SupportedLanguage, st
     "fr-FR": "Takemichi Hanagaki fait un bond de 12 ans dans le passé pour infiltrer le gang Tokyo Manji et empêcher le futur meurtre de son ancienne petite amie.",
     "de-DE": "Takemichi Hanagaki reist 12 Jahre in seine Schulzeit zurück, um die Tokyo Manji Gang zu infiltrieren und den Mord an seiner Jugendliebe zu verhindern.",
   },
+  "Keroro Gunsou": {
+    "pt-BR": "O Sargento Keroro e seu pelotão de sapos alienígenas planejam invadir a Terra, mas acabam acolhidos por uma família humana comum, vivendo situações hilárias e colecionando modelos de robôs.",
+    "en-US": "Sergeant Keroro and his frog alien platoon arrive to conquer Earth, but after being captured by a human family, they end up doing household chores and building plastic model kits.",
+    "ja-JP": "地球侵略のため潜入したケロン星人のケロロ軍曹。日向家に捕獲され、侵略どころか家事やガンプラ作りに没頭するドタバタ侵略コメディ。",
+    "es-ES": "El Sargento Keroro y su escuadrón de ranas alienígenas llegan para invadir la Tierra, pero terminan viviendo con una familia humana común mientras coleccionan maquetas.",
+    "fr-FR": "Le Sergent Keroro et son peloton extraterrestre tentent d'envahir la Terre mais finissent hébergés par une famille tokyoïte à fabriquer des maquettes en plastique.",
+    "de-DE": "Sergeant Keroro und seine Frosch-Aliens wollen die Erde erobern, landen aber als Mitbewohner bei einer menschlichen Familie und bauen lieber Plastikmodelle.",
+  },
+  "Keroro Gunsou☆": {
+    "pt-BR": "O Sargento Keroro e seu pelotão de sapos alienígenas planejam invadir a Terra, mas acabam acolhidos por uma família humana comum, vivendo situações hilárias e colecionando modelos de robôs.",
+    "en-US": "Sergeant Keroro and his frog alien platoon arrive to conquer Earth, but after being captured by a human family, they end up doing household chores and building plastic model kits.",
+    "ja-JP": "地球侵略のため潜入したケロン星人のケロロ軍曹。日向家に捕獲され、侵略どころか家事やガンプラ作りに没頭するドタバタ侵略コメディ。",
+    "es-ES": "El Sargento Keroro y su escuadrón de ranas alienígenas llegan para invadir la Tierra, pero terminan viviendo con una familia humana común mientras coleccionan maquetas.",
+    "fr-FR": "Le Sergent Keroro et son peloton extraterrestre tentent d'envahir la Terre mais finissent hébergés par une famille tokyoïte à fabriquer des maquettes en plastique.",
+    "de-DE": "Sergeant Keroro und seine Frosch-Aliens wollen die Erde erobern, landen aber als Mitbewohner bei einer menschlichen Familie und bauen lieber Plastikmodelle.",
+  },
 };
 
 /**
@@ -723,30 +809,39 @@ export function getLocalizedSynopsis(anime: any, lang: SupportedLanguage): strin
   if (lang === "fr-FR" && anime.synopsis_french) return anime.synopsis_french;
   if (lang === "de-DE" && anime.synopsis_german) return anime.synopsis_german;
 
-  // 3. Mapeamento canônico universal por título ou título em inglês
-  const lookupKey = anime.title || anime.title_english;
-  if (lookupKey && LOCALIZED_SYNOPSIS_MAP[lookupKey] && LOCALIZED_SYNOPSIS_MAP[lookupKey][lang]) {
-    return LOCALIZED_SYNOPSIS_MAP[lookupKey][lang];
-  }
-  if (anime.title_english && LOCALIZED_SYNOPSIS_MAP[anime.title_english] && LOCALIZED_SYNOPSIS_MAP[anime.title_english][lang]) {
-    return LOCALIZED_SYNOPSIS_MAP[anime.title_english][lang];
+  // 3. Mapeamento canônico universal por título ou título em inglês (normalizado sem pontuação extra)
+  const rawKey = anime.title || anime.title_english || "";
+  const cleanKey = rawKey.replace(/[★☆\s]+$/g, "").trim();
+  
+  const foundMap =
+    LOCALIZED_SYNOPSIS_MAP[rawKey] ||
+    LOCALIZED_SYNOPSIS_MAP[cleanKey] ||
+    (anime.title_english ? LOCALIZED_SYNOPSIS_MAP[anime.title_english] : null);
+
+  if (foundMap && foundMap[lang]) {
+    return foundMap[lang];
   }
 
-  // 4. Retorna a sinopse original se for inglês ou se existir
-  if (anime.synopsis && (lang === "en-US" || !lang)) {
+  // 4. Se o idioma ativo for inglês e houver sinopse, retorna
+  if (lang === "en-US" && anime.synopsis) {
     return anime.synopsis;
+  }
+
+  // 5. Se o idioma for outro mas houver tradução no mapa para pt-BR
+  if (lang === "pt-BR" && foundMap && foundMap["pt-BR"]) {
+    return foundMap["pt-BR"];
   }
 
   // 5. Fallback regionalizado limpo no idioma ativo caso o registro bruto seja apenas em inglês
   const genericFallback: Record<SupportedLanguage, string> = {
-    "pt-BR": anime.synopsis || "Exploração canônica de catálogo streaming em alta definição.",
-    "en-US": anime.synopsis || "Canonical anime catalog exploration in high definition.",
-    "ja-JP": "公式ストリーミングカタログによる高解像度アニメ視聴体験。",
-    "es-ES": "Exploración canónica de catálogo anime en alta definición.",
-    "fr-FR": "Exploration canonique du catalogue d'anime en haute définition.",
-    "de-DE": "Kanonische Erkundung des Anime-Katalogs in High Definition.",
+    "pt-BR": "Sinopse indisponível.",
+    "en-US": "Synopsis unavailable.",
+    "ja-JP": "あらすじは未提供です。",
+    "es-ES": "Sinopsis no disponible.",
+    "fr-FR": "Synopsis indisponible.",
+    "de-DE": "Keine Inhaltsangabe verfügbar.",
   };
 
-  return genericFallback[lang] || anime.synopsis || "Anirium Streaming";
+  return anime.synopsis || genericFallback[lang] || genericFallback["en-US"];
 }
 

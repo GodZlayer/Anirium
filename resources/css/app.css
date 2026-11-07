@@ -1,20 +1,87 @@
-@import "tailwindcss";
+:root {
+  --color-bg-base: #0B0B0D;
+  --color-bg-surface: #1A1A1F;
+  --color-bg-raised: #23232A;
+  --color-bg-overlay: rgba(11, 11, 13, 0.85);
+  --color-border-default: rgba(255, 255, 255, 0.1);
+  --color-border-highlight: #FFC766;
+  --color-text-primary: #FFF9F0;
+  --color-text-secondary: #EADCC8;
+  --color-text-muted: #8E8E93;
+  --color-accent-primary: #FFC766;
+  --color-accent-gold: #FFC766;
+  --color-accent-amber: #FFB347;
+  --color-state-canon: #10B981;
+  --color-state-filler: #F43F5E;
+  --color-state-mixed: #A855F7;
+  --color-header-bg: rgba(9, 10, 15, 0.85);
+  --color-card-bg: rgba(26, 26, 31, 0.7);
+  --color-pill-bg: rgba(14, 17, 24, 0.8);
+
+  /* Atalhos TGCode */
+  --bg-canvas: var(--color-bg-base);
+  --surface-elevated: var(--color-bg-surface);
+  --surface-border: var(--color-border-default);
+}
+
+@import "tailwindcss" source("../");
 
 @layer base {
-  :root {
-    --bg-primary: #0a0a0c;
-    --bg-secondary: #121217;
-    --accent: #e5b869;
-    --text-primary: #ffffff;
-    --text-muted: #8e8ea0;
-    --border-color: rgba(255, 255, 255, 0.08);
-  }
-
   body {
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
+    background-color: var(--color-bg-base);
+    color: var(--color-text-primary);
     overflow: hidden;
     user-select: none;
+    -webkit-user-select: none;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
+}
+
+/* Utilitários semânticos orientados a tokens */
+.bg-theme-base { background-color: var(--color-bg-base) !important; }
+.bg-theme-surface { background-color: var(--color-bg-surface) !important; }
+.bg-theme-raised { background-color: var(--color-bg-raised) !important; }
+.bg-theme-overlay { background-color: var(--color-bg-overlay) !important; }
+.bg-theme-header { background-color: var(--color-header-bg) !important; }
+.bg-theme-card { background-color: var(--color-card-bg) !important; }
+.bg-theme-pill { background-color: var(--color-pill-bg) !important; }
+
+.border-theme-default { border-color: var(--color-border-default) !important; }
+.border-theme-highlight { border-color: var(--color-border-highlight) !important; }
+
+.text-theme-primary { color: var(--color-text-primary) !important; }
+.text-theme-secondary { color: var(--color-text-secondary) !important; }
+.text-theme-muted { color: var(--color-text-muted) !important; }
+.text-theme-accent { color: var(--color-accent-primary) !important; }
+
+.bg-theme-accent { background-color: var(--color-accent-primary) !important; }
+
+/* Menu dropdown de alta legibilidade, contraste e opacidade sólida */
+.theme-dropdown-panel {
+  background-color: var(--color-bg-surface) !important;
+  border-color: var(--color-border-highlight) !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 1px 1px var(--color-border-default) !important;
+}
+
+.theme-dropdown-item {
+  color: var(--color-text-primary) !important;
+}
+
+.theme-dropdown-item:hover {
+  background-color: var(--color-bg-raised) !important;
+  color: var(--color-accent-primary) !important;
+}
+
+.theme-dropdown-section-title {
+  color: var(--color-text-muted) !important;
+}
+
+/* Ocultar scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

@@ -1,21 +1,10 @@
 import React from "react";
 import { Play, Bookmark, Star, Clock } from "lucide-react";
 import { useDesignTheme } from "../context/ThemeContext";
+import { statusLabelKey } from "../lib/catalogMetadata.mjs";
+import { CATALOG_STRINGS } from "../lib/catalogStrings";
 
-export interface AnimeRecord {
-  id: number;
-  mal_id?: number;
-  title: string;
-  title_english?: string;
-  title_japanese?: string;
-  title_portuguese?: string;
-  synopsis?: string;
-  score?: number;
-  episodes_count?: number;
-  status?: string;
-  banner_image?: string;
-  cover_image?: string;
-}
+export type AnimeRecord = import("../lib/parquetCatalog").UnifiedCatalogWork;
 
 interface AnimeCardProps {
   anime: AnimeRecord;
@@ -24,6 +13,8 @@ interface AnimeCardProps {
   onPlay?: () => void;
   onToggleBookmark?: () => void;
   isBookmarked?: boolean;
+  /** Rótulo opcional (ex.: horário real de transmissão) exibido no lugar da contagem de episódios */
+  airingLabel?: string;
 }
 
 export function AnimeCard({
@@ -33,8 +24,10 @@ export function AnimeCard({
   onPlay,
   onToggleBookmark,
   isBookmarked = false,
+  airingLabel,
 }: AnimeCardProps) {
-  const { tokens, strings, getLocalizedTitle } = useDesignTheme();
+  const { tokens, strings, language, getLocalizedTitle } = useDesignTheme();
+  const labels = CATALOG_STRINGS[language] || CATALOG_STRINGS["pt-BR"];
   const localizedTitle = getLocalizedTitle(anime);
 
   return (
@@ -49,7 +42,7 @@ export function AnimeCard({
       }}
     >
       {/* Imagem do Poster */}
-      <div className="relative w-full h-60 overflow-hidden bg-black/40">
+      <div className="relative w-full h-60 overflow-hidden bg-[color:var(--wc-bgBase)]/40">
         <img
           src={anime.cover_image || anime.banner_image || "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=400&q=80"}
           alt={localizedTitle}
@@ -57,7 +50,7 @@ export function AnimeCard({
         />
 
         {/* Gradiente de Fusão */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--wc-bgBase)]/90 via-[color:var(--wc-bgBase)]/20 to-transparent" />
 
         {/* Badge de Nota Canônica */}
         {anime.score && (
@@ -76,6 +69,8 @@ export function AnimeCard({
 
         {/* Ação Rápida de Favoritar */}
         <button
+          type="button"
+          disabled={!onToggleBookmark}
           onClick={(e) => {
             e.stopPropagation();
             onToggleBookmark?.();
@@ -86,7 +81,7 @@ export function AnimeCard({
             borderColor: isBookmarked ? tokens.colors.accentGold : tokens.colors.borderDefault,
             color: isBookmarked ? tokens.colors.accentGold : tokens.colors.textMuted,
           }}
-          title={isBookmarked ? strings.actions.removeFromFavorites : strings.actions.addToFavorites}
+          title={!onToggleBookmark ? strings.actions.loginWithGoogle : isBookmarked ? strings.actions.removeFromFavorites : strings.actions.addToFavorites}
         >
           <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? "fill-current" : ""}`} />
         </button>
@@ -103,7 +98,7 @@ export function AnimeCard({
               backgroundColor: tokens.colors.accentGold,
               color: tokens.colors.bgBase,
             }}
-            title={strings.actions.play}
+            title={strings.actions.details}
           >
             <Play className="w-5 h-5 fill-current ml-0.5" />
           </button>
@@ -123,7 +118,11 @@ export function AnimeCard({
         <div className="flex items-center justify-between mt-2 pt-2 border-t" style={{ borderColor: tokens.colors.borderDefault }}>
           <span className="text-[10px] flex items-center gap-1 font-medium" style={{ color: tokens.colors.textMuted }}>
             <Clock className="w-2.5 h-2.5" />
-            {anime.episodes_count ? `${anime.episodes_count} ${strings.labels.episode}` : strings.labels.format}
+            {airingLabel
+              ? airingLabel
+              : anime.episodes_count
+              ? `${anime.episodes_count} ${strings.labels.episode}`
+              : strings.labels.format}
           </span>
           <span
             className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
@@ -132,7 +131,7 @@ export function AnimeCard({
               color: tokens.colors.accentGold,
             }}
           >
-            {anime.status === "RELEASING" ? strings.labels.releasing : strings.labels.completed}
+            {statusLabelKey(anime.status) ? strings.labels[statusLabelKey(anime.status)] : labels.unknown}
           </span>
         </div>
       </div>

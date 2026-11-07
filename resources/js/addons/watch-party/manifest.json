@@ -1,0 +1,14 @@
+{
+  "id": "watch-party",
+  "name": "Watch Party",
+  "version": "0.1.0",
+  "description": "Sessões de visualização sincronizada em grupo com chat em tempo real.",
+  "author": "Anirium Community",
+  "license": "MIT",
+  "type": "community",
+  "capabilities": ["ui.panel.render", "network.external.fetch"],
+  "uiEdits": ["ui.player.overlay"],
+  "display": ["media.social"],
+  "permissions": ["network.external.fetch"],
+  "enabled": false
+}

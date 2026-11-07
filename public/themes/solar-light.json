@@ -1,0 +1,25 @@
+{
+  "theme_id": "solar-light",
+  "name": "Solar Warm Light",
+  "mode": "light",
+  "color_primary": "#EA580C",
+  "tokens": {
+    "color.bg.base": "#FFFBEB",
+    "color.bg.surface": "#FFFFFF",
+    "color.bg.raised": "#FEF3C7",
+    "color.bg.overlay": "rgba(255, 251, 235, 0.95)",
+    "color.border.default": "rgba(180, 83, 9, 0.12)",
+    "color.border.highlight": "#EA580C",
+    "color.text.primary": "#451A03",
+    "color.text.secondary": "#78350F",
+    "color.text.muted": "#78350F",
+    "color.accent.primary": "#C2410C",
+    "color.accent.amber": "#B45309",
+    "color.state.canon": "#15803D",
+    "color.state.filler": "#B91C1C",
+    "color.state.mixed": "#7E22CE",
+    "color.header.bg": "#FEF3C7",
+    "color.card.bg": "#FFFFFF",
+    "color.pill.bg": "#FDE68A"
+  }
+}

@@ -6,6 +6,7 @@ services:
     container_name: anirium_app
     restart: unless-stopped
     working_dir: /var/www/html
+    command: ["sh", "/var/www/html/docker/start-app.sh"]
     volumes:
       - ./:/var/www/html
     networks:

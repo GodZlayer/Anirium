@@ -1,0 +1,25 @@
+{
+  "theme_id": "black",
+  "name": "Dark Clássico",
+  "mode": "dark",
+  "color_primary": "#FFC766",
+  "tokens": {
+    "color.bg.base": "#0B0B0D",
+    "color.bg.surface": "#1A1A1F",
+    "color.bg.raised": "#23232A",
+    "color.bg.overlay": "rgba(11, 11, 13, 0.85)",
+    "color.border.default": "rgba(255, 255, 255, 0.1)",
+    "color.border.highlight": "#FFC766",
+    "color.text.primary": "#FFF9F0",
+    "color.text.secondary": "#EADCC8",
+    "color.text.muted": "#8E8E93",
+    "color.accent.primary": "#FFC766",
+    "color.accent.amber": "#FFB347",
+    "color.state.canon": "#10B981",
+    "color.state.filler": "#F43F5E",
+    "color.state.mixed": "#A855F7",
+    "color.header.bg": "#0E1118",
+    "color.card.bg": "#141720",
+    "color.pill.bg": "#1C202E"
+  }
+}

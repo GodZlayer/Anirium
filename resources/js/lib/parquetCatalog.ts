@@ -1,8 +1,21 @@
 import { parquetRead } from "hyparquet";
+import { compressors } from "hyparquet-compressors";
+import { catalogIdentity } from "./catalogIdentity.mjs";
+import { catalogMetadata } from "./catalogMetadata.mjs";
+import { readCatalogRelease } from "./catalogRelease.mjs";
+import { createCatalogSnapshotCache } from "./catalogSnapshotCache.mjs";
+import { createCatalogGenerationClient } from "./catalogGenerationClient.mjs";
+import { catalogFetch } from "./catalogTransport.mjs";
+import { catalogPreviewSelected } from "./catalogLocation.mjs";
 
 export interface ParquetAnime {
   id: number;
   mal_id: number;
+  catalog_key: string;
+  entity_type: "WORK" | "MANGA";
+  metadata_source?: string;
+  episodes_metadata_url?: string;
+  episodes_checked_at?: string;
   title: string;
   title_english?: string | null;
   title_japanese?: string | null;
@@ -24,14 +37,31 @@ export interface ParquetAnime {
   year?: number | null;
   format?: string;
   universe_id?: string | null;
+  universe_source?: string;
+  relations_json?: string | null;
+  arcs_json?: string | null;
   cover_image: string;
   banner_image: string;
   updated_at?: number;
+  latest_episode_num?: number;
+  release?: { id: string; work_id: string; number: number; air_date_utc: string };
+  airing_day?: string;
+  airing_time?: string;
+  airing_timezone?: string;
+  official_site_url?: string;
+  streaming_links?: Array<{ site: string; url: string }>;
+  filler_episodes_json?: string | null;
 }
 
+export type UnifiedCatalogWork = Omit<ParquetAnime, "id" | "mal_id" | "entity_type"> & {
+  id: number | string; mal_id: number | null; entity_type: "WORK" | "MANGA" | "NOVEL";
+  catalog_visibility?: string; provider_health_json?: string;
+  work_id?: string; account_reference?: string; aliases_json?: string; capabilities_json?: string;
+  chapters_count?: number | null; volumes_count?: number | null; universe_v2_id?: string;
+  universe_ids_json?: string; universe_identity_version?: number; universe_reconciliation_pending?: boolean; continuity_root_work_id?: string;
+};
+
 // O Catálogo Universal Único em Memória
-let universalCatalogCache: ParquetAnime[] | null = null;
-let catalogLoadingPromise: Promise<ParquetAnime[]> | null = null;
 
 // Dicionário canônico para mapping imediato de títulos em português
 const PORTUGUESE_TITLE_MAP: Record<string, string> = {
@@ -86,7 +116,7 @@ const PORTUGUESE_TITLE_MAP: Record<string, string> = {
   "JoJo's Bizarre Adventure": "As Aventuras Bizarras de JoJo",
 };
 
-function normalizeAnime(record: any): ParquetAnime {
+export function normalizeCatalogWork(record: any): UnifiedCatalogWork {
   let images = record.images || {};
   if (typeof record.images_json === "string") {
     try { images = JSON.parse(record.images_json); } catch {}
@@ -103,28 +133,50 @@ function normalizeAnime(record: any): ParquetAnime {
     images.jpg?.large_image_url ||
     cover_image;
 
+  const toNames = (list: any[]): string[] =>
+    list
+      .map((item) => (typeof item === "string" ? item : item && typeof item.name === "string" ? item.name : ""))
+      .filter(Boolean);
+
   let genres: string[] = [];
   if (Array.isArray(record.genres)) {
-    genres = record.genres;
+    genres = toNames(record.genres);
   } else if (typeof record.genres_json === "string") {
-    try { genres = JSON.parse(record.genres_json); } catch {}
+    try { genres = toNames(JSON.parse(record.genres_json)); } catch {}
   }
 
   let studios: string[] = [];
   if (Array.isArray(record.studios)) {
-    studios = record.studios;
+    studios = toNames(record.studios);
   } else if (typeof record.studios_json === "string") {
-    try { studios = JSON.parse(record.studios_json); } catch {}
+    try { studios = toNames(JSON.parse(record.studios_json)); } catch {}
   }
 
-  const mal_id = Number(record.mal_id || record.id || Math.floor(Math.random() * 100000));
+  const identity = catalogIdentity(record);
+  const mal_id = identity.mal_id;
   const rawTitle = String(record.title || "");
   const rawEng = record.title_english ? String(record.title_english) : undefined;
   const mappedPt = PORTUGUESE_TITLE_MAP[rawTitle] || (rawEng ? PORTUGUESE_TITLE_MAP[rawEng] : undefined);
 
   return {
-    id: mal_id,
-    mal_id,
+    ...identity,
+    account_reference: record.account_reference,
+    catalog_visibility: record.catalog_visibility,
+    provider_health_json: record.provider_health_json,
+    aliases_json: record.aliases_json,
+    capabilities_json: record.capabilities_json,
+    chapters_count: record.chapters_count,
+    volumes_count: record.volumes_count,
+    universe_v2_id: record.universe_v2_id,
+    universe_ids_json: record.universe_ids_json,
+    universe_identity_version: record.universe_identity_version,
+    universe_reconciliation_pending: record.universe_reconciliation_pending,
+    continuity_root_work_id: record.continuity_root_work_id,
+    ...catalogMetadata(record, identity),
+    release: readCatalogRelease(record.release, identity.work_id),
+    metadata_source: typeof record.metadata_source === "string" ? record.metadata_source : undefined,
+    episodes_metadata_url: typeof record.episodes_metadata_url === "string" ? record.episodes_metadata_url : undefined,
+    episodes_checked_at: typeof record.episodes_checked_at === "string" ? record.episodes_checked_at : undefined,
     title: rawTitle,
     title_english: rawEng,
     title_japanese: record.title_japanese ? String(record.title_japanese) : undefined,
@@ -133,140 +185,118 @@ function normalizeAnime(record: any): ParquetAnime {
     title_french: record.title_french ? String(record.title_french) : undefined,
     title_german: record.title_german ? String(record.title_german) : undefined,
     synopsis: record.synopsis ? String(record.synopsis) : "",
-    synopses: record.synopses || undefined,
+    synopses: record.synopses || (typeof record.synopses_json === "string" ? (() => { try { return JSON.parse(record.synopses_json); } catch { return undefined; } })() : undefined),
     score: record.score != null ? Number(record.score) : undefined,
     popularity: record.popularity != null ? Number(record.popularity) : undefined,
-    episodes_count: record.episodes != null ? Number(record.episodes) : (record.episodes_count != null ? Number(record.episodes_count) : undefined),
-    status: String(record.status || "COMPLETED").toUpperCase(),
     category: record.category ? String(record.category) : "all",
     genres,
-    studios,
+    studios: identity.entity_type !== "WORK" ? [] : studios,
     year: record.year != null ? Number(record.year) : undefined,
-    format: String(record.format || "TV"),
-    universe_id: record.universe_id ? String(record.universe_id) : `univ-${mal_id}`,
+    universe_id: record.universe_id ? String(record.universe_id) : identity.catalog_key,
+    universe_source: record.universe_source === "relations" ? "relations" : "unverified",
+    relations_json: typeof record.relations_json === "string" ? record.relations_json : null,
+    arcs_json: typeof record.arcs_json === "string" ? record.arcs_json : null,
     cover_image,
     banner_image,
-    updated_at: record.updated_at ? Number(record.updated_at) : Date.now(),
+    updated_at: record.updated_at ? Number(record.updated_at) : undefined,
+    airing_day: record.airing_day ? String(record.airing_day) : undefined,
+    airing_time: record.airing_time ? String(record.airing_time) : undefined,
+    airing_timezone: record.airing_timezone === "UTC" ? "UTC" : undefined,
+    official_site_url: record.official_site_url ? String(record.official_site_url) : undefined,
+    streaming_links: Array.isArray(record.streaming_links)
+      ? record.streaming_links
+      : typeof record.streaming_links_json === "string"
+      ? (() => {
+          try {
+            return JSON.parse(record.streaming_links_json);
+          } catch {
+            return undefined;
+          }
+        })()
+      : undefined,
+    filler_episodes_json: typeof record.filler_episodes_json === "string" ? record.filler_episodes_json : null,
   };
 }
 
-async function loadSliceData(sliceName: string): Promise<ParquetAnime[]> {
-  try {
-    const res = await fetch(`/data/${sliceName}.json`);
-    if (res.ok) {
-      const rows = await res.json();
-      return rows.map((record: any) => normalizeAnime(record));
-    }
-  } catch {}
+function normalizeAnime(record: any): ParquetAnime {
+  const work = normalizeCatalogWork(record);
+  if (typeof work.id !== "number" || !work.mal_id || work.entity_type === "NOVEL") throw new Error("Legacy catalog contains an unsupported identity");
+  return work as ParquetAnime;
+}
 
-  try {
-    const response = await fetch(`/data/${sliceName}.parquet`);
-    if (!response.ok) return [];
-    const arrayBuffer = await response.arrayBuffer();
+const generationClient = createCatalogGenerationClient({ request: catalogFetch, normalize: normalizeCatalogWork,
+  onChange: () => { if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("anirium_generation_updated")); },
+  resolveReference: async (reference: string) => {
+    const response = await catalogFetch(`/api/catalog/work/${encodeURIComponent(reference)}`, { signal: AbortSignal.timeout(20000) });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`Work lookup HTTP ${response.status}`);
+    return response.json();
+  }, decode: (file: ArrayBuffer) =>
+  new Promise((resolve, reject) => { parquetRead({ file, compressors, rowFormat: "object", onComplete: resolve }).catch(reject); }) });
 
-    const items: ParquetAnime[] = [];
-    await parquetRead({
-      file: arrayBuffer,
-      rowFormat: "object",
-      onComplete: (rows) => {
-        for (const record of rows) {
-          items.push(normalizeAnime(record));
-        }
-      },
-    });
+export async function resolveUnifiedWork(reference: string): Promise<UnifiedCatalogWork | null> {
+  return generationClient.resolve(reference);
+}
 
-    return items;
-  } catch (err) {
-    console.error(`[Parquet] Falha ao ler fatia ${sliceName}:`, err);
-    return [];
-  }
+export async function refreshUnifiedCatalog(options: { signal?: AbortSignal } = {}): Promise<void> {
+  await generationClient.refresh(options);
 }
 
 /**
- * Carrega e funde a base única em um mapa indexado sem duplicações (mal_id).
- * O catálogo inteiro é um só.
+ * Carrega a Base Única Canônica do arquivo catalog.parquet.
+ * Zero fatiamento, zero duplicidades, tabela relacional única em memória.
  */
-export async function getUniversalCatalog(): Promise<ParquetAnime[]> {
-  if (universalCatalogCache) {
-    return universalCatalogCache;
+const catalogCache = createCatalogSnapshotCache(async () => {
+  const response = await fetch("/data/catalog.parquet", { cache: "no-cache" });
+  if (!response.ok) throw new Error(`Catalog HTTP ${response.status}`);
+  const arrayBuffer = await response.arrayBuffer();
+  const items: ParquetAnime[] = [];
+  await parquetRead({ file: arrayBuffer, compressors, rowFormat: "object", onComplete: rows => {
+    for (const record of rows) items.push(normalizeAnime(record));
+  } });
+  if (new Set(items.map(item => item.catalog_key)).size !== items.length) throw new Error("Duplicate catalog identity");
+  const digest = await crypto.subtle.digest("SHA-256", arrayBuffer);
+  const revision = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
+  return { items, revision };
+}, {
+  onChange: (items: ParquetAnime[]) => {
+    if (typeof window !== "undefined" && !catalogPreviewSelected()) window.dispatchEvent(new CustomEvent("anirium_catalog_expanded", { detail: items }));
+  },
+  onError: (error: Error) => console.error("[Universal Catalog]", error),
+});
+
+export async function getUniversalCatalog(force = false): Promise<ParquetAnime[]> {
+  if (catalogPreviewSelected()) return [];
+  return (await catalogCache.load(force)).items;
+}
+
+export function getCatalogRevision(): string | null { return catalogCache.revision(); }
+const ADULT_RESTRICTED_GENRES = new Set(["hentai", "erotica", "rx"]);
+
+/**
+ * Identifica obras classificadas como Hentai / Erotica (+24 anos).
+ * No modo sem conta (visitante / guest), nunca podem ser listadas nem acessadas,
+ * pois não há como comprovar maioridade de +24 anos sem autenticação.
+ */
+export function isHentaiOrAdultAnime(anime: Pick<ParquetAnime, "genres" | "category"> | null | undefined): boolean {
+  if (!anime) return false;
+  if (anime.category && ADULT_RESTRICTED_GENRES.has(anime.category.toLowerCase().trim())) {
+    return true;
   }
-
-  if (catalogLoadingPromise) {
-    return catalogLoadingPromise;
-  }
-
-  catalogLoadingPromise = (async () => {
-    // 1. Carrega as fatias prioritárias imediatas (Popular, Seasonal, Upcoming)
-    const prioritySlices = await Promise.all([
-      loadSliceData("catalog-popular"),
-      loadSliceData("catalog-seasonal"),
-      loadSliceData("catalog-upcoming"),
-    ]);
-
-    const animeMap = new Map<number, ParquetAnime>();
-
-    for (const slice of prioritySlices) {
-      for (const item of slice) {
-        if (!animeMap.has(item.mal_id)) {
-          animeMap.set(item.mal_id, item);
-        } else {
-          animeMap.set(item.mal_id, { ...animeMap.get(item.mal_id)!, ...item });
-        }
-      }
-    }
-
-    // Define cache inicial imediato para renderizar em milissegundos
-    universalCatalogCache = Array.from(animeMap.values());
-
-    // 2. Carrega em background o Arquivo Completo com as 30.000+ obras e os Mangás
-    Promise.all([
-      loadSliceData("catalog-diff"),
-      loadSliceData("catalog-manga"),
-    ]).then(([fullArchive, mangaArchive]) => {
-      let updated = false;
-
-      if (fullArchive && fullArchive.length > 0) {
-        for (const item of fullArchive) {
-          if (!animeMap.has(item.mal_id)) {
-            animeMap.set(item.mal_id, item);
-            updated = true;
-          }
-        }
-      }
-
-      if (mangaArchive && mangaArchive.length > 0) {
-        for (const item of mangaArchive) {
-          if (!animeMap.has(item.mal_id)) {
-            animeMap.set(item.mal_id, item);
-            updated = true;
-          }
-        }
-      }
-
-      if (updated) {
-        universalCatalogCache = Array.from(animeMap.values());
-        // Dispara evento reativo para que todas as telas atualizem para as 30.000+ obras
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("anirium_catalog_expanded", { detail: universalCatalogCache }));
-        }
-      }
-    });
-
-    return universalCatalogCache;
-  })();
-
-  return catalogLoadingPromise;
+  return (anime.genres || []).some((g) => ADULT_RESTRICTED_GENRES.has(String(g).toLowerCase().trim()));
 }
 
 /**
  * Filtros puros aplicados sobre o catálogo universal único
  */
-export function filterCatalog(
-  catalog: ParquetAnime[],
+export function filterCatalog<T extends UnifiedCatalogWork>(
+  catalog: T[],
   filterType: "all" | "popular" | "releasing" | "upcoming" | "calendar" | "franchises",
-  searchQuery?: string
-): ParquetAnime[] {
-  let filtered = catalog;
+  searchQuery?: string,
+  allowAdult = false
+): T[] {
+  // 0. Trava de Segurança Etária (+24): se allowAdult for false (modo sem conta ou filtro +24 desativado), remove 100% dos Hentais/Erotica
+  let filtered = allowAdult ? catalog : catalog.filter((a) => !isHentaiOrAdultAnime(a));
 
   // 1. Filtro de Texto Global (busca por qualquer título ou estúdio)
   if (searchQuery && searchQuery.trim()) {
@@ -287,25 +317,51 @@ export function filterCatalog(
       return [...filtered].sort((a, b) => (b.score || 0) - (a.score || 0));
 
     case "releasing":
-      return [...filtered]
-        .filter((a) => a.status === "RELEASING" || a.status === "AIRING" || a.status === "CURRENT")
+      // Anirium exibe apenas animações com episódios lançados até o exato segundo presente (release_at <= now())
+      const now = Date.now();
+      const sortedReleasing = [...filtered]
+        .filter(
+          (a) =>
+            (a.status === "RELEASING" || a.status === "AIRING" || a.status === "CURRENT") &&
+            a.format !== "MANGA" &&
+            a.format !== "NOVEL" &&
+            a.format !== "ONE_SHOT" &&
+            a.format !== "DOUJINSHI" &&
+            a.format !== "MANHWA" &&
+            a.format !== "MANHUA" &&
+            (Number(a.updated_at) || 0) <= now
+        )
         .sort((a, b) => (Number(b.updated_at) || 0) - (Number(a.updated_at) || 0) || (b.year || 0) - (a.year || 0));
+
+      return sortedReleasing;
 
     case "upcoming":
       return filtered.filter(
         (a) =>
-          a.status === "UPCOMING" ||
-          a.status === "NOT_YET_AIRED" ||
-          a.status === "NOT_YET_RELEASED"
+          (a.status === "UPCOMING" ||
+            a.status === "NOT_YET_AIRED" ||
+            a.status === "NOT_YET_RELEASED") &&
+          a.format !== "MANGA" &&
+          a.format !== "NOVEL" &&
+          a.format !== "ONE_SHOT"
       );
 
     case "calendar":
-      // Ordenação temporal / transmissões da semana
-      return [...filtered].sort((a, b) => (b.year || 0) - (a.year || 0));
+      // Todas as obras de animação ativas no ciclo de transmissão semanal
+      return [...filtered].filter(
+        (a) =>
+          (a.status === "RELEASING" || a.status === "AIRING" || a.status === "CURRENT") &&
+          a.format !== "MANGA" &&
+          a.format !== "NOVEL" &&
+          a.format !== "ONE_SHOT" &&
+          a.format !== "DOUJINSHI" &&
+          a.format !== "MANHWA" &&
+          a.format !== "MANHUA"
+      );
 
     case "franchises":
       // Obras que possuem identificador de universo ou sequências
-      return filtered.filter((a) => a.universe_id || (a.episodes_count && a.episodes_count > 12));
+      return filtered.filter((a) => a.universe_source === "relations" && a.universe_id);
 
     case "all":
     default:

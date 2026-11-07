@@ -2,6 +2,20 @@
 
 return [
 
+    'anirium' => [
+        'service_secret' => env('ANIRIUM_SERVICE_SECRET', 'development-only-anirium-service-secret'),
+    ],
+
+    'myanimelist' => [
+        'client_id' => env('MAL_CLIENT_ID'),
+        'detail_budget' => env('MAL_DETAIL_BUDGET', 1000),
+    ],
+
+    'catalog' => [
+        'arc_budget' => env('MEDIAWIKI_WORK_BUDGET', 10),
+        'episode_budget' => env('EPISODE_DETAIL_BUDGET', 200),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

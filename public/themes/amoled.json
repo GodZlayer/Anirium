@@ -1,0 +1,25 @@
+{
+  "theme_id": "amoled",
+  "name": "AMOLED Puro",
+  "mode": "dark",
+  "color_primary": "#38BDF8",
+  "tokens": {
+    "color.bg.base": "#000000",
+    "color.bg.surface": "#0A0A0C",
+    "color.bg.raised": "#141418",
+    "color.bg.overlay": "rgba(0, 0, 0, 0.95)",
+    "color.border.default": "rgba(255, 255, 255, 0.08)",
+    "color.border.highlight": "#38BDF8",
+    "color.text.primary": "#FFFFFF",
+    "color.text.secondary": "#A1A1AA",
+    "color.text.muted": "#71717A",
+    "color.accent.primary": "#38BDF8",
+    "color.accent.amber": "#0284C7",
+    "color.state.canon": "#34D399",
+    "color.state.filler": "#F43F5E",
+    "color.state.mixed": "#A855F7",
+    "color.header.bg": "#000000",
+    "color.card.bg": "#08080A",
+    "color.pill.bg": "#121216"
+  }
+}

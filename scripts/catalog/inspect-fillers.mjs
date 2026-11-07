@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+const data = JSON.parse(fs.readFileSync('storage/app/catalog/snapshots/fillers-fillers.json', 'utf-8'));
+const shows = data.shows;
+const keys = Object.keys(shows);
+console.log('first keys:', keys.slice(0, 10));
+const fields = {};
+for (const s of Object.values(shows)) for (const k of Object.keys(s)) fields[k] = (fields[k] || 0) + 1;
+console.log('field frequency:', fields);
+const op = shows['21'];
+if (op) console.log('key 21:', op.source, 'episodes:', op.episodes, Object.fromEntries(Object.entries(op).filter(([k,v]) => Array.isArray(v)).map(([k,v]) => [k, v.length])));

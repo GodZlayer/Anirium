@@ -21,5 +21,11 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
+COPY docker/php-performance.ini /usr/local/etc/php/conf.d/anirium-performance.ini
+
+# Configura o Scheduler nativo do Laravel dentro do container (a cada minuto)
+RUN echo "* * * * * cd /var/www/html && /usr/local/bin/php artisan schedule:run >> /var/www/html/storage/logs/scheduler.log 2>&1" >> /etc/crontabs/root
+
 EXPOSE 9000
-CMD ["php-fpm"]
+COPY docker/start-app.sh /usr/local/bin/start-anirium
+CMD ["sh", "/usr/local/bin/start-anirium"]
