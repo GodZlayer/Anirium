@@ -198,7 +198,7 @@
                 </section>
 
                 <!-- B. GENEALOGIA DE OBRAS (LINHA DO TEMPO SEQUENCIAL) -->
-                <section class="flex flex-col gap-3">
+                <section id="section-universe-genealogy" class="flex flex-col gap-3">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-base text-theme-accent">🧬</span>
@@ -209,16 +209,23 @@
                     </div>
 
                     <div class="p-5 rounded-3xl bg-theme-raised/60 border border-theme-default flex items-center gap-3 overflow-x-auto no-scrollbar">
-                        @foreach($works->take(4) as $index => $gw)
+                        @forelse($genealogy as $index => $item)
                             <div class="flex items-center gap-3 shrink-0">
                                 <div class="flex items-center gap-3 p-2.5 pr-4 rounded-2xl bg-theme-card border border-theme-default hover:border-theme-accent cursor-pointer transition-all hover:scale-105"
-                                     onclick="window.pushNavigation('work', '{{ $gw->id }}', '{{ addslashes($gw->title) }}')">
+                                     onclick="window.pushNavigation('work', '{{ $item->id }}', '{{ addslashes($item->title) }}')">
                                     <div class="w-10 h-10 rounded-xl overflow-hidden bg-black shrink-0">
-                                        <img src="{{ $gw->image_url ?? $leadImage }}" class="w-full h-full object-cover">
+                                        <img src="{{ $item->image_url ?? $leadImage }}" class="w-full h-full object-cover">
                                     </div>
                                     <div>
-                                        <h4 class="text-xs font-bold text-theme-primary truncate max-w-[140px]">{{ $gw->title }}</h4>
-                                        <p class="text-[9px] font-mono text-theme-muted">{{ $gw->format ?? 'TV' }} • {{ $gw->episode_count ?? '?' }} eps</p>
+                                        <div class="flex items-center gap-1.5">
+                                            <h4 class="text-xs font-bold text-theme-primary truncate max-w-[130px]">{{ $item->title }}</h4>
+                                            @if(!empty($item->relation_type))
+                                                <span class="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold uppercase bg-theme-accent/20 text-theme-accent border border-theme-accent/30">
+                                                    {{ $item->relation_type === 'side_story' ? 'Side-Story' : ($item->relation_type === 'sequel' ? 'Sequência' : ($item->relation_type === 'prequel' ? 'Prequel' : $item->relation_type)) }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <p class="text-[9px] font-mono text-theme-muted">{{ $item->format ?? 'TV' }} • {{ $item->release_year ?? '' }} {{ $item->episode_count ? '• ' . $item->episode_count . ' eps' : '' }}</p>
                                     </div>
                                 </div>
 
@@ -226,12 +233,14 @@
                                     <span class="text-theme-muted text-sm font-mono opacity-50">➔</span>
                                 @endif
                             </div>
-                        @endforeach
+                        @empty
+                            <p class="text-xs font-mono text-theme-muted">Nenhuma relação genealógica registrada.</p>
+                        @endforelse
                     </div>
                 </section>
 
                 <!-- C. CARROSSEL DE SAGAS & ARCOS NARRATIVOS -->
-                <section class="flex flex-col gap-3">
+                <section id="section-universe-arcs" class="flex flex-col gap-3">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-base text-theme-accent">📜</span>
@@ -257,9 +266,11 @@
                                         {{ $arc->title }}
                                     </h3>
                                 </div>
-                                <p class="text-[10px] font-mono text-theme-muted mt-3">
-                                    {{ $arc->work_title ?? $name }}
-                                </p>
+                                <div class="mt-3 pt-2 border-t border-theme-default/40">
+                                    <p class="text-[10px] font-mono text-theme-accent truncate" title="{{ $arc->span_description ?? ($arc->work_title ?? $name) }}">
+                                        {{ $arc->span_description ?? ($arc->work_title ?? $name) }}
+                                    </p>
+                                </div>
                             </div>
                         @empty
                             <p class="text-xs font-mono text-theme-muted" data-i18n="entity.no_arcs">Nenhum arco vinculado.</p>
@@ -421,7 +432,16 @@ window.switchUniverseTab = function(tabName) {
     const overviewPanel = document.getElementById('universe-panel-overview');
     const discussionPanel = document.getElementById('universe-panel-discussion');
     const btnOverview = document.getElementById('tab-btn-overview');
+    const btnWorks = document.getElementById('tab-btn-works');
+    const btnGenealogy = document.getElementById('tab-btn-genealogy');
+    const btnArcs = document.getElementById('tab-btn-arcs');
     const btnDiscussion = document.getElementById('tab-btn-discussion');
+
+    const resetButtons = () => {
+        [btnOverview, btnWorks, btnGenealogy, btnArcs, btnDiscussion].forEach(btn => {
+            if (btn) btn.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all text-theme-muted hover:text-theme-primary cursor-pointer shrink-0';
+        });
+    };
 
     if (tabName === 'discussion') {
         if (overviewPanel) overviewPanel.classList.add('hidden');
@@ -430,9 +450,7 @@ window.switchUniverseTab = function(tabName) {
             discussionPanel.classList.add('flex');
             window.refreshEntityComments?.();
         }
-        if (btnOverview) {
-            btnOverview.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all text-theme-muted hover:text-theme-primary cursor-pointer shrink-0';
-        }
+        resetButtons();
         if (btnDiscussion) {
             btnDiscussion.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer shrink-0';
         }
@@ -442,15 +460,20 @@ window.switchUniverseTab = function(tabName) {
             discussionPanel.classList.remove('flex');
         }
         if (overviewPanel) overviewPanel.classList.remove('hidden');
-        if (btnOverview) {
-            btnOverview.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer shrink-0';
-        }
-        if (btnDiscussion) {
-            btnDiscussion.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all text-theme-muted hover:text-theme-primary cursor-pointer shrink-0';
-        }
+        resetButtons();
 
         if (tabName === 'works') {
+            if (btnWorks) btnWorks.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer shrink-0';
             document.getElementById('section-universe-works')?.scrollIntoView({ behavior: 'smooth' });
+        } else if (tabName === 'genealogy') {
+            if (btnGenealogy) btnGenealogy.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer shrink-0';
+            document.getElementById('section-universe-genealogy')?.scrollIntoView({ behavior: 'smooth' });
+        } else if (tabName === 'arcs') {
+            if (btnArcs) btnArcs.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer shrink-0';
+            document.getElementById('section-universe-arcs')?.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            if (btnOverview) btnOverview.className = 'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer shrink-0';
+            document.getElementById('universe-panel-overview')?.scrollIntoView({ behavior: 'smooth' });
         }
     }
 };

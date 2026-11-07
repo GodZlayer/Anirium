@@ -1,7 +1,7 @@
 <x-app-layout>
     <!-- 1. TOPBAR FLUTUANTE (Idêntica à versão TSX de Lobby.tsx) -->
     <header class="w-full h-14 flex-none px-3 lg:px-6 z-40 border-b border-theme-default bg-theme-header backdrop-blur-xl flex items-center justify-between gap-1 lg:gap-4 select-none">
-        <!-- Lado Esquerdo: Mascote + Logo Textual + DOCK CÃPSULA ACRÃLICA DE NAVEGAÇÃO -->
+        <!-- Lado Esquerdo: Mascote + Logo Textual + DOCK CÁPSULA ACRÍLICA DE NAVEGAÇÃO -->
         <div class="flex items-center gap-2 lg:gap-5 shrink-0">
             <!-- Botão Logotipo Canônico Anirium -->
             <button type="button"
@@ -15,7 +15,7 @@
                      class="hidden lg:block h-6 w-auto object-contain filter drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
             </button>
 
-            <!-- DOCK CÃPSULA ACRÃLICA NA TOPBAR (Home, Explorar, Calendário) -->
+            <!-- DOCK CÁPSULA ACRÍLICA NA TOPBAR (Home, Explorar, Calendário) -->
             <nav class="flex items-center backdrop-blur-md p-1 rounded-full border border-theme-default bg-theme-pill text-xs shadow-inner">
                 @php $initialTab = request()->query('tab', 'home'); @endphp
                 <!-- 1. Home -->
@@ -170,7 +170,7 @@
 
                 <!-- Dropdown de Idiomas (100% Opaco, Alto Contraste, Guiado por Tokens) -->
                 <div id="lang-dropdown" class="hidden absolute right-0 top-11 z-50 w-60 rounded-2xl p-3 shadow-2xl theme-dropdown-panel border border-theme-default">
-                    <p class="text-[10px] font-mono px-2 py-1 uppercase tracking-wider font-bold theme-dropdown-section-title" data-i18n="lang.label">🌐 Idioma do Sistema</p>
+                    <p class="text-[10px] font-mono px-2 py-1 uppercase tracking-wider font-bold theme-dropdown-section-title" data-i18n="lang.label">🌐 Idioma do Sistema</p>
                     <div class="space-y-1 max-h-64 overflow-y-auto pr-1">
                         <button type="button" onclick="window.applyLanguage('pt-BR'); window.closeLangMenu();" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs theme-dropdown-item transition-all cursor-pointer font-medium">
     <img src="/assets/flags/pt-BR.svg" class="w-5 h-3.5 rounded-xs object-cover border border-white/10 shrink-0" alt="pt-BR" />
@@ -194,7 +194,7 @@
 </button>
                         <button type="button" onclick="window.applyLanguage('ru-RU'); window.closeLangMenu();" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs theme-dropdown-item transition-all cursor-pointer font-medium">
     <img src="/assets/flags/ru-RU.svg" class="w-5 h-3.5 rounded-xs object-cover border border-white/10 shrink-0" alt="ru-RU" />
-    <span data-i18n="lang.ru">Ð ÑƒÑÑÐºÐ¸Ð¹ (Russo)</span>
+    <span data-i18n="lang.ru">Русский (Russo)</span>
 </button>
                         <button type="button" onclick="window.applyLanguage('it-IT'); window.closeLangMenu();" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs theme-dropdown-item transition-all cursor-pointer font-medium">
     <img src="/assets/flags/it-IT.svg" class="w-5 h-3.5 rounded-xs object-cover border border-white/10 shrink-0" alt="it-IT" />
@@ -210,14 +210,14 @@
 </button>
                         <button type="button" onclick="window.applyLanguage('hi-IN'); window.closeLangMenu();" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs theme-dropdown-item transition-all cursor-pointer font-medium">
     <img src="/assets/flags/hi-IN.svg" class="w-5 h-3.5 rounded-xs object-cover border border-white/10 shrink-0" alt="hi-IN" />
-    <span data-i18n="lang.hi">à¤¹à¤¿à¤¨à¥à¤¦à¥€ (Hindi / Indiano)</span>
+    <span data-i18n="lang.hi">हिन्दी (Hindi / Indiano)</span>
 </button>
                     </div>
                 </div>
             </div>
 
             @if(!$user)
-                <!-- DESLOGADO: BOTÃO OFICIAL LIMPO "ENTRAR COM GOOGLE" (Apenas o Ãcone Oficial SVG) -->
+                <!-- DESLOGADO: BOTÃO OFICIAL LIMPO "ENTRAR COM GOOGLE" (Apenas o Ícone Oficial SVG) -->
                 <a href="/auth/google"
                    title="Entrar com o Google" data-i18n-title="auth.google"
                    class="w-8 h-8 rounded-full border border-theme-default bg-theme-surface hover:border-theme-highlight flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-md cursor-pointer shrink-0">
@@ -229,7 +229,7 @@
                     </svg>
                 </a>
             @else
-                <!-- LOGADO: MOLDURA LOLPROFILEBADGE COM ANEL DE XP E NÃVEL -->
+                <!-- LOGADO: MOLDURA LOLPROFILEBADGE COM ANEL DE XP E NÍVEL -->
                 <div class="relative flex items-center gap-3 px-3 py-1 rounded-full border border-white/10 bg-[#0E1118]/80 cursor-pointer hover:border-theme-accent/50 transition-all"
                      onclick="window.openProfileModal()">
                     <div class="relative w-9 h-9 flex items-center justify-center">
@@ -296,7 +296,7 @@
         </div>
     </section>
 
-    <!-- PALCO 3: VIEW CALENDÃRIO (CalendarHeader + CalendarWorkCard Paginado) -->
+    <!-- PALCO 3: VIEW CALENDÁRIO (CalendarHeader + CalendarWorkCard Paginado) -->
     <section id="view-calendar" class="view-stage hidden h-full flex flex-col justify-between gap-3 p-4 overflow-hidden">
         <!-- Header Oficial do Calendário (CalendarHeader.tsx) -->
         <div class="p-4 rounded-3xl border border-theme-default bg-theme-card backdrop-blur-xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 flex-none">
@@ -557,8 +557,8 @@
     if (tab === 'calendar') window.renderCalendarPage();
 };
 
-        // 2. DERIVAÇÃO DETERMINÃSTICA DO HERO ROLL PELO CALENDÃRIO E HORÃRIO ATUAL (Playhead Contínuo)
-                // FILTRO GLOBAL DETERMINÃSTICO DE PORNOGRAFIA / ADULTO (Forçado por Padrão em Todo o Sistema)
+        // 2. DERIVAÇÃO DETERMINÍSTICA DO HERO ROLL PELO CALENDÁRIO E HORÁRIO ATUAL (Playhead Contínuo)
+                // FILTRO GLOBAL DETERMINÍSTICO DE PORNOGRAFIA / ADULTO (Forçado por Padrão em Todo o Sistema)
         window.isAdultContentAllowed = function() {
             return Boolean(window.currentUser && window.currentUser.adult_content_enabled);
         };
@@ -669,7 +669,7 @@
             window.setHeroIndex(next);
         };
 
-        // CONTROLE DE VISIBILIDADE DAS PÃLULAS DA NAVBAR (Aparecem só ao focar na busca ou abrir o Explorar)
+        // CONTROLE DE VISIBILIDADE DAS PÍLULAS DA NAVBAR (Aparecem só ao focar na busca ou abrir o Explorar)
         window.showExploreFilters = function() {
             const container = document.getElementById('topbar-pills-container');
             if (container) {
@@ -687,7 +687,7 @@
             }
         };
 
-        // 3. EXPLORAR: FILTRAGEM DETERMINÃSTICA LOCAL POR KIND (Universo, Obra, Entidade)
+        // 3. EXPLORAR: FILTRAGEM DETERMINÍSTICA LOCAL POR KIND (Universo, Obra, Entidade)
         window.exploreKindFilter = 'work';
 
         window.setExploreKind = function(kind) {
@@ -872,7 +872,7 @@
             }).join('');
         };
 
-        // 4. CALENDÃRIO: PAGINAÇÃO E CARDS OFICIAIS (CalendarHeader.tsx + CalendarWorkCard.tsx)
+        // 4. CALENDÁRIO: PAGINAÇÃO E CARDS OFICIAIS (CalendarHeader.tsx + CalendarWorkCard.tsx)
         window.selectCalendarDay = function(dayKey, dayFull) {
             window.currentCalDay = dayKey;
             window.calPage = 1;
@@ -1229,7 +1229,7 @@ if (window.i18n) window.i18n.applyToDOM();
         };
 
         // 9. MODAL DE PERFIL / GOOGLE
-                // 9. GERENCIAMENTO DAS 5 ABAS DO PERFIL CANÔNICO DO USUÃRIO
+                // 9. GERENCIAMENTO DAS 5 ABAS DO PERFIL CANÔNICO DO USUÁRIO
         window.currentProfileTab = 'overview';
         window.userLibraryList = [];
         window.userAddonsList = [];

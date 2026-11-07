@@ -182,7 +182,7 @@ class CatalogGraphController extends Controller
         $realId = $this->resolveUuid($id, 'universe');
         $allowAdult = (bool) ($request->user()?->adult_content_enabled || $request->query('adult') === '1');
 
-        $cacheKey = "catalog:universe:graph:payload:v2:{$realId}:" . ($allowAdult ? '1' : '0');
+        $cacheKey = "catalog:universe:graph:payload:v3:{$realId}:" . ($allowAdult ? '1' : '0');
         $data = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($realId, $allowAdult) {
             $universe = DB::table('catalog_universes')->where('id', $realId)->first();
             if (!$universe) return null;
@@ -301,7 +301,7 @@ class CatalogGraphController extends Controller
 
             // Genealogia ontológica: Cronologia, Prequels, Sequels e Side-Stories baseadas nas relações
             $genealogyRaw = collect(DB::select("
-                SELECT r.from_work_id, r.relation_type, r.to_work_id, w2.title as to_title, w2.format, wa.image_url, w2.episode_count 
+                SELECT w2.id, r.relation_type, w2.title, w2.format, wa.image_url, w2.episode_count 
                 FROM catalog_work_relations r 
                 JOIN catalog_works w2 ON r.to_work_id = w2.id 
                 LEFT JOIN catalog_work_assets wa ON w2.id = wa.work_id 
@@ -309,7 +309,7 @@ class CatalogGraphController extends Controller
                   AND r.to_work_id IN (SELECT work_id FROM catalog_universe_works WHERE universe_id = ?) 
                   AND w2.media = 'anime' 
                   AND r.relation_type IN ('prequel', 'sequel', 'side_story', 'spin_off', 'parent_story') 
-                GROUP BY r.from_work_id, r.relation_type, r.to_work_id
+                GROUP BY w2.id, r.relation_type
             ", [$realId, $realId]))
             ->map(fn($item) => (array) $item)
             ->toArray();
