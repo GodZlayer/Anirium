@@ -2,9 +2,16 @@
     $totalWorks = count($works);
     $totalArcs = count($arcs);
     $totalEps = $totalEpisodes ?? 0;
+    $totalChaps = $totalChapters ?? 0;
+    $totalVols = $totalVolumes ?? 0;
     $leadImage = $universe->image_url ?? ($works[0]->image_url ?? '/assets/icons/actions/search.png');
-    $desc = $universe->description ?? "Linha do tempo e ontologia oficial de {$universe->name}, conectando produções, arcos narrativos e genealogia de continuidade.";
     $name = $universe->name ?? 'Universo Canônico';
+
+    // Total consolidado de todas as obras (animes, mangás, novels, etc.)
+    $totalAllWorks = isset($formats) ? $formats->sum('total') : $totalWorks;
+    $formatFormula = isset($formats) && count($formats) > 0 
+        ? $formats->map(fn($f) => "{$f->total} " . strtolower(str_replace('_', ' ', $f->format)))->join(' + ')
+        : "{$totalWorks} produções";
 @endphp
 
 <div class="w-full h-full flex flex-col overflow-hidden select-none bg-theme-base text-theme-primary">
@@ -19,8 +26,8 @@
             </button>
 
             <!-- Trilha Dinâmica Viva -->
-            <nav id="dynamic-breadcrumb" class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar py-1">
-                <span class="hover:text-theme-primary cursor-pointer transition-colors" onclick="window.switchTab('home')">Lobby</span>
+            <nav id="entity-dynamic-breadcrumb" class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar py-1">
+                <button type="button" onclick="window.clearNavigation()" class="hover:text-theme-accent transition-colors shrink-0" data-i18n="nav.home">Lobby</button>
                 <span class="opacity-40">❯</span>
                 <span class="text-theme-accent font-bold truncate max-w-[200px]">{{ $name }}</span>
             </nav>
@@ -41,7 +48,7 @@
         <main class="flex-1 min-w-0 flex flex-col gap-4 overflow-hidden">
             
             <!-- 1. HERO PANORÂMICO DO UNIVERSO -->
-            <section class="relative w-full rounded-3xl overflow-hidden border border-theme-default bg-theme-raised shadow-xl min-h-[180px] max-h-[220px] flex flex-col justify-end p-5 md:p-6 group shrink-0">
+            <section class="relative w-full rounded-3xl overflow-hidden border border-theme-default bg-theme-raised shadow-xl min-h-[175px] max-h-[210px] flex flex-col justify-end p-5 md:p-6 group shrink-0">
                 <!-- Imagem Panorâmica de Fundo com Fade -->
                 <div class="absolute inset-0 z-0">
                     <img src="{{ $leadImage }}" class="w-full h-full object-cover object-center filter brightness-[0.35] blur-[1px] group-hover:scale-105 transition-transform duration-1000">
@@ -61,7 +68,7 @@
                         </h1>
                         
                         <p class="text-[11px] md:text-xs text-theme-muted line-clamp-2 leading-relaxed max-w-lg">
-                            {{ $desc }}
+                            Universo narrativo e cronologia ontológica oficial de {{ $name }}.
                         </p>
 
                         <!-- Ações Rápidas -->
@@ -244,79 +251,80 @@
 
         </main>
 
-        <!-- COLUNA LATERAL FIXA (SIDEBAR ONTOLÓGICA ORGANIZADA EM DOCKS LIMPOS) -->
-        <aside class="w-full lg:w-80 flex flex-col gap-3.5 shrink-0 overflow-y-auto no-scrollbar">
+        <!-- COLUNA LATERAL FIXA: SIDEBAR ONTOLÓGICA (MÉTRICAS, AUTORES, ESTÚDIOS) -->
+        <aside class="w-full lg:w-80 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
             
-            <!-- DOCK 1: SOBRE O UNIVERSO & MÉTRICAS CONSOLIDADAS -->
+            <!-- DOCK 1: MÉTRICAS CONSOLIDADAS DO UNIVERSO -->
             <div class="p-4 rounded-3xl bg-theme-card border border-theme-default space-y-3 shadow-xl">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <span class="text-theme-accent">ℹ️</span>
-                        <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold" data-i18n="universe.about_title">
-                            Sobre o Universo
-                        </h3>
+                <!-- Linha 1: Obras Total N e fórmula por tipo -->
+                <div class="p-3 rounded-2xl bg-theme-raised/70 border border-theme-default/50 space-y-1.5">
+                    <div class="flex items-baseline justify-between">
+                        <span class="text-[10px] font-mono uppercase tracking-wider text-theme-muted font-bold">Obras do Universo</span>
+                        <span class="text-base font-black font-mono text-theme-accent">{{ $totalAllWorks }}</span>
                     </div>
+                    <!-- Fórmula menor (x + y + z + ...) baseada em quantas de cada tipo -->
+                    <p class="text-[10px] font-mono text-theme-muted leading-relaxed border-t border-theme-default/30 pt-1">
+                        ({{ $formatFormula }})
+                    </p>
                 </div>
 
-                <!-- Métricas Consolidadas -->
-                <div class="grid grid-cols-3 gap-2">
-                    <div class="text-center p-2 rounded-xl bg-theme-raised border border-theme-default/40">
-                        <span class="block text-sm font-black font-mono text-theme-accent">{{ $totalWorks }}</span>
-                        <span class="text-[9px] font-mono text-theme-muted uppercase" data-i18n="universe.metric_works">Obras</span>
-                    </div>
-                    <div class="text-center p-2 rounded-xl bg-theme-raised border border-theme-default/40">
+                <!-- Linha 2: Quantidade de Arcos e Episódios de todas as obras -->
+                <div class="grid {{ ($totalChaps > 0 || $totalVols > 0) ? 'grid-cols-3' : 'grid-cols-2' }} gap-2">
+                    <div class="p-2.5 rounded-xl bg-theme-raised/70 border border-theme-default/50 text-center">
                         <span class="block text-sm font-black font-mono text-[var(--color-state-canon,#10B981)]">{{ $totalArcs }}</span>
-                        <span class="text-[9px] font-mono text-theme-muted uppercase" data-i18n="universe.metric_arcs">Arcos</span>
+                        <span class="text-[9px] font-mono text-theme-muted uppercase">Arcos</span>
                     </div>
-                    <div class="text-center p-2 rounded-xl bg-theme-raised border border-theme-default/40">
-                        <span class="block text-sm font-black font-mono text-white">{{ $totalEps }}</span>
-                        <span class="text-[9px] font-mono text-theme-muted uppercase" data-i18n="universe.metric_eps">Episódios</span>
-                    </div>
-                </div>
 
-                <!-- Formatos Reais Presentes no Catálogo -->
-                @if(isset($formats) && count($formats) > 0)
-                    <div class="pt-2 border-t border-theme-default/40">
-                        <span class="text-[10px] font-mono uppercase font-bold text-theme-muted block mb-1.5">Formatos no Catálogo</span>
-                        <div class="flex flex-wrap gap-1.5">
-                            @foreach($formats as $fmt)
-                                <span class="px-2 py-0.5 rounded-md text-[9px] font-mono font-bold bg-theme-raised border border-theme-default/60 text-theme-primary">
-                                    {{ $fmt->format }} ({{ $fmt->total }})
-                                </span>
-                            @endforeach
-                        </div>
+                    <div class="p-2.5 rounded-xl bg-theme-raised/70 border border-theme-default/50 text-center">
+                        <span class="block text-sm font-black font-mono text-white">{{ $totalEps }}</span>
+                        <span class="text-[9px] font-mono text-theme-muted uppercase">Episódios</span>
                     </div>
-                @endif
+
+                    @if($totalChaps > 0)
+                        <div class="p-2.5 rounded-xl bg-theme-raised/70 border border-theme-default/50 text-center">
+                            <span class="block text-sm font-black font-mono text-amber-400">{{ $totalChaps }}</span>
+                            <span class="text-[9px] font-mono text-theme-muted uppercase">Capítulos</span>
+                        </div>
+                    @elseif($totalVols > 0)
+                        <div class="p-2.5 rounded-xl bg-theme-raised/70 border border-theme-default/50 text-center">
+                            <span class="block text-sm font-black font-mono text-purple-400">{{ $totalVols }}</span>
+                            <span class="text-[9px] font-mono text-theme-muted uppercase">Volumes</span>
+                        </div>
+                    @endif
+                </div>
             </div>
 
-            <!-- DOCK 2: PRINCIPAIS CRIADORES (AUTOR, DIRETOR, DESIGNER) -->
-            @if(count($creators) > 0)
+            <!-- DOCK 2: AUTORES (AUTOR ORIGINAL VS AUTOR DE OUTRAS OBRAS/ROTEIRISTA) -->
+            @if(isset($authors) && count($authors) > 0)
                 <div class="p-4 rounded-3xl bg-theme-card border border-theme-default space-y-2.5 shadow-xl">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <span class="text-theme-accent">👤</span>
-                            <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold" data-i18n="universe.creators_title">
-                                Principais Criadores
+                            <span class="text-theme-accent">✍️</span>
+                            <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold">
+                                Autores
                             </h3>
                         </div>
+                        <span class="text-[9px] font-mono text-theme-muted">Criação & Roteiro</span>
                     </div>
 
                     <div class="space-y-2">
-                        @foreach(collect($creators)->take(3) as $cr)
+                        @foreach(collect($authors)->take(4) as $au)
                             <div class="flex items-center justify-between p-2 rounded-2xl bg-theme-raised/60 border border-theme-default hover:border-theme-accent cursor-pointer transition-all hover:scale-[1.02]"
-                                 onclick="window.pushNavigation('creator', '{{ $cr->id }}', '{{ addslashes($cr->name) }}')">
+                                 onclick="window.pushNavigation('creator', '{{ $au->id }}', '{{ addslashes($au->name) }}')">
                                 <div class="flex items-center gap-2.5 min-w-0">
                                     <div class="w-8 h-8 rounded-full overflow-hidden bg-black shrink-0 border border-theme-default">
-                                        <img src="{{ $cr->image_url ?? '/assets/icons/actions/search.png' }}" class="w-full h-full object-cover">
+                                        <img src="{{ $au->image_url ?? '/assets/icons/actions/search.png' }}" class="w-full h-full object-cover">
                                     </div>
                                     <div class="min-w-0">
-                                        <h4 class="text-xs font-bold text-theme-primary truncate">{{ $cr->name }}</h4>
-                                        <p class="text-[9px] font-mono text-theme-muted uppercase">{{ $cr->role ?? 'Criador' }}</p>
+                                        <h4 class="text-xs font-bold text-theme-primary truncate max-w-[130px]">{{ $au->name }}</h4>
+                                        <p class="text-[9px] font-mono {{ ($au->is_original ?? 2) == 1 ? 'text-theme-accent font-bold' : 'text-theme-muted' }}">
+                                            {{ ($au->is_original ?? 2) == 1 ? 'Autor do Original' : 'Autor (Outras Obras)' }}
+                                        </p>
                                     </div>
                                 </div>
-                                @if(!empty($cr->total_works))
+                                @if(!empty($au->total_works))
                                     <span class="text-[9px] font-mono text-theme-accent px-1.5 py-0.5 rounded bg-theme-accent/10 border border-theme-accent/20 shrink-0">
-                                        {{ $cr->total_works }} obs
+                                        {{ $au->total_works }} obs
                                     </span>
                                 @endif
                             </div>
@@ -325,14 +333,14 @@
                 </div>
             @endif
 
-            <!-- DOCK 3: ESTÚDIOS DE ANIMAÇÃO -->
-            @if(count($studios) > 0)
+            <!-- DOCK 3: ESTÚDIOS -->
+            @if(isset($studios) && count($studios) > 0)
                 <div class="p-4 rounded-3xl bg-theme-card border border-theme-default space-y-2.5 shadow-xl">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-theme-accent">🏢</span>
-                            <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold" data-i18n="universe.studios_title">
-                                Estúdios de Animação
+                            <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold">
+                                Estúdios
                             </h3>
                         </div>
                     </div>
@@ -346,8 +354,8 @@
                                         🏢
                                     </div>
                                     <div class="min-w-0">
-                                        <h4 class="text-xs font-bold text-theme-primary truncate">{{ $st->name }}</h4>
-                                        <p class="text-[9px] font-mono text-theme-muted" data-i18n="universe.studio_production">Produção</p>
+                                        <h4 class="text-xs font-bold text-theme-primary truncate max-w-[140px]">{{ $st->name }}</h4>
+                                        <p class="text-[9px] font-mono text-theme-muted">Produção & Animação</p>
                                     </div>
                                 </div>
                                 @if(!empty($st->total_works))
@@ -355,33 +363,6 @@
                                         {{ $st->total_works }} obs
                                     </span>
                                 @endif
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
-            <!-- DOCK 4: TRILHAS EM DESTAQUE -->
-            @if(count($tracks) > 0)
-                <div class="p-4 rounded-3xl bg-theme-card border border-theme-default space-y-2 shadow-xl">
-                    <div class="flex items-center gap-2">
-                        <span class="text-theme-accent">🎵</span>
-                        <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold" data-i18n="universe.tracks_title">
-                            Trilhas em Destaque
-                        </h3>
-                    </div>
-
-                    <div class="space-y-1.5">
-                        @foreach(collect($tracks)->take(3) as $tr)
-                            <div class="flex items-center justify-between p-2 rounded-2xl bg-theme-raised/60 border border-theme-default hover:border-theme-accent cursor-pointer transition-all group"
-                                 onclick="window.pushNavigation('track', '{{ $tr->id }}', '{{ addslashes($tr->title) }}')">
-                                <div class="min-w-0 flex items-center gap-2">
-                                    <span class="text-xs text-theme-muted group-hover:text-theme-accent">▶</span>
-                                    <div class="min-w-0">
-                                        <h4 class="text-xs font-bold text-theme-primary truncate">{{ $tr->title }}</h4>
-                                        <p class="text-[9px] font-mono text-theme-muted uppercase">{{ $tr->track_type ?? 'OST' }}</p>
-                                    </div>
-                                </div>
                             </div>
                         @endforeach
                     </div>
@@ -397,7 +378,6 @@
 window.switchUniverseTab = function(tabName) {
     const tabs = ['works', 'genealogy', 'arcs', 'discussion'];
     
-    // Atualiza botões
     tabs.forEach(t => {
         const btn = document.getElementById('tab-btn-' + t);
         const pane = document.getElementById('universe-tab-' + t);

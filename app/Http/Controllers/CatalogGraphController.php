@@ -182,7 +182,7 @@ class CatalogGraphController extends Controller
         $realId = $this->resolveUuid($id, 'universe');
         $allowAdult = (bool) ($request->user()?->adult_content_enabled || $request->query('adult') === '1');
 
-        $cacheKey = "catalog:universe:graph:payload:v4:{$realId}:" . ($allowAdult ? '1' : '0');
+        $cacheKey = "catalog:universe:graph:payload:v5:{$realId}:" . ($allowAdult ? '1' : '0');
         $data = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($realId, $allowAdult) {
             $universe = DB::table('catalog_universes')->where('id', $realId)->first();
             if (!$universe) return null;
@@ -208,19 +208,20 @@ class CatalogGraphController extends Controller
 
             $universe->name = $canonicalTitle ?: ($universe->name ?? ($works[0]->title ?? 'Universo Canônico'));
 
-            // Buscar criadores principais da franquia com contagem de produções
-            $creators = DB::table('catalog_work_creators as wc')
+            // Buscar autores com distinção explícita de autor original vs roteirista/autor derivado
+            $authors = DB::table('catalog_work_creators as wc')
                 ->join('catalog_creators as c', 'wc.creator_id', '=', 'c.id')
                 ->leftJoin('catalog_roles as r', 'wc.role_id', '=', 'r.id')
                 ->whereIn('wc.work_id', $allWorkIds)
+                ->whereIn('r.token', ['author', 'writer'])
                 ->select(
                     'c.id',
                     'c.name',
                     'c.image_url',
-                    'r.token as role',
-                    DB::raw('COUNT(wc.work_id) as total_works')
+                    DB::raw("MIN(CASE WHEN r.token = 'author' THEN 1 ELSE 2 END) as is_original"),
+                    DB::raw('COUNT(DISTINCT wc.work_id) as total_works')
                 )
-                ->groupBy('c.id', 'c.name', 'r.token')
+                ->groupBy('c.id', 'c.name')
                 ->orderByDesc('total_works')
                 ->take(6)
                 ->get();
@@ -258,8 +259,22 @@ class CatalogGraphController extends Controller
                 ->take(5)
                 ->get();
 
-            // Total consolidado de episódios
-            $totalEpisodes = DB::table('catalog_episodes')->whereIn('work_id', $allWorkIds)->count();
+            // Métricas agregadas de unidades (episódios de animes, capítulos de mangás e volumes)
+            $unitMetrics = DB::table('catalog_works')
+                ->whereIn('id', $allWorkIds)
+                ->select(
+                    DB::raw("SUM(CASE WHEN media = 'anime' THEN coalesce(episode_count, 0) ELSE 0 END) as anime_episodes"),
+                    DB::raw("SUM(CASE WHEN media = 'manga' THEN coalesce(episode_count, 0) ELSE 0 END) as manga_chapters"),
+                    DB::raw("SUM(CASE WHEN media = 'novel' THEN coalesce(episode_count, 0) ELSE 0 END) as novel_volumes")
+                )
+                ->first();
+
+            $totalEpisodes = (int) ($unitMetrics->anime_episodes ?? 0);
+            if ($totalEpisodes === 0) {
+                $totalEpisodes = DB::table('catalog_episodes')->whereIn('work_id', $allWorkIds)->count();
+            }
+            $totalChapters = (int) ($unitMetrics->manga_chapters ?? 0);
+            $totalVolumes = (int) ($unitMetrics->novel_volumes ?? 0);
 
             // Poster/Lead Image da franquia
             $universeLeadImage = $works[0]->image_url ?? '/assets/icons/actions/search.png';
@@ -340,11 +355,12 @@ class CatalogGraphController extends Controller
                 'mangas' => $mangas->map(fn($m) => (array)$m)->toArray(),
                 'arcs' => $arcs,
                 'genealogy' => $genealogyRaw,
-                'creators' => $creators->map(fn($c) => (array)$c)->toArray(),
+                'authors' => $authors->map(fn($a) => (array)$a)->toArray(),
                 'studios' => $studios->map(fn($s) => (array)$s)->toArray(),
-                'tracks' => $tracks->map(fn($t) => (array)$t)->toArray(),
                 'formats' => $formats->map(fn($f) => (array)$f)->toArray(),
                 'totalEpisodes' => $totalEpisodes,
+                'totalChapters' => $totalChapters,
+                'totalVolumes' => $totalVolumes,
                 'visibleWorkIds' => $visibleWorkIds,
             ];
         });
@@ -358,11 +374,12 @@ class CatalogGraphController extends Controller
         $mangas = collect($data['mangas'])->map(fn($m) => (object)$m);
         $arcs = collect($data['arcs'])->map(fn($a) => (object)$a);
         $genealogy = collect($data['genealogy'] ?? [])->map(fn($g) => (object)$g);
-        $creators = collect($data['creators'])->map(fn($c) => (object)$c);
+        $authors = collect($data['authors'] ?? ($data['creators'] ?? []))->map(fn($a) => (object)$a);
         $studios = collect($data['studios'])->map(fn($s) => (object)$s);
-        $tracks = collect($data['tracks'])->map(fn($t) => (object)$t);
         $formats = collect($data['formats'] ?? [])->map(fn($f) => (object)$f);
-        $totalEpisodes = $data['totalEpisodes'];
+        $totalEpisodes = $data['totalEpisodes'] ?? 0;
+        $totalChapters = $data['totalChapters'] ?? 0;
+        $totalVolumes = $data['totalVolumes'] ?? 0;
         $visibleWorkIds = $data['visibleWorkIds'];
 
         if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
@@ -381,11 +398,12 @@ class CatalogGraphController extends Controller
                 'mangas' => $mangas,
                 'arcs' => $arcs,
                 'genealogy' => $genealogy,
-                'creators' => $creators,
+                'authors' => $authors,
                 'studios' => $studios,
-                'tracks' => $tracks,
                 'formats' => $formats,
                 'totalEpisodes' => $totalEpisodes,
+                'totalChapters' => $totalChapters,
+                'totalVolumes' => $totalVolumes,
                 'isLiked' => (bool) ($pref->liked ?? false),
                 'isBookmarked' => (bool) ($pref->bookmarked ?? false),
                 'userScore' => $pref->user_score ?? null,
