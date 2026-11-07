@@ -34,18 +34,8 @@
                 <span id="btn-context-back-label" data-i18n="nav.back">Voltar</span>
             </button>
 
-            <nav class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar">
+            <nav id="entity-dynamic-breadcrumb" class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar">
                 <button type="button" onclick="window.clearNavigation()" class="hover:text-theme-accent transition-colors shrink-0" data-i18n="nav.home">Lobby</button>
-                @if($universe)
-                    <span class="opacity-40">❯</span>
-                    <button type="button" onclick="window.pushNavigation('universe', '{{ $universe->id }}', '{{ addslashes($universeName) }}')" class="hover:text-theme-accent transition-colors truncate max-w-xs">{{ $universeName }}</button>
-                @endif
-                @if($work)
-                    <span class="opacity-40">❯</span>
-                    <button type="button" onclick="window.pushNavigation('work', '{{ $work->id }}', '{{ addslashes($workTitle) }}')" class="hover:text-theme-accent transition-colors truncate max-w-xs">{{ $workTitle }}</button>
-                @endif
-                <span class="opacity-40">❯</span>
-                <span class="text-theme-accent font-bold truncate max-w-xs">{{ $arcTitle }}</span>
             </nav>
         </div>
 

@@ -34,22 +34,8 @@
             </button>
 
             <!-- Breadcrumb Fractal (Universo > Obra > Arco > Episódio) -->
-            <nav class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar">
+            <nav id="entity-dynamic-breadcrumb" class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar">
                 <button type="button" onclick="window.clearNavigation()" class="hover:text-theme-accent transition-colors shrink-0" data-i18n="nav.home">Lobby</button>
-                @if(!empty($universe))
-                    <span class="opacity-40">❯</span>
-                    <button type="button" onclick="window.pushNavigation('universe', '{{ $universe->id }}', '{{ addslashes($universe->name) }}')" class="hover:text-theme-accent transition-colors truncate max-w-xs">{{ $universe->name }}</button>
-                @endif
-                <span class="opacity-40">❯</span>
-                <button type="button" onclick="window.pushNavigation('work', '{{ $work->id }}', '{{ addslashes($title) }}')" class="hover:text-theme-accent transition-colors truncate max-w-xs {{ empty($currentArc) && empty($currentEpisode) ? 'text-theme-accent font-bold' : '' }}">{{ $title }}</button>
-                @if(!empty($currentArc))
-                    <span class="opacity-40">❯</span>
-                    <button type="button" onclick="window.pushNavigation('arc', '{{ $currentArc->id }}', '{{ addslashes($currentArc->title) }}')" class="hover:text-theme-accent transition-colors truncate max-w-xs text-theme-accent font-bold">{{ $currentArc->title }}</button>
-                @endif
-                @if(!empty($currentEpisode))
-                    <span class="opacity-40">❯</span>
-                    <span class="text-theme-accent font-bold">Ep. {{ $currentEpisode->number }}</span>
-                @endif
             </nav>
         </div>
 

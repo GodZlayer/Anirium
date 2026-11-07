@@ -1006,12 +1006,33 @@
             }).join('');
         };
 
-        // 5. PILHA DE NAVEGAÇÃO DETERMINÃSTICA DO TGCODE (Injeção de Parciais Blade Direto do PHP)
+                // 5. PILHA DE NAVEGAÇÃO DETERMINÍSTICA DINÂMICA DO TGCODE (Histórico Vivo de Navegação pelas Entidades)
         window.navStack = [];
 
         window.pushNavigation = function(type, id, label) {
-            window.navStack.push({ type, id, label });
+            // Se a mesma entidade já estiver no topo, não duplica
+            const current = window.navStack[window.navStack.length - 1];
+            if (current && current.id === id && current.type === type) return;
+
+            // Se o usuário clicar em um item anterior de sua própria jornada, retrocede até ele
+            const existingIndex = window.navStack.findIndex(item => item.id === id && item.type === type);
+            if (existingIndex !== -1) {
+                window.navStack = window.navStack.slice(0, existingIndex + 1);
+            } else {
+                window.navStack.push({ type, id, label: label || type });
+            }
             window.renderCurrentState();
+        };
+
+        window.navigateToHistoryIndex = function(index) {
+            if (index < 0) {
+                window.clearNavigation();
+                return;
+            }
+            if (index < window.navStack.length) {
+                window.navStack = window.navStack.slice(0, index + 1);
+                window.renderCurrentState();
+            }
         };
 
         window.popNavigation = function() {
@@ -1024,6 +1045,26 @@
         window.clearNavigation = function() {
             window.navStack = [];
             window.renderCurrentState();
+        };
+
+        window.renderDynamicBreadcrumb = function() {
+            const nav = document.getElementById('entity-dynamic-breadcrumb');
+            if (!nav) return;
+
+            let html = '<button type="button" onclick="window.clearNavigation()" class="hover:text-theme-accent transition-colors shrink-0" data-i18n="nav.home">Lobby</button>';
+
+            window.navStack.forEach((entry, idx) => {
+                const isLast = (idx === window.navStack.length - 1);
+                const displayLabel = entry.label || entry.type || 'Entidade';
+                html += '<span class="opacity-40">❯</span>';
+                if (isLast) {
+                    html += `<span class="text-theme-accent font-bold truncate max-w-xs">${displayLabel}</span>`;
+                } else {
+                    html += `<button type="button" onclick="window.navigateToHistoryIndex(${idx})" class="hover:text-theme-accent transition-colors truncate max-w-xs cursor-pointer">${displayLabel}</button>`;
+                }
+            });
+
+            nav.innerHTML = html;
         };
 
         window.entityHtmlCache = new Map();
@@ -1045,7 +1086,8 @@
             // LOCAL-FIRST: Renderização instantânea se já estiver no cache local da sessão
             if (window.entityHtmlCache.has(cacheKey)) {
                 container.innerHTML = window.entityHtmlCache.get(cacheKey);
-                if (window.i18n) window.i18n.applyToDOM();
+                window.renderDynamicBreadcrumb();
+if (window.i18n) window.i18n.applyToDOM();
                 return;
             }
 
@@ -1079,7 +1121,8 @@
                     const html = await res.text();
                     window.entityHtmlCache.set(cacheKey, html);
                     container.innerHTML = html;
-                    if (window.i18n) window.i18n.applyToDOM();
+                    window.renderDynamicBreadcrumb();
+if (window.i18n) window.i18n.applyToDOM();
                 } else {
                     container.innerHTML = `<div class="p-8 text-center text-red-400 font-mono text-xs" data-i18n="state.error_partial">Erro ao compilar parcial Blade para esta obra.</div>`;
                 }

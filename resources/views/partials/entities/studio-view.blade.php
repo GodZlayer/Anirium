@@ -22,10 +22,8 @@
                 <span id="btn-context-back-label" data-i18n="nav.back">Voltar</span>
             </button>
 
-            <nav class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar">
+            <nav id="entity-dynamic-breadcrumb" class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar">
                 <button type="button" onclick="window.clearNavigation()" class="hover:text-theme-accent transition-colors shrink-0" data-i18n="nav.home">Lobby</button>
-                <span class="opacity-40">❯</span>
-                <span class="text-theme-accent font-bold truncate max-w-xs">{{ $name }}</span>
             </nav>
         </div>
 
