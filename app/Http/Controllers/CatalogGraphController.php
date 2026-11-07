@@ -19,7 +19,7 @@ class CatalogGraphController extends Controller
 
         // 1. Se já for um UUID v4 legítimo e existir na tabela principal, retorna em 1ms
         if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $cleanId)) {
-            if ($kind === 'work') {
+            if ($kind === 'work' || $kind === 'manga') {
                 $isWork = DB::table('catalog_works')->where('id', $cleanId)->exists();
                 if ($isWork) return $cleanId;
                 
@@ -33,13 +33,28 @@ class CatalogGraphController extends Controller
         }
 
         // 2. Se for external ID (ex: MyAnimeList ID, AniList ID, Shikimori ID), busca no índice
-        $ext = DB::table('catalog_external_identities')
-            ->where('external_id', $cleanId)
-            ->value('entity_id');
+        $query = DB::table('catalog_external_identities')
+            ->where('external_id', $cleanId);
+
+        if ($kind === 'manga') {
+            $query->where('namespace', 'like', 'manga%')
+                  ->orderByRaw("CASE WHEN provider = 'mal' THEN 1 WHEN provider = 'shikimori' THEN 2 WHEN provider = 'anilist' THEN 3 ELSE 4 END");
+        } elseif ($kind === 'work' || $kind === 'anime') {
+            $query->where('namespace', 'like', 'anime%')
+                  ->orderByRaw("CASE WHEN provider = 'mal' THEN 1 WHEN provider = 'shikimori' THEN 2 WHEN provider = 'anilist' THEN 3 ELSE 4 END");
+        }
+
+        $ext = $query->value('entity_id');
         if ($ext) return $ext;
 
-        // 3. Fallback: busca por prefixo/título se não for UUID
-        if ($kind === 'work' && strlen($cleanId) >= 3) {
+        // Fallback amplo caso não encontre no namespace restrito
+        $fallbackExt = DB::table('catalog_external_identities')
+            ->where('external_id', $cleanId)
+            ->value('entity_id');
+        if ($fallbackExt) return $fallbackExt;
+
+        // 3. Fallback: busca por prefixo se não for UUID
+        if (($kind === 'work' || $kind === 'manga') && strlen($cleanId) >= 3) {
             $workId = DB::table('catalog_works')
                 ->where('id', 'like', "{$cleanId}%")
                 ->value('id');
@@ -65,7 +80,8 @@ class CatalogGraphController extends Controller
     public function work(Request $request, string $id, CatalogWorkGraph $graph): JsonResponse|Response
     {
         try {
-            $realId = $this->resolveUuid($id, 'work');
+            $kind = $request->query('kind', 'work');
+            $realId = $this->resolveUuid($id, $kind);
             $allowAdult = (bool) (
                 $request->user()?->adult_content_enabled ||
                 in_array($request->query('adult'), ['1', 'true', true], true)
@@ -287,12 +303,15 @@ class CatalogGraphController extends Controller
             $universe->image_url = $universeLeadImage;
             $universe->total_episodes = $totalEpisodes;
 
-            $mangas = DB::table('catalog_universe_works as uw')
+            $mangasQuery = DB::table('catalog_universe_works as uw')
                 ->join('catalog_works as w', 'uw.work_id', '=', 'w.id')
                 ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
                 ->where('uw.universe_id', $realId)
-                ->where('w.media', 'manga')
-                ->get(['w.id', 'w.title', 'w.format', 'w.status', 'wa.image_url']);
+                ->where('w.media', 'manga');
+            if (!empty($visibleWorkIds)) {
+                $mangasQuery->whereIn('w.id', $visibleWorkIds);
+            }
+            $mangas = $mangasQuery->get(['w.id', 'w.title', 'w.format', 'w.status', 'wa.image_url']);
 
             // Sagas & Arcos com mapeamento exato de cobertura (Obra, Temporada, Episódio Inicial e Final)
             $arcsRaw = DB::table('catalog_arcs as a')

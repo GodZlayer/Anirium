@@ -440,7 +440,7 @@
 
         // Local-First Catalog Engine via IndexedDB (Zero bloqueio de thread, Zero JSON de 34MB)
         const DB_NAME = 'anirium_local_catalog';
-        const DB_VERSION = 1;
+        const DB_VERSION = 2;
         const STORE_NAME = 'works';
 
         function openCatalogDB() {
@@ -448,11 +448,12 @@
                 const req = indexedDB.open(DB_NAME, DB_VERSION);
                 req.onupgradeneeded = (e) => {
                     const db = e.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                        store.createIndex('format', 'format', { unique: false });
-                        store.createIndex('status', 'status', { unique: false });
+                    if (db.objectStoreNames.contains(STORE_NAME)) {
+                        db.deleteObjectStore(STORE_NAME);
                     }
+                    const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    store.createIndex('format', 'format', { unique: false });
+                    store.createIndex('status', 'status', { unique: false });
                 };
                 req.onsuccess = (e) => resolve(e.target.result);
                 req.onerror = (e) => reject(e.target.error);
@@ -776,7 +777,7 @@
             });
 
             // Ordenação Sempre Alfabética (A-Z)
-            filtered.sort((a, b) => a.title.localeCompare(b.title));
+            filtered.sort((a, b) => (a.title || a.name || "").localeCompare(b.title || b.name || ""));
 
             const total = filtered.length;
             const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -1100,9 +1101,9 @@ if (window.i18n) window.i18n.applyToDOM();
             `;
 
             try {
-                let endpoint = `/api/catalog/graph/work/${current.id}?render=blade&adult=${isAdultAllowed}`;
+                let endpoint = `/api/catalog/graph/work/${current.id}?render=blade&adult=${isAdultAllowed}&kind=${current.type || 'work'}`;
                 if (current.type === 'manga' || current.type === 'work') {
-                    endpoint = `/api/catalog/graph/work/${current.id}?render=blade&adult=${isAdultAllowed}`;
+                    endpoint = `/api/catalog/graph/work/${current.id}?render=blade&adult=${isAdultAllowed}&kind=${current.type}`;
                 } else if (current.type === 'episode') {
                     endpoint = `/api/catalog/graph/episode/${current.id}?render=blade&adult=${isAdultAllowed}`;
                 } else if (current.type === 'universe') {
