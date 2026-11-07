@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\DB;
+
 class CatalogGraphVisibility
 {
     public function __construct(private CatalogSearch $catalog) {}
@@ -11,9 +13,17 @@ class CatalogGraphVisibility
         if ($ids === []) {
             return [];
         }
-        $references = array_map(fn (string $id) => 'work:'.$id, array_values(array_unique($ids)));
-        $resolved = $this->catalog->summaries($references, $adult)['resolved'];
 
-        return array_values(array_unique(array_column($resolved, 'work_id')));
+        $uniqueIds = array_values(array_unique($ids));
+
+        // Verificação direta no banco SQLite do catálogo via índice dedicado
+        $query = DB::table('catalog_works')
+            ->whereIn('id', $uniqueIds);
+
+        if (! $adult) {
+            $query->where('is_adult', 0);
+        }
+
+        return $query->pluck('id')->all();
     }
 }

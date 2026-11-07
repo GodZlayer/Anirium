@@ -569,7 +569,9 @@
             const fmt = (item.format || '').toUpperCase();
             if (fmt === 'HENTAI' || fmt === 'DOUJINSHI' || fmt === 'EROTICA') return true;
             const title = (item.title || item.name || '').toLowerCase();
-            if (/\b(hentai|erotica|ecchi|doujinshi|ero-anime|18\+|nsfw|r18)\b/i.test(title)) return true;
+            const rels = (item.rel_works || []).join(' ').toLowerCase();
+            if (/\b(hentai|erotica|ecchi|doujinshi|ero-anime|18\+|nsfw|r18|smut|yaoi|yuri|sukumizu|oppai|futanari|milf|chikan|netorare|ntr|ahegao|rape|incest|creampie|blowjob|anal|bondage|bdsm|uncensored|r-18|x-rated)\b/i.test(title)) return true;
+            if (/\b(hentai|erotica|ecchi|doujinshi|ero-anime|18\+|nsfw|r18|smut|yaoi|yuri|sukumizu|oppai|futanari|milf|chikan|netorare|ntr|ahegao|rape|incest|creampie|blowjob|anal|bondage|bdsm|uncensored|r-18|x-rated)\b/i.test(rels)) return true;
             return false;
         };
 

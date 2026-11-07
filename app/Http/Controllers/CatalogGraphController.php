@@ -127,7 +127,8 @@ class CatalogGraphController extends Controller
                 $res['tracks'] = $tracks;
                 $res['universe'] = $universeData;
 
-                return $res;
+                // Converter todos os stdClass para arrays antes de salvar em cache (evita incomplete object error)
+                return json_decode(json_encode($res), true);
             });
 
             if (!$result) {
@@ -179,90 +180,118 @@ class CatalogGraphController extends Controller
     public function universe(Request $request, string $id, CatalogSearch $catalog): JsonResponse|Response
     {
         $realId = $this->resolveUuid($id, 'universe');
-        $universe = DB::table('catalog_universes')->where('id', $realId)->first();
-        if (!$universe) {
+        $allowAdult = (bool) ($request->user()?->adult_content_enabled || $request->query('adult') === '1');
+
+        $cacheKey = "catalog:universe:graph:payload:v2:{$realId}:" . ($allowAdult ? '1' : '0');
+        $data = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($realId, $allowAdult) {
+            $universe = DB::table('catalog_universes')->where('id', $realId)->first();
+            if (!$universe) return null;
+
+            $allWorkIds = DB::table('catalog_universe_works')->where('universe_id', $realId)->pluck('work_id')->all();
+            $visibility = app(\App\Support\CatalogGraphVisibility::class);
+            $visibleWorkIds = $visibility->works($allWorkIds, $allowAdult);
+
+            // Buscar todas as obras vinculadas a este universo
+            $works = DB::table('catalog_universe_works as uw')
+                ->join('catalog_works as w', 'uw.work_id', '=', 'w.id')
+                ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
+                ->where('uw.universe_id', $realId)
+                ->where('w.media', 'anime')
+                ->get(['w.id', 'w.title', 'w.format', 'w.status', 'w.episode_count', 'wa.image_url']);
+
+            // Buscar título canônico próprio da entidade de universo
+            $canonicalTitle = DB::table('catalog_entity_titles')
+                ->where('entity_id', $realId)
+                ->whereIn('locale', ['pt-BR', 'und', 'en'])
+                ->orderByRaw("CASE WHEN locale = 'pt-BR' THEN 1 WHEN locale = 'und' THEN 2 ELSE 3 END")
+                ->value('title');
+
+            $universe->name = $canonicalTitle ?: ($universe->name ?? ($works[0]->title ?? 'Universo Canônico'));
+
+            // Buscar criadores principais da franquia (autores, diretores, etc.)
+            $creators = DB::table('catalog_work_creators as wc')
+                ->join('catalog_creators as c', 'wc.creator_id', '=', 'c.id')
+                ->join('catalog_roles as r', 'wc.role_id', '=', 'r.id')
+                ->whereIn('wc.work_id', $allWorkIds)
+                ->select('c.id', 'c.name', 'c.image_url', 'r.token as role')
+                ->distinct()
+                ->orderByRaw("CASE WHEN r.token IN ('author', 'original_creator') THEN 1 WHEN r.token = 'director' THEN 2 ELSE 3 END")
+                ->take(8)
+                ->get();
+
+            // Buscar estúdios de animação da franquia
+            $studios = DB::table('catalog_work_studios as ws')
+                ->join('catalog_studios as s', 'ws.studio_id', '=', 's.id')
+                ->whereIn('ws.work_id', $allWorkIds)
+                ->select('s.id', 's.name', 's.image_url')
+                ->distinct()
+                ->take(6)
+                ->get();
+
+            // Buscar trilhas sonoras em destaque
+            $tracks = DB::table('catalog_work_tracks as wt')
+                ->join('catalog_tracks as t', 'wt.track_id', '=', 't.id')
+                ->leftJoin('catalog_works as w', 'wt.work_id', '=', 'w.id')
+                ->whereIn('wt.work_id', $allWorkIds)
+                ->select('t.id', 't.title', 't.track_type', 'w.title as work_title')
+                ->distinct()
+                ->take(6)
+                ->get();
+
+            // Total consolidado de episódios
+            $totalEpisodes = DB::table('catalog_episodes')->whereIn('work_id', $allWorkIds)->count();
+
+            // Poster/Lead Image da franquia
+            $universeLeadImage = $works[0]->image_url ?? '/assets/icons/actions/search.png';
+            foreach ($works as $w) {
+                if (strcasecmp($w->title, $universe->name) === 0 && !empty($w->image_url)) {
+                    $universeLeadImage = $w->image_url;
+                    break;
+                }
+            }
+            $universe->image_url = $universeLeadImage;
+            $universe->total_episodes = $totalEpisodes;
+
+            $mangas = DB::table('catalog_universe_works as uw')
+                ->join('catalog_works as w', 'uw.work_id', '=', 'w.id')
+                ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
+                ->where('uw.universe_id', $realId)
+                ->where('w.media', 'manga')
+                ->get(['w.id', 'w.title', 'w.format', 'w.status', 'wa.image_url']);
+
+            $arcs = DB::table('catalog_arcs as a')
+                ->leftJoin('catalog_arc_works as aw', 'a.id', '=', 'aw.arc_id')
+                ->leftJoin('catalog_works as w', 'aw.work_id', '=', 'w.id')
+                ->where('a.universe_id', $realId)
+                ->distinct()
+                ->get(['a.id', 'a.title', 'a.classification', 'w.title as work_title']);
+
+            return [
+                'universe' => (array) $universe,
+                'works' => $works->map(fn($w) => (array)$w)->toArray(),
+                'mangas' => $mangas->map(fn($m) => (array)$m)->toArray(),
+                'arcs' => $arcs->map(fn($a) => (array)$a)->toArray(),
+                'creators' => $creators->map(fn($c) => (array)$c)->toArray(),
+                'studios' => $studios->map(fn($s) => (array)$s)->toArray(),
+                'tracks' => $tracks->map(fn($t) => (array)$t)->toArray(),
+                'totalEpisodes' => $totalEpisodes,
+                'visibleWorkIds' => $visibleWorkIds,
+            ];
+        });
+
+        if (!$data) {
             return response()->json(['error' => 'entity_not_found'], 404);
         }
 
-        $allowAdult = (bool) ($request->user()?->adult_content_enabled || $request->query('adult') === '1');
-        $allWorkIds = DB::table('catalog_universe_works')->where('universe_id', $realId)->pluck('work_id')->all();
-        $visibility = app(\App\Support\CatalogGraphVisibility::class);
-        $visibleWorkIds = $visibility->works($allWorkIds, $allowAdult);
-
-        // Buscar todas as obras vinculadas a este universo
-        $works = DB::table('catalog_universe_works as uw')
-            ->join('catalog_works as w', 'uw.work_id', '=', 'w.id')
-            ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
-            ->where('uw.universe_id', $realId)
-            ->where('w.media', 'anime')
-            ->get(['w.id', 'w.title', 'w.format', 'w.status', 'w.episode_count', 'wa.image_url']);
-
-        // Buscar título canônico próprio da entidade de universo
-        $canonicalTitle = DB::table('catalog_entity_titles')
-            ->where('entity_id', $realId)
-            ->whereIn('locale', ['pt-BR', 'und', 'en'])
-            ->orderByRaw("CASE WHEN locale = 'pt-BR' THEN 1 WHEN locale = 'und' THEN 2 ELSE 3 END")
-            ->value('title');
-
-        $universe->name = $canonicalTitle ?: ($universe->name ?? ($works[0]->title ?? 'Universo Canônico'));
-
-        // Buscar criadores principais da franquia (autores, diretores, etc.)
-        $creators = DB::table('catalog_work_creators as wc')
-            ->join('catalog_creators as c', 'wc.creator_id', '=', 'c.id')
-            ->join('catalog_roles as r', 'wc.role_id', '=', 'r.id')
-            ->whereIn('wc.work_id', $allWorkIds)
-            ->select('c.id', 'c.name', 'c.image_url', 'r.token as role')
-            ->distinct()
-            ->orderByRaw("CASE WHEN r.token IN ('author', 'original_creator') THEN 1 WHEN r.token = 'director' THEN 2 ELSE 3 END")
-            ->take(8)
-            ->get();
-
-        // Buscar estúdios de animação da franquia
-        $studios = DB::table('catalog_work_studios as ws')
-            ->join('catalog_studios as s', 'ws.studio_id', '=', 's.id')
-            ->whereIn('ws.work_id', $allWorkIds)
-            ->select('s.id', 's.name', 's.image_url')
-            ->distinct()
-            ->take(6)
-            ->get();
-
-        // Buscar trilhas sonoras em destaque
-        $tracks = DB::table('catalog_work_tracks as wt')
-            ->join('catalog_tracks as t', 'wt.track_id', '=', 't.id')
-            ->leftJoin('catalog_works as w', 'wt.work_id', '=', 'w.id')
-            ->whereIn('wt.work_id', $allWorkIds)
-            ->select('t.id', 't.title', 't.track_type', 'w.title as work_title')
-            ->distinct()
-            ->take(6)
-            ->get();
-
-        // Total consolidado de episódios
-        $totalEpisodes = DB::table('catalog_episodes')->whereIn('work_id', $allWorkIds)->count();
-
-        // Poster/Lead Image da franquia
-        $universeLeadImage = $works[0]->image_url ?? '/assets/icons/actions/search.png';
-        foreach ($works as $w) {
-            if (strcasecmp($w->title, $universe->name) === 0 && !empty($w->image_url)) {
-                $universeLeadImage = $w->image_url;
-                break;
-            }
-        }
-        $universe->image_url = $universeLeadImage;
-        $universe->total_episodes = $totalEpisodes;
-
-        $mangas = DB::table('catalog_universe_works as uw')
-            ->join('catalog_works as w', 'uw.work_id', '=', 'w.id')
-            ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
-            ->where('uw.universe_id', $realId)
-            ->where('w.media', 'manga')
-            ->get(['w.id', 'w.title', 'w.format', 'w.status', 'wa.image_url']);
-
-        $arcs = DB::table('catalog_arcs as a')
-            ->leftJoin('catalog_arc_works as aw', 'a.id', '=', 'aw.arc_id')
-            ->leftJoin('catalog_works as w', 'aw.work_id', '=', 'w.id')
-            ->where('a.universe_id', $realId)
-            ->distinct()
-            ->get(['a.id', 'a.title', 'a.classification', 'w.title as work_title']);
+        $universe = (object) $data['universe'];
+        $works = collect($data['works'])->map(fn($w) => (object)$w);
+        $mangas = collect($data['mangas'])->map(fn($m) => (object)$m);
+        $arcs = collect($data['arcs'])->map(fn($a) => (object)$a);
+        $creators = collect($data['creators'])->map(fn($c) => (object)$c);
+        $studios = collect($data['studios'])->map(fn($s) => (object)$s);
+        $tracks = collect($data['tracks'])->map(fn($t) => (object)$t);
+        $totalEpisodes = $data['totalEpisodes'];
+        $visibleWorkIds = $data['visibleWorkIds'];
 
         if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
             $user = $request->user();
