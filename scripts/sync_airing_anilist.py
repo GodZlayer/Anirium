@@ -79,6 +79,65 @@ def fetch_anilist_page(start_ts, end_ts, page):
                 print(f"[AiringSync] Falha na página {page}: {e}")
                 return None
 
+CN_KR_QUERY = """
+query ($country: CountryCode, $page: Int) {
+  Page(page: $page, perPage: 50) {
+    pageInfo {
+      hasNextPage
+    }
+    media(countryOfOrigin: $country, type: ANIME, status: RELEASING) {
+      id
+      idMal
+      format
+      status
+      title {
+        romaji
+        english
+        native
+      }
+      airingSchedule(perPage: 3) {
+        nodes {
+          airingAt
+          episode
+        }
+      }
+      nextAiringEpisode {
+        airingAt
+        episode
+      }
+    }
+  }
+}
+"""
+
+def fetch_regional_streaming(country, page=1):
+    payload = json.dumps({
+        'query': CN_KR_QUERY,
+        'variables': {
+            'country': country,
+            'page': page
+        }
+    }).encode('utf-8')
+    
+    req = urllib.request.Request(
+        ANILIST_URL,
+        data=payload,
+        headers={
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AniriumAiringSync/1.0'
+        }
+    )
+    
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read().decode('utf-8'))
+        except Exception as e:
+            time.sleep(1.5 * (attempt + 1))
+            if attempt == 2:
+                print(f"[AiringSync] Falha em streaming regional ({country} p{page}): {e}")
+                return None
+
 def run_sync():
     print("[AiringSync] === INICIANDO SINCRONIZAÇÃO DE TRANSMISSÃO E EPISÓDIOS (ANILIST) ===")
     
@@ -145,7 +204,67 @@ def run_sync():
         page += 1
         time.sleep(0.4)
 
-    print(f"[AiringSync] Coletadas programações para {len(schedules_by_entry)} obras audiovisuais do AniList.")
+    # 1.5 Coleta complementar para obras de streaming regional (Donghuas CN e Aenis KR)
+    print("[AiringSync] Consultando lançamentos semanais de Donghuas (CN) e Aenis (KR)...")
+    for country in ['CN', 'KR']:
+        c_page = 1
+        c_has_next = True
+        while c_has_next and c_page <= 3:
+            reg_data = fetch_regional_streaming(country, c_page)
+            if not reg_data or 'data' not in reg_data or 'Page' not in reg_data['data']:
+                break
+            reg_items = reg_data['data']['Page'].get('media', [])
+            for media in reg_items:
+                anilist_id = media.get('id')
+                mal_id = media.get('idMal')
+                if not anilist_id and not mal_id:
+                    continue
+                entry_key = f"mal:{mal_id}" if mal_id else f"anilist:{anilist_id}"
+                
+                # Se já foi capturado pela janela de TV tradicional, mantém
+                if entry_key in schedules_by_entry and schedules_by_entry[entry_key].get('airing_day'):
+                    continue
+                    
+                nex = media.get('nextAiringEpisode')
+                sched_nodes = media.get('airingSchedule', {}).get('nodes', [])
+                
+                day_name = None
+                time_str = None
+                ep_num = 1
+                airing_at = None
+                
+                if nex and nex.get('airingAt'):
+                    airing_at = nex['airingAt']
+                    dt = datetime.fromtimestamp(airing_at, timezone.utc)
+                    day_name = dt.strftime('%A')
+                    time_str = dt.strftime('%H:%M')
+                    ep_num = nex.get('episode', 1)
+                elif sched_nodes:
+                    last_node = sched_nodes[-1]
+                    if last_node.get('airingAt'):
+                        airing_at = last_node['airingAt']
+                        dt = datetime.fromtimestamp(airing_at, timezone.utc)
+                        day_name = dt.strftime('%A')
+                        time_str = dt.strftime('%H:%M')
+                        ep_num = last_node.get('episode', 1)
+                        
+                if day_name:
+                    schedules_by_entry[entry_key] = {
+                        'anilist_id': anilist_id,
+                        'mal_id': mal_id,
+                        'title': media.get('title', {}).get('romaji'),
+                        'airing_day': day_name,
+                        'airing_time': time_str,
+                        'latest_episode_num': ep_num,
+                        'next_episode': ep_num + 1,
+                        'airing_at': airing_at,
+                        'status': media.get('status') or 'RELEASING'
+                    }
+            c_has_next = reg_data['data']['Page'].get('pageInfo', {}).get('hasNextPage', False)
+            c_page += 1
+            time.sleep(0.3)
+
+    print(f"[AiringSync] Coletadas programações para {len(schedules_by_entry)} obras audiovisuais globais (TV + Donghua + Aeni).")
     
     # 1. Atualizar Tabela Relacional database.sqlite
     if not os.path.exists(DB_PATH):
