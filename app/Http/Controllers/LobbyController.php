@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Http\Response;
+use Illuminate\Http\JsonResponse;
 
 class LobbyController extends Controller
 {
@@ -15,7 +16,7 @@ class LobbyController extends Controller
         private readonly InMemoryCatalogService $catalogService
     ) {}
 
-    public function index(Request $request): View|Response
+    public function index(Request $request): View|Response|JsonResponse
     {
         // Se for requisição AJAX de filtragem do Explorar, compila e retorna apenas a parcial Blade da grade
         if ($request->query('explore_filter') === '1' || $request->header('HX-Explore')) {
