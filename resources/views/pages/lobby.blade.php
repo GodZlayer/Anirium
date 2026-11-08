@@ -7,10 +7,10 @@
             <button type="button"
                     onclick="window.switchTab('home')"
                     class="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl cursor-pointer group transition-all duration-300 hover:scale-[1.02] bg-theme-pill border border-theme-highlight shadow-md">
-                <img src="/assets/logos/Anirium-favicon.png"
+                <img src="/assets/logos/Anirium-favicon.png?v=2" width="28" height="28"
                      alt="Anirium Mascot"
                      class="w-7 h-7 object-contain drop-shadow-[0_2px_8px_rgba(255,199,102,0.4)] group-hover:rotate-6 transition-transform">
-                <img src="/assets/logos/Anirium-Textlogo.png"
+                <img src="/assets/logos/Anirium-Textlogo.png?v=2" width="72" height="24"
                      alt="Anirium"
                      class="hidden lg:block h-6 w-auto object-contain filter drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
             </button>
@@ -698,8 +698,13 @@
             }
 
             if (roll.length > 0) {
-                window.heroRoll = roll.slice(0, 3);
-                window.setHeroIndex(0);
+                const nextRoll = roll.slice(0, 3);
+                const firstSame = window.heroRoll && window.heroRoll[0] && String(window.heroRoll[0].id) === String(nextRoll[0].id);
+                if (firstSame && window.heroRoll[0].synopsis && !nextRoll[0].synopsis) {
+                    nextRoll[0].synopsis = window.heroRoll[0].synopsis;
+                }
+                window.heroRoll = nextRoll;
+                if (!firstSame) window.setHeroIndex(0);
             }
         };
 

@@ -2,6 +2,7 @@
 
 namespace App\Services\Cache;
 
+use App\Support\CatalogSearch;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -14,7 +15,53 @@ class InMemoryCatalogService
      */
     public function getHeroFeatured(): array
     {
-        return Cache::remember('catalog:home:hero:3latest:canonical', 3600, function () {
+        return Cache::remember('catalog:home:hero:3latest:canonical:v2', 900, function () {
+            $calendar = $this->getCalendarByDay();
+            $daysOrder = ['sundays', 'mondays', 'tuesdays', 'wednesdays', 'thursdays', 'fridays', 'saturdays'];
+            $currentDayIdx = (int) date('w');
+            $nowTimeStr = date('H:i');
+
+            $roll = [];
+            $todayKey = $daysOrder[$currentDayIdx];
+            foreach ($calendar[$todayKey] ?? [] as $item) {
+                $time = $item['time'] ?? 'TBA';
+                if ($time !== 'TBA' && $time <= $nowTimeStr) {
+                    $roll[] = $item;
+                }
+            }
+            usort($roll, fn ($a, $b) => strcmp($b['time'] ?? '', $a['time'] ?? ''));
+
+            for ($offset = 1; $offset < 7 && count($roll) < 3; $offset++) {
+                $prevIdx = ($currentDayIdx - $offset + 7) % 7;
+                $prevKey = $daysOrder[$prevIdx];
+                $prevItems = array_values(array_filter(
+                    $calendar[$prevKey] ?? [],
+                    fn ($item) => ! empty($item['time']) && $item['time'] !== 'TBA'
+                ));
+                usort($prevItems, fn ($a, $b) => strcmp($b['time'] ?? '', $a['time'] ?? ''));
+                $roll = array_merge($roll, $prevItems);
+            }
+
+            if (count($roll) >= 1) {
+                $selected = array_slice($roll, 0, 3);
+                $results = [];
+                foreach ($selected as $it) {
+                    $results[] = $this->hydrateWorkPayload(
+                        (string) $it['id'],
+                        (string) ($it['title'] ?? 'Obra da Temporada'),
+                        (string) ($it['format'] ?? 'TV'),
+                        (int) ($it['episode'] ?? 1),
+                        $it['image'] ?? null,
+                        [
+                            'airing_time' => $it['time'] ?? null,
+                            'latest_episode' => $it['episode'] ?? 1,
+                        ]
+                    );
+                }
+
+                return $results;
+            }
+
             $rows = DB::table('catalog_work_schedules as s')
                 ->join('catalog_works as w', 'w.id', '=', 's.work_id')
                 ->join('catalog_work_assets as a', 'a.work_id', '=', 's.work_id')
@@ -38,9 +85,10 @@ class InMemoryCatalogService
             return $results;
         });
     }
+
     public function getCalendarByDay(): array
     {
-        return Cache::remember('catalog:calendar:by_day:canonical_full', 300, function () {
+        return Cache::remember('catalog:calendar:by_day:canonical_full', self::TTL_SECONDS, function () {
             $dayMap = [
                 'monday' => 'mondays',
                 'tuesday' => 'tuesdays',
@@ -62,7 +110,7 @@ class InMemoryCatalogService
             ];
 
             try {
-                $catalogSearch = app(\App\Support\CatalogSearch::class);
+                $catalogSearch = app(CatalogSearch::class);
                 $allItems = [];
                 $page = 1;
                 do {
@@ -78,14 +126,18 @@ class InMemoryCatalogService
 
                 foreach ($allItems as $it) {
                     $rawDay = $it['airing_day'] ?? null;
-                    if (!$rawDay) continue;
+                    if (! $rawDay) {
+                        continue;
+                    }
 
                     $cleanDay = strtolower(trim($rawDay));
                     $dayKey = $dayMap[$cleanDay] ?? null;
-                    if (!$dayKey) continue;
+                    if (! $dayKey) {
+                        continue;
+                    }
 
                     $img = null;
-                    if (!empty($it['images_json'])) {
+                    if (! empty($it['images_json'])) {
                         $d = json_decode($it['images_json'], true);
                         $img = $d['jpg']['large_image_url'] ?? $d['jpg']['image_url'] ?? null;
                     }
@@ -193,7 +245,9 @@ class InMemoryCatalogService
             }
 
             return [
-                'total' => Cache::rememberForever('catalog:total_anime_count', function () { return DB::table('catalog_works')->where('media', 'anime')->count(); }),
+                'total' => Cache::rememberForever('catalog:total_anime_count', function () {
+                    return DB::table('catalog_works')->where('media', 'anime')->count();
+                }),
                 'page' => 1,
                 'last_page' => 1,
                 'items' => $items,
@@ -208,8 +262,8 @@ class InMemoryCatalogService
             ->get(['field', 'locale', 'value'])
             ->groupBy('field');
 
-        $titleRomaji = $translations->get('title')?->firstWhere('locale', 'romaji')?->value 
-            ?? $translations->get('title')?->firstWhere('locale', 'en')?->value 
+        $titleRomaji = $translations->get('title')?->firstWhere('locale', 'romaji')?->value
+            ?? $translations->get('title')?->firstWhere('locale', 'en')?->value
             ?? $title;
 
         $titleNative = $translations->get('title')?->firstWhere('locale', 'ja')?->value ?? null;

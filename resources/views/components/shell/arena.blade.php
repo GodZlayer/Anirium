@@ -14,6 +14,7 @@
     $airingTime = $work['airing_time'] ?? null;
 @endphp
 
+@if($banner)<link rel="preload" as="image" href="{{ $banner }}" fetchpriority="high">@endif
 <div {{ $attributes->merge(['class' => 'relative w-full h-full flex items-center justify-center p-4 sm:p-8 md:p-12 overflow-hidden select-none']) }}
      id="hero-cinematic-arena">
     

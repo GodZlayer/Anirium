@@ -96,7 +96,7 @@
             <!-- Mascote Oficial Anirium com Anel de Órbita -->
             <div style="position: relative; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center;">
                 <div class="anirium-orbit-ring" style="position: absolute; inset: 0;"></div>
-                <img src="/assets/logos/Anirium-favicon.png"
+                <img src="/assets/logos/Anirium-favicon.png?v=2"
                      alt="Anirium"
                      class="anirium-mascot-glow"
                      style="width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 0 12px rgba(255,199,102,0.6));">
@@ -104,7 +104,7 @@
 
             <!-- Identidade & Status de Sincronização -->
             <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;">
-                <img src="/assets/logos/Anirium-Textlogo.png"
+                <img src="/assets/logos/Anirium-Textlogo.png?v=2"
                      alt="Anirium"
                      style="height: 24px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.8));">
                 <div style="display: flex; align-items: center; gap: 8px;">
