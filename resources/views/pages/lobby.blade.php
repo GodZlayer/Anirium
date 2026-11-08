@@ -483,6 +483,14 @@
 
         async function initLocalFirstCatalog() {
             try {
+                // Carrega imediatamente o primeiro lote de 120 obras (32KB instantaneo < 20ms)
+                fetch('/data/catalog_chunk0.json').then(r => r.json()).then(chunk => {
+                    if (Array.isArray(chunk) && (!window.clientCatalog || window.clientCatalog.length === 0)) {
+                        window.clientCatalog = chunk;
+                        if (window.currentTab === 'explore') window.runClientSideCatalogFilter();
+                    }
+                }).catch(() => {});
+
                 const db = await openCatalogDB();
                 const tx = db.transaction(STORE_NAME, 'readonly');
                 const store = tx.objectStore(STORE_NAME);
@@ -501,7 +509,6 @@
                             }
                         };
                     } else {
-                        // Sincroniza em background o catálogo consolidado multi-entidade
                         setTimeout(async () => {
                             try {
                                 const res = await fetch('/data/catalog_clean.json');
@@ -521,14 +528,13 @@
                             } catch (e) {
                                 console.warn('[Anirium Catalog] Fallback background fetch:', e);
                             }
-                        }, 500);
+                        }, 200);
                     }
                 };
             } catch (err) {
                 console.warn('[Anirium Engine] IndexedDB local:', err);
             }
         }
-
         initLocalFirstCatalog();
 
         // 1. GERENCIADOR DE ABAS DA TOPBAR (Home, Explorar, Calendário)
