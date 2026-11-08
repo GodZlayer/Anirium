@@ -483,14 +483,18 @@
 
         async function initLocalFirstCatalog() {
             try {
-                // Carrega imediatamente o primeiro lote de 120 obras (32KB instantaneo < 20ms)
-                fetch('/data/catalog_chunk0.json').then(r => r.json()).then(chunk => {
-                    if (Array.isArray(chunk) && (!window.clientCatalog || window.clientCatalog.length === 0)) {
+                // Sincroniza chunk inicial limpo (<20ms) enquanto o HUD global cobre a tela
+                const chunkRes = await fetch('/data/catalog_chunk0.json');
+                if (chunkRes.ok) {
+                    const chunk = await chunkRes.json();
+                    if (Array.isArray(chunk) && chunk.length > 0) {
                         window.clientCatalog = chunk;
-                        if (window.currentTab === 'explore') window.runClientSideCatalogFilter();
+                        window.kindShardsCache['work'] = chunk;
+                        window.runClientSideCatalogFilter();
                     }
-                }).catch(() => {});
+                }
 
+                // Carrega base do IndexedDB ou shard completo em background
                 const db = await openCatalogDB();
                 const tx = db.transaction(STORE_NAME, 'readonly');
                 const store = tx.objectStore(STORE_NAME);
@@ -498,38 +502,42 @@
 
                 countReq.onsuccess = () => {
                     const localCount = countReq.result;
-                    if (localCount >= 50000) {
+                    if (localCount >= 20000) {
                         const allReq = store.getAll();
                         allReq.onsuccess = () => {
                             if (allReq.result && allReq.result.length > 0) {
                                 window.clientCatalog = allReq.result;
+                                window.kindShardsCache['work'] = allReq.result;
                                 if (window.currentTab === 'explore') {
                                     window.runClientSideCatalogFilter();
                                 }
                             }
                         };
                     } else {
-                        // Sincroniza shards leves e específicos por demanda (work.json, universe.json, manga.json)
-                        setTimeout(async () => {
-                            try {
-                                const shardRes = await fetch('/data/shards/work.json');
-                                if (shardRes.ok) {
-                                    const workData = await shardRes.json();
-                                    if (Array.isArray(workData) && workData.length > 0) {
-                                        window.clientCatalog = workData;
-                                        if (window.currentTab === 'explore') {
-                                            window.runClientSideCatalogFilter();
-                                        }
-                                    }
+                        // Sincroniza shard completo de obras (gzip ~773KB) e popula IndexedDB
+                        fetch('/data/shards/work.json').then(r => r.json()).then(workData => {
+                            if (Array.isArray(workData) && workData.length > 0) {
+                                window.clientCatalog = workData;
+                                window.kindShardsCache['work'] = workData;
+                                if (window.currentTab === 'explore') {
+                                    window.runClientSideCatalogFilter();
                                 }
-                            } catch (e) {
-                                console.warn('[Anirium Catalog] Shard fetch fallback:', e);
+                                try {
+                                    const wTx = db.transaction(STORE_NAME, 'readwrite');
+                                    const wStore = wTx.objectStore(STORE_NAME);
+                                    workData.forEach(it => wStore.put(it));
+                                } catch (e) {}
                             }
-                        }, 500);
+                        }).catch(e => console.warn('[Anirium Shards] work fetch fallback:', e));
                     }
                 };
             } catch (err) {
                 console.warn('[Anirium Engine] IndexedDB local:', err);
+            } finally {
+                // HUD só é liberado APÓS a hidratação completa da interface no DOM
+                if (window.hideGlobalSiteLoader) {
+                    window.hideGlobalSiteLoader();
+                }
             }
         }
         initLocalFirstCatalog();
@@ -724,7 +732,8 @@
         // 3. EXPLORAR: FILTRAGEM DETERMINÍSTICA LOCAL POR KIND (Universo, Obra, Entidade)
         window.exploreKindFilter = 'work';
 
-        window.setExploreKind = function(kind) {
+        window.kindShardsCache = window.kindShardsCache || {};
+        window.setExploreKind = async function(kind) {
             window.exploreKindFilter = kind;
             document.querySelectorAll('.explore-kind-btn').forEach(btn => {
                 if (btn.getAttribute('data-kind') === kind) {
@@ -734,7 +743,32 @@
                 }
             });
             window.explorePage = 1;
-            window.runClientSideCatalogFilter();
+
+            // Carregamento dinâmico otimizado do shard específico da entidade se ainda não estiver em cache
+            if (kind !== 'all') {
+                if (window.kindShardsCache[kind]) {
+                    window.clientCatalog = window.kindShardsCache[kind];
+                    window.runClientSideCatalogFilter();
+                } else {
+                    try {
+                        const res = await fetch(`/data/shards/${kind}.json`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (Array.isArray(data)) {
+                                window.kindShardsCache[kind] = data;
+                                if (window.exploreKindFilter === kind) {
+                                    window.clientCatalog = data;
+                                    window.runClientSideCatalogFilter();
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[Anirium Shards] Falha ao carregar shard:', kind, e);
+                    }
+                }
+            } else {
+                window.runClientSideCatalogFilter();
+            }
         };
 
         window.stepExplorePage = function(step) {
@@ -1843,23 +1877,7 @@ window.toggleEntityBookmark = async function(type, id) {
             window.deriveHeroRollFromCalendar();
             window.runClientSideCatalogFilter();
             window.renderCalendarPage();
-
-            // Desativa suavemente o HUD de carregamento global após a inicialização do DOM
-            if (window.hideGlobalSiteLoader) {
-                setTimeout(window.hideGlobalSiteLoader, 150);
-            }
         });
-        const initialParams = new URLSearchParams(window.location.search);
-        const initialTabNow = initialParams.get('tab');
-        if (initialTabNow && ['home', 'explore', 'calendar'].includes(initialTabNow)) {
-            window.switchTab(initialTabNow);
-        }
-        window.deriveHeroRollFromCalendar();
-        window.runClientSideCatalogFilter();
-        window.renderCalendarPage();
-        if (window.hideGlobalSiteLoader) {
-            setTimeout(window.hideGlobalSiteLoader, 300);
-        }
 
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {

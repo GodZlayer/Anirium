@@ -159,23 +159,17 @@ class InMemoryCatalogService
                 $query->where('w.media', $media);
             }
 
-            // Seleciona uma mistura rica e representativa de formatos reais, incluindo amostra de conteúdo adulto
-            $formats = ['TV', 'MOVIE', 'OVA', 'ONA', 'SPECIAL', 'DOUJINSHI', 'MANGA'];
-            $query->where(function($q) use ($formats) {
-                $q->whereIn('w.format', ['TV', 'MOVIE', 'OVA', 'ONA', 'SPECIAL'])
-                  ->orWhere('w.format', 'DOUJINSHI')
-                  ->orWhere('w.title', 'LIKE', '%hentai%')
-                  ->orWhere('w.title', 'LIKE', '%ecchi%');
-            })
-            ->orderBy('w.id', 'ASC')
-            ->limit($perPage);
+            // Filtro rigoroso: Obras no Explore inicial sao estritamente livres de conteudo adulto
+            $query->where('w.is_adult', 0)
+                ->whereIn('w.format', ['TV', 'MOVIE', 'OVA', 'ONA', 'SPECIAL'])
+                ->orderBy('w.id', 'ASC')
+                ->limit($perPage);
 
-            $rows = $query->get(['w.id', 'w.title', 'w.media', 'w.format', 'w.status', 'w.episode_count', 'a.image_url']);
+            $rows = $query->get(['w.id', 'w.title', 'w.media', 'w.format', 'w.status', 'w.episode_count', 'w.is_adult', 'a.image_url']);
 
             $items = [];
             foreach ($rows as $r) {
-                $isAdult = (strtoupper($r->format ?? '') === 'DOUJINSHI') 
-                    || (bool) preg_match('/hentai|erotica|ecchi/i', $r->title);
+                $isAdult = (bool) ($r->is_adult ?? false);
 
                 $items[] = [
                     'id' => $r->id,
