@@ -138,7 +138,7 @@
                 </div>
                 <div class="relative aspect-[3/4] w-72 rounded-3xl overflow-hidden border border-theme-default shadow-2xl bg-theme-raised">
                     <img id="hero-poster-img"
-                         src="{{ $banner }}"
+                         src="{{ $banner }}" fetchpriority="high" decoding="async"
                          alt="{{ $title }}"
                          class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>

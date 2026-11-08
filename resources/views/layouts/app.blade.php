@@ -57,12 +57,13 @@
             justify-content: center !important;
             background-color: #0B0B0D !important;
             opacity: 1;
-            transition: opacity 0.5s ease-out;
+            transition: opacity 0.15s ease-out;
             pointer-events: auto;
             user-select: none;
             -webkit-user-select: none;
         }
         #global-site-loader.loader-hidden {
+            display: none !important;
             opacity: 0 !important;
             pointer-events: none !important;
         }
@@ -87,7 +88,7 @@
         }
     </style>
 
-    <div id="global-site-loader">
+    <div id="global-site-loader" class="loader-hidden" style="display: none;">
         <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 32px;">
             <!-- Glow Cósmico Dourado de Fundo -->
             <div style="position: absolute; inset: -16px; background-color: rgba(255, 199, 102, 0.1); border-radius: 9999px; filter: blur(32px); pointer-events: none;"></div>
@@ -134,12 +135,7 @@
             const loader = document.getElementById('global-site-loader');
             if (loader && !loader.classList.contains('loader-hidden')) {
                 window.updateGlobalSiteLoader(100, 'Catálogo Pronto!');
-                setTimeout(() => {
-                    loader.classList.add('loader-hidden');
-                    setTimeout(() => {
-                        loader.style.display = 'none';
-                    }, 550);
-                }, 250);
+                loader.classList.add('loader-hidden'); setTimeout(() => { loader.style.display = 'none'; }, 150);
             }
         };
     </script>

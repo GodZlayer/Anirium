@@ -12,6 +12,11 @@ trap cleanup EXIT
 trap 'exit 143' TERM
 trap 'exit 130' INT
 
+# Garante que a configuração de performance de OPcache/realpath esteja aplicada
+if [ -f /var/www/html/docker/php-performance.ini ]; then
+    cp /var/www/html/docker/php-performance.ini /usr/local/etc/php/conf.d/anirium-performance.ini
+fi
+
 # Inicia o daemon de tarefas agendadas (Cron do Laravel a cada minuto)
 crond -b -l 8
 

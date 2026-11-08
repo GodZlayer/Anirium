@@ -436,28 +436,16 @@
         window.clientCatalog = @json($explore['items']);
         window.calendarData = @json($calendar);
         window.adultTitlesSet = new Set();
-        fetch('/data/adult_titles.json').then(r => r.json()).then(titles => {
-            if (Array.isArray(titles)) {
-                titles.forEach(t => window.adultTitlesSet.add(t.toLowerCase().trim()));
-                if (window.currentTab === 'explore') window.runClientSideCatalogFilter();
-                if (window.currentTab === 'calendar') window.renderCalendarPage();
-            }
-        }).catch(() => {});
-        fetch('/?feed=init', { headers: { 'Accept': 'application/json' } })
-            .then(r => r.json())
-            .then(data => {
-                if (data.calendar) {
-                    window.calendarData = data.calendar;
-                    window.deriveHeroRollFromCalendar();
+        window.scheduleIdle = window.requestIdleCallback || function(cb) { return setTimeout(cb, 300); };
+        window.scheduleIdle(() => {
+            fetch('/data/adult_titles.json').then(r => r.json()).then(titles => {
+                if (Array.isArray(titles)) {
+                    titles.forEach(t => window.adultTitlesSet.add(t.toLowerCase().trim()));
+                    if (window.currentTab === 'explore') window.runClientSideCatalogFilter();
                     if (window.currentTab === 'calendar') window.renderCalendarPage();
                 }
-                if (data.featuredRoll && data.featuredRoll.length > 0) {
-                    window.heroRoll = data.featuredRoll;
-                    if (typeof window.setHeroIndex === 'function') {
-                        window.setHeroIndex(0);
-                    }
-                }
             }).catch(() => {});
+        });
         // Detecta dinamicamente o dia da semana atual no fuso do usuário (0: Domingo, 1: Segunda... 6: Sábado)
         const dayNames = ['sundays', 'mondays', 'tuesdays', 'wednesdays', 'thursdays', 'fridays', 'saturdays'];
         const dayFullNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -517,98 +505,88 @@
             });
         }
 
-        async function initLocalFirstCatalog() {
-            if (window.updateGlobalSiteLoader) {
-                window.updateGlobalSiteLoader(20, 'Carregando Catálogo Local...');
-            }
+        window.fullCatalogSynced = false;
+        window.fullCatalogSyncPromise = null;
 
-            let catalogReady = false;
+        window.ensureFullCatalogSynced = function() {
+            if (window.fullCatalogSynced) return Promise.resolve();
+            if (window.fullCatalogSyncPromise) return window.fullCatalogSyncPromise;
 
-            try {
-                // 1. Tenta carregar os dados completos instantaneamente do IndexedDB (Cache do Navegador)
-                const db = await openCatalogDB();
-                const cachedWorks = await new Promise((resolve) => {
-                    try {
-                        const tx = db.transaction(STORE_NAME, 'readonly');
-                        const store = tx.objectStore(STORE_NAME);
-                        const countReq = store.count();
-                        countReq.onsuccess = () => {
-                            if (countReq.result >= 20000) {
-                                const allReq = store.getAll();
-                                allReq.onsuccess = () => resolve(allReq.result || null);
-                                allReq.onerror = () => resolve(null);
-                            } else {
-                                resolve(null);
-                            }
-                        };
-                        countReq.onerror = () => resolve(null);
-                    } catch (e) {
-                        resolve(null);
-                    }
-                });
+            window.fullCatalogSyncPromise = (async () => {
+                try {
+                    const db = await openCatalogDB();
+                    const cachedWorks = await new Promise((resolve) => {
+                        try {
+                            const tx = db.transaction(STORE_NAME, 'readonly');
+                            const store = tx.objectStore(STORE_NAME);
+                            const countReq = store.count();
+                            countReq.onsuccess = () => {
+                                if (countReq.result >= 20000) {
+                                    const allReq = store.getAll();
+                                    allReq.onsuccess = () => resolve(allReq.result || null);
+                                    allReq.onerror = () => resolve(null);
+                                } else {
+                                    resolve(null);
+                                }
+                            };
+                            countReq.onerror = () => resolve(null);
+                        } catch (e) {
+                            resolve(null);
+                        }
+                    });
 
-                if (Array.isArray(cachedWorks) && cachedWorks.length >= 20000) {
-                    if (window.updateGlobalSiteLoader) {
-                        window.updateGlobalSiteLoader(85, 'Renderizando Catálogo...');
+                    if (Array.isArray(cachedWorks) && cachedWorks.length >= 20000) {
+                        window.clientCatalog = cachedWorks;
+                        window.kindShardsCache['work'] = cachedWorks;
+                        window.fullCatalogSynced = true;
+                        if (window.currentTab === 'explore' && window.exploreKindFilter === 'work') {
+                            window.runClientSideCatalogFilter();
+                        }
+                        return;
                     }
-                    window.clientCatalog = cachedWorks;
-                    window.kindShardsCache['work'] = cachedWorks;
-                    window.runClientSideCatalogFilter();
-                    catalogReady = true;
-                } else {
-                    // 2. Primeira visita ou cache desatualizado: baixa 100% da base completa sob o HUD
-                    if (window.updateGlobalSiteLoader) {
-                        window.updateGlobalSiteLoader(45, 'Baixando Acervo Completo (28k+ obras)...');
-                    }
+
                     const shardRes = await fetch('/data/shards/work.json');
                     if (shardRes.ok) {
                         const workData = await shardRes.json();
                         if (Array.isArray(workData) && workData.length > 0) {
-                            if (window.updateGlobalSiteLoader) {
-                                window.updateGlobalSiteLoader(80, 'Armazenando no Cache Local...');
-                            }
                             window.clientCatalog = workData;
                             window.kindShardsCache['work'] = workData;
-                            window.runClientSideCatalogFilter();
-                            catalogReady = true;
-
-                            // Persiste no IndexedDB de forma determinística
-                            try {
-                                const wTx = db.transaction(STORE_NAME, 'readwrite');
-                                const wStore = wTx.objectStore(STORE_NAME);
-                                workData.forEach(it => wStore.put(it));
-                            } catch (e) {
-                                console.warn('[Anirium Shards] Falha ao persistir no IndexedDB:', e);
+                            window.fullCatalogSynced = true;
+                            if (window.currentTab === 'explore' && window.exploreKindFilter === 'work') {
+                                window.runClientSideCatalogFilter();
                             }
+
+                            // Persiste em lotes assíncronos durante ociosidade para zero TBT (zero travamento da UI)
+                            const CHUNK_SIZE = 1500;
+                            let offset = 0;
+                            function writeNextChunk() {
+                                if (offset >= workData.length) return;
+                                try {
+                                    const wTx = db.transaction(STORE_NAME, 'readwrite');
+                                    const wStore = wTx.objectStore(STORE_NAME);
+                                    const end = Math.min(offset + CHUNK_SIZE, workData.length);
+                                    for (let i = offset; i < end; i++) {
+                                        wStore.put(workData[i]);
+                                    }
+                                    offset = end;
+                                    wTx.oncomplete = () => window.scheduleIdle(writeNextChunk);
+                                } catch (e) {}
+                            }
+                            window.scheduleIdle(writeNextChunk);
                         }
                     }
+                } catch (err) {
+                    console.warn('[Anirium Engine] Falha durante sincronização do catálogo:', err);
                 }
-            } catch (err) {
-                console.warn('[Anirium Engine] Falha durante sincronização do catálogo:', err);
-            }
+            })();
 
-            // Fallback se necessário: garante que há catálogo antes de fechar o loader
-            if (!catalogReady && (!window.clientCatalog || window.clientCatalog.length === 0)) {
-                try {
-                    const fallbackRes = await fetch('/data/catalog_chunk0.json');
-                    if (fallbackRes.ok) {
-                        const chunk = await fallbackRes.json();
-                        window.clientCatalog = chunk;
-                        window.kindShardsCache['work'] = chunk;
-                        window.runClientSideCatalogFilter();
-                    }
-                } catch (e) {}
-            }
+            return window.fullCatalogSyncPromise;
+        };
 
-            // 100% DA BASE CARREGADA E RENDERIZADA: Só agora o site abre para o usuário!
-            if (window.updateGlobalSiteLoader) {
-                window.updateGlobalSiteLoader(100, 'Tudo Pronto!');
-            }
-            if (window.hideGlobalSiteLoader) {
-                window.hideGlobalSiteLoader();
-            }
+        // Libera o palco imediatamente (Hero e 24 itens do Explore já estão no SSR)
+        if (window.hideGlobalSiteLoader) {
+            window.hideGlobalSiteLoader();
         }
-        initLocalFirstCatalog();
 
         // 1. GERENCIADOR DE ABAS DA TOPBAR (Home, Explorar, Calendário)
         window.switchTab = function(tab) {
@@ -652,6 +630,7 @@
     if (tab === 'explore') {
         window.showExploreFilters();
         window.runClientSideCatalogFilter();
+        if (typeof window.ensureFullCatalogSynced === 'function') window.ensureFullCatalogSynced();
     } else {
         window.hideExploreFilters();
     }
@@ -820,6 +799,10 @@
             window.explorePage = 1;
 
             // Carregamento dinâmico otimizado do shard específico da entidade se ainda não estiver em cache
+            if (kind === 'work' && !window.fullCatalogSynced && typeof window.ensureFullCatalogSynced === 'function') {
+                window.ensureFullCatalogSynced();
+                return;
+            }
             if (kind !== 'all') {
                 if (window.kindShardsCache[kind]) {
                     window.clientCatalog = window.kindShardsCache[kind];
@@ -847,11 +830,13 @@
         };
 
         window.stepExplorePage = function(step) {
+            if (window.exploreKindFilter === 'work' && !window.fullCatalogSynced && typeof window.ensureFullCatalogSynced === 'function') window.ensureFullCatalogSynced();
             window.explorePage += step;
             window.runClientSideCatalogFilter();
         };
 
         window.syncSearch = function(val) {
+            if (window.exploreKindFilter === 'work' && !window.fullCatalogSynced && typeof window.ensureFullCatalogSynced === 'function') window.ensureFullCatalogSynced();
             window.explorePage = 1;
             window.runClientSideCatalogFilter();
         };
@@ -2006,8 +1991,8 @@ window.toggleEntityBookmark = async function(type, id) {
                 window.initRollingDaysBar();
             }
             window.deriveHeroRollFromCalendar();
-            window.runClientSideCatalogFilter();
-            window.renderCalendarPage();
+            if (window.currentTab === 'explore') window.runClientSideCatalogFilter();
+            if (window.currentTab === 'calendar') window.renderCalendarPage();
         });
 
         document.addEventListener('keydown', e => {

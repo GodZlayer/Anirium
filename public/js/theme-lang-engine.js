@@ -12,7 +12,7 @@ window.currentLang = localStorage.getItem('anirium_lang') || 'pt-BR';
 window.applyTheme = async function(themeId) {
     try {
         if (!window.THEME_CACHE[themeId]) {
-            const res = await fetch(`/themes/${themeId}.json?v=${Date.now()}`);
+            const res = await fetch(`/themes/${themeId}.json?v=2`);
             if (!res.ok) throw new Error(`Tema ${themeId} não encontrado.`);
             window.THEME_CACHE[themeId] = await res.json();
         }
@@ -114,7 +114,7 @@ window.applyTheme = async function(themeId) {
 window.applyLanguage = async function(langCode) {
     try {
         if (!window.LANG_CACHE[langCode]) {
-            const res = await fetch(`/i18n/${langCode}.json?v=${Date.now()}`);
+            const res = await fetch(`/i18n/${langCode}.json?v=2`);
             if (!res.ok) throw new Error(`Idioma ${langCode} não encontrado.`);
             window.LANG_CACHE[langCode] = await res.json();
         }
@@ -246,8 +246,12 @@ const observer = new MutationObserver((mutations) => {
 });
 observer.observe(document.body, { childList: true, subtree: true });
 
-// Inicialização automática ao carregar
+// Inicialização automática ao carregar (Zero fetch se for o tema/idioma padrão já renderizados pelo servidor)
 document.addEventListener('DOMContentLoaded', function() {
-    window.applyTheme(window.currentTheme);
-    window.applyLanguage(window.currentLang);
+    if (window.currentTheme && window.currentTheme !== 'black') {
+        window.applyTheme(window.currentTheme);
+    }
+    if (window.currentLang && window.currentLang !== 'pt-BR') {
+        window.applyLanguage(window.currentLang);
+    }
 });
