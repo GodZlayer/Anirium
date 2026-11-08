@@ -731,7 +731,7 @@
             const item = window.heroRoll[idx];
 
             document.getElementById('hero-title').innerText = item.title;
-            document.getElementById('hero-synopsis').innerText = item.synopsis || '';
+            const rawSyn = (item.synopsis || '').replace(/<[^>]*>?/gm, ''); document.getElementById('hero-synopsis').innerText = rawSyn;
             const epNum = item.latest_episode || item.episode || item.episode_count || 1;
             document.getElementById('hero-ep-number').innerText = epNum;
             document.getElementById('hero-btn-ep').innerText = epNum;

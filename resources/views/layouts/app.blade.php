@@ -6,8 +6,8 @@
     <title>{{ config('app.name', 'Anirium') }} — Plataforma Ontológica</title>
 
     <!-- Favicon Oficial Anirium -->
-    <link rel="icon" type="image/png" href="/assets/logos/Anirium-favicon.png">
-    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/assets/logos/Anirium-favicon.png?v=2">
+    <link rel="shortcut icon" href="/favicon.ico?v=2">
 
     <!-- Tailwind CSS v4 / App Stylesheet -->
     @vite(['resources/css/app.css'])

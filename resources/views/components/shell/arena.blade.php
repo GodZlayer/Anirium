@@ -75,7 +75,7 @@
             <!-- Sinopse Dinâmica Regionalizada -->
             <p id="hero-synopsis"
                class="text-xs sm:text-sm lg:text-base leading-relaxed drop-shadow line-clamp-3 max-w-xl font-normal text-theme-secondary">
-                {{ $synopsis }}
+                {{ strip_tags($synopsis ?? '') }}
             </p>
 
             <!-- Ações Cinemáticas do Cinema -->
