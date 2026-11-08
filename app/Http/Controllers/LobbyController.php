@@ -34,15 +34,30 @@ class LobbyController extends Controller
             ]);
         }
 
-        // 1. Os 3 lançamentos reais do horário atual para a Arena
+        // Endpoint JSON para carregamento assíncrono interno da tela (Hero Roll e Calendário Completo)
+        if ($request->expectsJson() || $request->query('feed') === 'init') {
+            return response()->json([
+                'featuredRoll' => $this->catalogService->getHeroFeatured(),
+                'calendar' => $this->catalogService->getCalendarByDay(),
+            ]);
+        }
+
+        // 1. Os 3 lançamentos reais para exibição instantânea no Hero
         $featuredRoll = $this->catalogService->getHeroFeatured();
         $hero = $featuredRoll[0] ?? null;
 
-        // 2. Obras organizadas pelo Calendário semanal real
-        $calendar = $this->catalogService->getCalendarByDay();
+        // 2. Calendário semanal inicial rápido (a sincronização assíncrona hidrata tudo sem travar a renderização inicial)
+        $calendar = [
+            'mondays' => [],
+            'tuesdays' => [],
+            'wednesdays' => [],
+            'thursdays' => [],
+            'fridays' => [],
+            'saturdays' => [],
+            'sundays' => [],
+        ];
 
         // 3. Catálogo inicial ultraleve (apenas 24 itens para preencher a primeira viewport)
-        // O restante do acervo é mantido no IndexedDB local do cliente a partir de shards colunares
         $explore = $this->catalogService->getExploreFeed('all', 'all', 1, 24);
 
         // 4. Usuário autenticado e suas preferências no banco de dados SQLite

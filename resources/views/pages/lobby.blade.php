@@ -341,7 +341,7 @@
         <!-- Grade Paginada de Cards do Calendário (CalendarWorkCard.tsx) -->
         <div class="flex-1 min-h-0 flex flex-col justify-between overflow-hidden">
             <div id="calendar-cards-container" class="flex-1 min-h-0 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 auto-rows-fr gap-3 overflow-y-auto no-scrollbar pb-2">
-                <!-- Injetado dinamicamente via JS com CalendarWorkCard -->
+                <div class='col-span-full py-16 text-center text-xs font-mono text-theme-muted animate-pulse'>Carregando grade semanal...</div>
             </div>
 
             <!-- Navegação de Páginas do Calendário -->
@@ -426,6 +426,27 @@
         // Carrega inicialmente os itens rápidos e em background sincroniza o acervo completo de 33.390 obras
         window.clientCatalog = @json($explore['items']);
         window.calendarData = @json($calendar);
+        window.adultTitlesSet = new Set();
+        fetch('/data/adult_titles.json').then(r => r.json()).then(titles => {
+            if (Array.isArray(titles)) {
+                titles.forEach(t => window.adultTitlesSet.add(t.toLowerCase().trim()));
+                if (window.currentTab === 'explore') window.runClientSideCatalogFilter();
+                if (window.currentTab === 'calendar') window.renderCalendarPage();
+            }
+        }).catch(() => {});
+        fetch('/?feed=init', { headers: { 'Accept': 'application/json' } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.featuredRoll && data.featuredRoll.length > 0) {
+                    window.heroRoll = data.featuredRoll;
+                    window.setHeroIndex(0);
+                }
+                if (data.calendar) {
+                    window.calendarData = data.calendar;
+                    window.deriveHeroRollFromCalendar();
+                    if (window.currentTab === 'calendar') window.renderCalendarPage();
+                }
+            }).catch(() => {});
         // Detecta dinamicamente o dia da semana atual no fuso do usuário (0: Domingo, 1: Segunda... 6: Sábado)
         const dayNames = ['sundays', 'mondays', 'tuesdays', 'wednesdays', 'thursdays', 'fridays', 'saturdays'];
         const dayFullNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -440,7 +461,7 @@
 
         // Local-First Catalog Engine via IndexedDB (Zero bloqueio de thread, Zero JSON de 34MB)
         const DB_NAME = 'anirium_local_catalog';
-        const DB_VERSION = 3;
+        const DB_VERSION = 4;
         const STORE_NAME = 'works';
 
         function openCatalogDB() {
@@ -569,11 +590,19 @@
             if (item.is_adult === true || item.is_adult === 1 || item.is_adult === '1') return true;
             const fmt = (item.format || '').toUpperCase();
             if (fmt === 'HENTAI' || fmt === 'DOUJINSHI' || fmt === 'EROTICA') return true;
-            const title = (item.title || item.name || '').toLowerCase();
-            const rels = (item.rel_works || []).join(' ').toLowerCase();
+            const title = (item.title || item.name || '').toLowerCase().trim();
+            if (window.adultTitlesSet && window.adultTitlesSet.has(title)) return true;
+            const rels = item.rel_works || [];
+            if (window.adultTitlesSet && Array.isArray(rels)) {
+                for (let i = 0; i < rels.length; i++) {
+                    const rw = (rels[i] || '').toLowerCase().trim();
+                    if (rw && window.adultTitlesSet.has(rw)) return true;
+                }
+            }
+            const relsStr = rels.join(' ').toLowerCase();
             const adultKeywords = /\b(hentai|erotica|ecchi|doujinshi|ero-anime|18\+|nsfw|r18|r-18|smut|yaoi|yuri|sukumizu|oppai|futanari|milf|chikan|netorare|ntr|ahegao|rape|incest|creampie|blowjob|anal|bondage|bdsm|uncensored|x-rated|bakunyuu|kyonyuu|kairaku|chijoku|inma|inran|taimanin|succubus|ejaculation|orgasm|dildo|masturbation|hardcore|pako|off-pako|seiyoku|sex|sexual|porno|eromanga|furete\s*mo\s*ii\s*yo)\b/i;
             if (adultKeywords.test(title)) return true;
-            if (adultKeywords.test(rels)) return true;
+            if (adultKeywords.test(relsStr)) return true;
             return false;
         };
 
