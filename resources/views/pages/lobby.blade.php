@@ -304,35 +304,40 @@
                 <div class="p-2.5 rounded-2xl border border-theme-accent/30 bg-[#0E1118] text-theme-accent backdrop-blur-md">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 </div>
-                <div>
-                    <h2 id="calendar-header-title" class="text-sm font-black uppercase tracking-wider text-white">
-                        Grade Semanal • Segunda-feira
-                    </h2>
-                    <p id="calendar-header-count" class="text-[11px] font-mono text-theme-muted">
-                        {{ count($calendar['mondays'] ?? []) }} lançamentos programados
-                    </p>
-                </div>
-            </div>
-
-            <!-- Seletor de Dias em Pílula Acrílica -->
-            <div class="flex items-center p-1 rounded-2xl border border-white/10 bg-[#0E1118] shadow-inner gap-1 overflow-x-auto no-scrollbar">
                 @php
-                    $daysMap = [
+                    $allDays = [
+                        ['id' => 'sundays', 'label' => 'DOM', 'full' => 'Domingo'],
                         ['id' => 'mondays', 'label' => 'SEG', 'full' => 'Segunda-feira'],
                         ['id' => 'tuesdays', 'label' => 'TER', 'full' => 'Terça-feira'],
                         ['id' => 'wednesdays', 'label' => 'QUA', 'full' => 'Quarta-feira'],
                         ['id' => 'thursdays', 'label' => 'QUI', 'full' => 'Quinta-feira'],
                         ['id' => 'fridays', 'label' => 'SEX', 'full' => 'Sexta-feira'],
                         ['id' => 'saturdays', 'label' => 'SÁB', 'full' => 'Sábado'],
-                        ['id' => 'sundays', 'label' => 'DOM', 'full' => 'Domingo'],
                     ];
+                    $todayNum = (int) date('w'); // 0 = Domingo ... 6 = Sábado
+                    $todayItem = $allDays[$todayNum];
+                    $rollingDays = [];
+                    for ($i = 0; $i < 7; $i++) {
+                        $idx = ($todayNum + $i) % 7;
+                        $item = $allDays[$idx];
+                        $item['isToday'] = ($i === 0);
+                        $rollingDays[] = $item;
+                    }
                 @endphp
-                @foreach($daysMap as $d)
+                <div>
+                    <h2 id="calendar-header-title" class="text-sm font-black uppercase tracking-wider text-white">
+                        Grade Semanal • {{ $todayItem['full'] }}
+                    </h2>
+                    <p id="calendar-header-count" class="text-[11px] font-mono text-theme-muted">
+                        {{ count($calendar[$todayItem['id']] ?? []) }} lançamentos programados
+                    </p>
+                </div>
+                @foreach($rollingDays as $d)
                     <button type="button"
                             onclick="window.selectCalendarDay('{{ $d['id'] }}', '{{ $d['full'] }}')"
                             class="cal-day-btn px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 {{ $loop->first ? 'bg-theme-accent text-theme-inverse shadow-md scale-105' : 'text-theme-muted hover:text-white opacity-60 hover:opacity-100' }}"
                             data-day="{{ $d['id'] }}">
-                        <span>{{ $d['label'] }}</span>
+                        <span>{{ $d['isToday'] ? 'HOJE' : $d['label'] }}</span>
                     </button>
                 @endforeach
             </div>
@@ -437,25 +442,52 @@
         fetch('/?feed=init', { headers: { 'Accept': 'application/json' } })
             .then(r => r.json())
             .then(data => {
-                if (data.featuredRoll && data.featuredRoll.length > 0) {
-                    window.heroRoll = data.featuredRoll;
-                    window.setHeroIndex(0);
-                }
                 if (data.calendar) {
                     window.calendarData = data.calendar;
                     window.deriveHeroRollFromCalendar();
                     if (window.currentTab === 'calendar') window.renderCalendarPage();
                 }
+                if (data.featuredRoll && data.featuredRoll.length > 0) {
+                    window.heroRoll = data.featuredRoll;
+                    if (typeof window.setHeroIndex === 'function') {
+                        window.setHeroIndex(0);
+                    }
+                }
             }).catch(() => {});
         // Detecta dinamicamente o dia da semana atual no fuso do usuário (0: Domingo, 1: Segunda... 6: Sábado)
         const dayNames = ['sundays', 'mondays', 'tuesdays', 'wednesdays', 'thursdays', 'fridays', 'saturdays'];
         const dayFullNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+        const dayLabels = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
         const todayIdx = new Date().getDay();
         window.currentCalDay = dayNames[todayIdx];
         window.currentCalDayFull = dayFullNames[todayIdx];
         window.calPage = 1;
         window.explorePage = 1;
         const PAGE_SIZE = 12;
+
+        // Renderiza deterministicamente a barra de dias para o fuso local do navegador do usuário
+        window.initRollingDaysBar = function() {
+            const bar = document.getElementById('calendar-days-bar');
+            if (!bar) return;
+            const clientToday = new Date().getDay();
+            let html = '';
+            for (let i = 0; i < 7; i++) {
+                const idx = (clientToday + i) % 7;
+                const dId = dayNames[idx];
+                const dFull = dayFullNames[idx];
+                const isSelected = (dId === window.currentCalDay);
+                const label = (i === 0) ? 'HOJE' : dayLabels[idx];
+                html += `
+                    <button type="button"
+                            onclick="window.selectCalendarDay('${dId}', '${dFull}')"
+                            class="cal-day-btn px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${isSelected ? 'bg-theme-accent text-theme-inverse shadow-md scale-105' : 'text-theme-muted hover:text-white opacity-60 hover:opacity-100'}"
+                            data-day="${dId}">
+                        <span>${label}</span>
+                    </button>
+                `;
+            }
+            bar.innerHTML = html;
+        };
 
         window.clientStatusFilter = 'all';
 
@@ -832,9 +864,12 @@
                         // Regra Canônica: Não exibe universos puramente de mangá sem obras animadas no filtro de Universos
                         if (item.works_count !== undefined && item.works_count <= 0) return false;
                     } else if (window.exploreKindFilter === 'work') {
-                        // Regra Canônica: Obras são estritamente animes/animações; mangás possuem filtro próprio
+                        // Regra Canônica: Obras são estritamente animes/animações (TV, MOVIE, OVA, ONA, SPECIAL).
+                        // Músicas (MUSIC), Mangás e outras mídias não pertencem a Obras.
+                        const fmt = (item.format || '').toUpperCase();
+                        if (fmt === 'MUSIC' || fmt === 'OST' || item.kind === 'track' || itemKind === 'music') return false;
                         if (itemKind !== 'work' && item.kind !== 'work') return false;
-                        const isManga = item.kind === 'manga' || ['MANGA', 'MANHWA', 'MANHUA', 'ONE_SHOT', 'DOUJINSHI', 'NOVEL', 'LIGHT_NOVEL', 'OEL'].includes(item.format);
+                        const isManga = item.kind === 'manga' || ['MANGA', 'MANHWA', 'MANHUA', 'ONE_SHOT', 'DOUJINSHI', 'NOVEL', 'LIGHT_NOVEL', 'OEL'].includes(fmt);
                         if (isManga) return false;
                     } else if (window.exploreKindFilter === 'manga') {
                         // Filtro Exclusivo de Mangá
@@ -849,7 +884,9 @@
                     } else if (window.exploreKindFilter === 'studio') {
                         if (itemKind !== 'studio' && item.kind !== 'studio' && item.kind !== 'company' && item.format !== 'STUDIO') return false;
                     } else if (window.exploreKindFilter === 'music') {
-                        if (itemKind !== 'music' && item.kind !== 'track' && item.format !== 'MUSIC' && item.format !== 'OST') return false;
+                        const fmt = (item.format || '').toUpperCase();
+                        if (fmt === 'MUSIC' || fmt === 'OST' || item.kind === 'track' || itemKind === 'music') return true;
+                        return false;
                     } else if (window.exploreKindFilter === 'character') {
                         if (itemKind !== 'character') return false;
                     }
@@ -981,6 +1018,7 @@
         // 4. CALENDÁRIO: PAGINAÇÃO E CARDS OFICIAIS (CalendarHeader.tsx + CalendarWorkCard.tsx)
         window.selectCalendarDay = function(dayKey, dayFull) {
             window.currentCalDay = dayKey;
+            window.currentCalDayFull = dayFull;
             window.calPage = 1;
 
             document.querySelectorAll('.cal-day-btn').forEach(btn => {
@@ -1046,7 +1084,10 @@
                 return;
             }
 
-            // Playhead do Calendário: Determina se o anime já foi lançado nesta semana
+            // Playhead do Calendário Contínuo (Rolling Window):
+            // O calendário é uma janela contínua dos próximos 7 dias (Hoje + 6 dias futuros).
+            // Apenas o dia de HOJE divide entre já lançado e a ser lançado pelo relógio.
+            // Todos os 6 dias seguintes são 100% futuros (Episódio futuro • Programado).
             const now = new Date();
             const currentDayIdx = now.getDay(); // 0 = Domingo, 1 = Segunda, 2 = Terça...
             const nowHour = String(now.getHours()).padStart(2, '0');
@@ -1054,15 +1095,22 @@
             const nowTimeStr = `${nowHour}:${nowMin}`;
             const daysOrder = ['sundays', 'mondays', 'tuesdays', 'wednesdays', 'thursdays', 'fridays', 'saturdays'];
             const selectedDayIdx = daysOrder.indexOf(window.currentCalDay);
+            const isToday = (selectedDayIdx === currentDayIdx);
 
             // Renderiza Cards Fiéis a CalendarWorkCard.tsx com Estado do Episódio e Progresso do Usuário
             container.innerHTML = paged.map(item => {
-                // Checa se já foi ao ar na semana
                 let isAired = false;
-                if (selectedDayIdx < currentDayIdx) {
-                    isAired = true;
-                } else if (selectedDayIdx === currentDayIdx) {
+                let displayEpisode = item.episode || 1;
+
+                if (isToday) {
+                    // No dia de HOJE: o playhead verifica se já atingiu o horário
                     isAired = (item.time && item.time !== 'TBA' && item.time <= nowTimeStr);
+                    displayEpisode = item.episode || 1;
+                } else {
+                    // Nos outros 6 dias seguintes: o dia é estritamente futuro!
+                    // O episódio a ser exibido é o próximo episódio programado
+                    isAired = false;
+                    displayEpisode = (item.episode || 1) + 1;
                 }
 
                 // Checa se o usuário logado já assistiu ou está acompanhando
@@ -1100,7 +1148,7 @@
                             </strong>
                             <div class="flex items-center justify-between mt-0.5">
                                 <span class="text-[10px] font-mono font-medium ${isAired ? 'text-[var(--color-state-canon,#10B981)]' : 'text-theme-muted'} block">
-                                    Episódio ${item.episode || 1} ${isAired ? '• Lançado' : '• Programado'}
+                                    ${item.total_episode ? `Episódio ${displayEpisode} (${item.total_episode})` : `Episódio ${displayEpisode}`} ${isAired ? '• Lançado' : '• Programado'}
                                 </span>
                             </div>
                         </div>
@@ -1905,6 +1953,9 @@ window.toggleEntityBookmark = async function(type, id) {
             const initialTab = urlParams.get('tab');
             if (initialTab && ['home', 'explore', 'calendar'].includes(initialTab)) {
                 window.switchTab(initialTab);
+            }
+            if (typeof window.initRollingDaysBar === 'function') {
+                window.initRollingDaysBar();
             }
             window.deriveHeroRollFromCalendar();
             window.runClientSideCatalogFilter();

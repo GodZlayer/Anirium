@@ -47,16 +47,8 @@ class LobbyController extends Controller
         $featuredRoll = $this->catalogService->getHeroFeatured();
         $hero = $featuredRoll[0] ?? null;
 
-        // 2. Calendário semanal inicial rápido (a sincronização assíncrona hidrata tudo sem travar a renderização inicial)
-        $calendar = [
-            'mondays' => [],
-            'tuesdays' => [],
-            'wednesdays' => [],
-            'thursdays' => [],
-            'fridays' => [],
-            'saturdays' => [],
-            'sundays' => [],
-        ];
+        // 2. Calendário semanal inicial completo (servido em milissegundos via memória/cache)
+        $calendar = $this->catalogService->getCalendarByDay();
 
         // 3. Catálogo inicial ultraleve (apenas 24 itens para preencher a primeira viewport)
         $explore = $this->catalogService->getExploreFeed('all', 'all', 1, 24);
