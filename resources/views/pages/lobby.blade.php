@@ -509,26 +509,23 @@
                             }
                         };
                     } else {
+                        // Sincroniza shards leves e específicos por demanda (work.json, universe.json, manga.json)
                         setTimeout(async () => {
                             try {
-                                const res = await fetch('/data/catalog_clean.json');
-                                if (res.ok) {
-                                    const fullCatalog = await res.json();
-                                    if (Array.isArray(fullCatalog) && fullCatalog.length > 0) {
-                                        window.clientCatalog = fullCatalog;
-                                        const wTx = db.transaction(STORE_NAME, 'readwrite');
-                                        const wStore = wTx.objectStore(STORE_NAME);
-                                        fullCatalog.forEach(it => wStore.put(it));
+                                const shardRes = await fetch('/data/shards/work.json');
+                                if (shardRes.ok) {
+                                    const workData = await shardRes.json();
+                                    if (Array.isArray(workData) && workData.length > 0) {
+                                        window.clientCatalog = workData;
                                         if (window.currentTab === 'explore') {
                                             window.runClientSideCatalogFilter();
                                         }
-                                        console.log('[Anirium Catalog] Local-first catalog sincronizado com', fullCatalog.length, 'entidades');
                                     }
                                 }
                             } catch (e) {
-                                console.warn('[Anirium Catalog] Fallback background fetch:', e);
+                                console.warn('[Anirium Catalog] Shard fetch fallback:', e);
                             }
-                        }, 200);
+                        }, 500);
                     }
                 };
             } catch (err) {
@@ -1846,6 +1843,11 @@ window.toggleEntityBookmark = async function(type, id) {
             window.deriveHeroRollFromCalendar();
             window.runClientSideCatalogFilter();
             window.renderCalendarPage();
+
+            // Desativa suavemente o HUD de carregamento global após a inicialização do DOM
+            if (window.hideGlobalSiteLoader) {
+                setTimeout(window.hideGlobalSiteLoader, 150);
+            }
         });
         const initialParams = new URLSearchParams(window.location.search);
         const initialTabNow = initialParams.get('tab');
@@ -1855,6 +1857,9 @@ window.toggleEntityBookmark = async function(type, id) {
         window.deriveHeroRollFromCalendar();
         window.runClientSideCatalogFilter();
         window.renderCalendarPage();
+        if (window.hideGlobalSiteLoader) {
+            setTimeout(window.hideGlobalSiteLoader, 300);
+        }
 
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
