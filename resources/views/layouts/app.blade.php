@@ -79,23 +79,25 @@
 
     <!-- Script Inline Imediato para Controle do Loader Global -->
     <script>
+        window.updateGlobalSiteLoader = function(percent, message) {
+            const bar = document.getElementById('global-loader-bar');
+            if (bar && percent !== undefined) bar.style.width = `${Math.min(100, Math.max(5, percent))}%`;
+            const txt = document.getElementById('global-loader-text');
+            if (txt && message) txt.innerText = message;
+        };
+
         window.hideGlobalSiteLoader = function() {
             const loader = document.getElementById('global-site-loader');
             if (loader && !loader.classList.contains('opacity-0')) {
-                const bar = document.getElementById('global-loader-bar');
-                if (bar) bar.style.width = '100%';
+                window.updateGlobalSiteLoader(100, 'Catálogo Pronto!');
                 setTimeout(() => {
                     loader.classList.add('opacity-0', 'pointer-events-none');
                     setTimeout(() => {
                         loader.style.display = 'none';
-                    }, 500);
-                }, 200);
+                    }, 600);
+                }, 250);
             }
         };
-        // Auto-dismiss de segurança máxima após 3.5 segundos para garantir que o usuário nunca fique preso
-        setTimeout(() => {
-            if (window.hideGlobalSiteLoader) window.hideGlobalSiteLoader();
-        }, 3500);
     </script>
 
     <!-- Viewport Fixa Anti-Scroll Cego (Padrão TGCode) -->

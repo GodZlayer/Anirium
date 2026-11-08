@@ -461,7 +461,7 @@
 
         // Local-First Catalog Engine via IndexedDB (Zero bloqueio de thread, Zero JSON de 34MB)
         const DB_NAME = 'anirium_local_catalog';
-        const DB_VERSION = 4;
+        const DB_VERSION = 5;
         const STORE_NAME = 'works';
 
         function openCatalogDB() {
@@ -482,62 +482,94 @@
         }
 
         async function initLocalFirstCatalog() {
+            if (window.updateGlobalSiteLoader) {
+                window.updateGlobalSiteLoader(20, 'Carregando Catálogo Local...');
+            }
+
+            let catalogReady = false;
+
             try {
-                // Sincroniza chunk inicial limpo (<20ms) enquanto o HUD global cobre a tela
-                const chunkRes = await fetch('/data/catalog_chunk0.json');
-                if (chunkRes.ok) {
-                    const chunk = await chunkRes.json();
-                    if (Array.isArray(chunk) && chunk.length > 0) {
+                // 1. Tenta carregar os dados completos instantaneamente do IndexedDB (Cache do Navegador)
+                const db = await openCatalogDB();
+                const cachedWorks = await new Promise((resolve) => {
+                    try {
+                        const tx = db.transaction(STORE_NAME, 'readonly');
+                        const store = tx.objectStore(STORE_NAME);
+                        const countReq = store.count();
+                        countReq.onsuccess = () => {
+                            if (countReq.result >= 20000) {
+                                const allReq = store.getAll();
+                                allReq.onsuccess = () => resolve(allReq.result || null);
+                                allReq.onerror = () => resolve(null);
+                            } else {
+                                resolve(null);
+                            }
+                        };
+                        countReq.onerror = () => resolve(null);
+                    } catch (e) {
+                        resolve(null);
+                    }
+                });
+
+                if (Array.isArray(cachedWorks) && cachedWorks.length >= 20000) {
+                    if (window.updateGlobalSiteLoader) {
+                        window.updateGlobalSiteLoader(85, 'Renderizando Catálogo...');
+                    }
+                    window.clientCatalog = cachedWorks;
+                    window.kindShardsCache['work'] = cachedWorks;
+                    window.runClientSideCatalogFilter();
+                    catalogReady = true;
+                } else {
+                    // 2. Primeira visita ou cache desatualizado: baixa 100% da base completa sob o HUD
+                    if (window.updateGlobalSiteLoader) {
+                        window.updateGlobalSiteLoader(45, 'Baixando Acervo Completo (28k+ obras)...');
+                    }
+                    const shardRes = await fetch('/data/shards/work.json');
+                    if (shardRes.ok) {
+                        const workData = await shardRes.json();
+                        if (Array.isArray(workData) && workData.length > 0) {
+                            if (window.updateGlobalSiteLoader) {
+                                window.updateGlobalSiteLoader(80, 'Armazenando no Cache Local...');
+                            }
+                            window.clientCatalog = workData;
+                            window.kindShardsCache['work'] = workData;
+                            window.runClientSideCatalogFilter();
+                            catalogReady = true;
+
+                            // Persiste no IndexedDB de forma determinística
+                            try {
+                                const wTx = db.transaction(STORE_NAME, 'readwrite');
+                                const wStore = wTx.objectStore(STORE_NAME);
+                                workData.forEach(it => wStore.put(it));
+                            } catch (e) {
+                                console.warn('[Anirium Shards] Falha ao persistir no IndexedDB:', e);
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('[Anirium Engine] Falha durante sincronização do catálogo:', err);
+            }
+
+            // Fallback se necessário: garante que há catálogo antes de fechar o loader
+            if (!catalogReady && (!window.clientCatalog || window.clientCatalog.length === 0)) {
+                try {
+                    const fallbackRes = await fetch('/data/catalog_chunk0.json');
+                    if (fallbackRes.ok) {
+                        const chunk = await fallbackRes.json();
                         window.clientCatalog = chunk;
                         window.kindShardsCache['work'] = chunk;
                         window.runClientSideCatalogFilter();
                     }
-                }
+                } catch (e) {}
+            }
 
-                // Carrega base do IndexedDB ou shard completo em background
-                const db = await openCatalogDB();
-                const tx = db.transaction(STORE_NAME, 'readonly');
-                const store = tx.objectStore(STORE_NAME);
-                const countReq = store.count();
-
-                countReq.onsuccess = () => {
-                    const localCount = countReq.result;
-                    if (localCount >= 20000) {
-                        const allReq = store.getAll();
-                        allReq.onsuccess = () => {
-                            if (allReq.result && allReq.result.length > 0) {
-                                window.clientCatalog = allReq.result;
-                                window.kindShardsCache['work'] = allReq.result;
-                                if (window.currentTab === 'explore') {
-                                    window.runClientSideCatalogFilter();
-                                }
-                            }
-                        };
-                    } else {
-                        // Sincroniza shard completo de obras (gzip ~773KB) e popula IndexedDB
-                        fetch('/data/shards/work.json').then(r => r.json()).then(workData => {
-                            if (Array.isArray(workData) && workData.length > 0) {
-                                window.clientCatalog = workData;
-                                window.kindShardsCache['work'] = workData;
-                                if (window.currentTab === 'explore') {
-                                    window.runClientSideCatalogFilter();
-                                }
-                                try {
-                                    const wTx = db.transaction(STORE_NAME, 'readwrite');
-                                    const wStore = wTx.objectStore(STORE_NAME);
-                                    workData.forEach(it => wStore.put(it));
-                                } catch (e) {}
-                            }
-                        }).catch(e => console.warn('[Anirium Shards] work fetch fallback:', e));
-                    }
-                };
-            } catch (err) {
-                console.warn('[Anirium Engine] IndexedDB local:', err);
-            } finally {
-                // HUD só é liberado APÓS a hidratação completa da interface no DOM
-                if (window.hideGlobalSiteLoader) {
-                    window.hideGlobalSiteLoader();
-                }
+            // 100% DA BASE CARREGADA E RENDERIZADA: Só agora o site abre para o usuário!
+            if (window.updateGlobalSiteLoader) {
+                window.updateGlobalSiteLoader(100, 'Tudo Pronto!');
+            }
+            if (window.hideGlobalSiteLoader) {
+                window.hideGlobalSiteLoader();
             }
         }
         initLocalFirstCatalog();
