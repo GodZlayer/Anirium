@@ -99,7 +99,7 @@ class CatalogSearch
             $where .= ' AND works.adult=0';
         }
         if ($view === 'calendar') {
-            $where .= " AND json_extract(summary, '$.airing_timezone') IS NOT NULL AND (json_extract(summary, '$.airing_day') IS NOT NULL OR json_extract(summary, '$.release.air_date_utc') IS NOT NULL)";
+            $where .= " AND (json_extract(summary, '$.airing_day') IS NOT NULL OR json_extract(summary, '$.release.air_date_utc') IS NOT NULL)";
         }
         $limit = $view === 'home' ? 3 : 100;
         $total = (int) $db->query('SELECT count(*) FROM works WHERE '.$where)->fetchColumn();

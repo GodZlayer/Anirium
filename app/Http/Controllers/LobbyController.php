@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Services\Cache\InMemoryCatalogService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use Illuminate\Http\Response;
-use Illuminate\Http\JsonResponse;
 
 class LobbyController extends Controller
 {

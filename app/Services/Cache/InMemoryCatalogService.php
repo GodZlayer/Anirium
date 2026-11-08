@@ -63,9 +63,18 @@ class InMemoryCatalogService
 
             try {
                 $catalogSearch = app(\App\Support\CatalogSearch::class);
-                $feed1 = $catalogSearch->feed('calendar', 1, false);
-                $feed2 = $catalogSearch->feed('calendar', 2, false);
-                $allItems = array_merge($feed1['items'] ?? [], $feed2['items'] ?? []);
+                $allItems = [];
+                $page = 1;
+                do {
+                    $feed = $catalogSearch->feed('calendar', $page, false);
+                    $pageItems = $feed['items'] ?? [];
+                    if (empty($pageItems)) {
+                        break;
+                    }
+                    $allItems = array_merge($allItems, $pageItems);
+                    $totalPages = $feed['pages'] ?? 1;
+                    $page++;
+                } while ($page <= $totalPages && $page <= 10);
 
                 foreach ($allItems as $it) {
                     $rawDay = $it['airing_day'] ?? null;

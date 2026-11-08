@@ -249,6 +249,9 @@ def run_sync():
                 if summary.get('airing_time') != info['airing_time']:
                     summary['airing_time'] = info['airing_time']
                     changed = True
+                if not summary.get('airing_timezone'):
+                    summary['airing_timezone'] = 'Asia/Tokyo'
+                    changed = True
                 if info['latest_episode_num'] and summary.get('latest_episode_num', 0) < info['latest_episode_num']:
                     summary['latest_episode_num'] = info['latest_episode_num']
                     changed = True
