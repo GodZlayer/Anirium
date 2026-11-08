@@ -332,6 +332,10 @@
                         {{ count($calendar[$todayItem['id']] ?? []) }} lançamentos programados
                     </p>
                 </div>
+            </div>
+
+            <!-- Seletor de Dias em Pílula Acrílica Alinhado à Direita -->
+            <div id="calendar-days-container" class="flex items-center p-1 rounded-2xl border border-white/10 bg-[#0E1118] shadow-inner gap-1 overflow-x-auto no-scrollbar">
                 @foreach($rollingDays as $d)
                     <button type="button"
                             onclick="window.selectCalendarDay('{{ $d['id'] }}', '{{ $d['full'] }}')"
