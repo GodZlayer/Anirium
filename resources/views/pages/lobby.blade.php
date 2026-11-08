@@ -272,7 +272,7 @@
         <!-- Grade ModularHubTrack Paginada (Sem Rolagem Cega de Janela) -->
         <div class="flex-1 min-h-0 flex flex-col justify-between overflow-hidden">
             <div id="explore-cards-container" class="flex-1 min-h-0 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 auto-rows-fr gap-3 overflow-y-auto no-scrollbar pb-2">
-                <!-- Cards injetados via JS local -->
+                <div class='col-span-full py-20 flex flex-col items-center justify-center gap-4 text-theme-muted'><div class='w-10 h-10 border-2 border-theme-accent border-t-transparent rounded-full animate-spin'></div><span class='text-xs font-mono font-bold uppercase tracking-wider text-theme-accent animate-pulse'>Carregando CatÃ¡logo Unificado...</span></div>
             </div>
 
             <!-- Navegação de Páginas do Explorar -->
@@ -833,6 +833,7 @@
             if (prevBtn) prevBtn.disabled = window.explorePage <= 1;
             if (nextBtn) nextBtn.disabled = window.explorePage >= totalPages;
 
+            if (!window.clientCatalog || window.clientCatalog.length === 0) { container.innerHTML = '<div class=\'col-span-full py-20 flex flex-col items-center justify-center gap-4 text-theme-muted\'><div class=\'w-10 h-10 border-2 border-theme-accent border-t-transparent rounded-full animate-spin\'></div><span class=\'text-xs font-mono font-bold uppercase tracking-wider text-theme-accent animate-pulse\'>Carregando CatÃ¡logo Unificado...</span></div>'; return; }
             if (paged.length === 0) {
                 container.innerHTML = `
                     <div class="col-span-full py-16 text-center flex flex-col items-center justify-center gap-2">
