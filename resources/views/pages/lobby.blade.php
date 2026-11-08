@@ -736,11 +736,18 @@
             document.getElementById('hero-ep-number').innerText = epNum;
             document.getElementById('hero-btn-ep').innerText = epNum;
             document.getElementById('hero-badge-format').innerText = `${item.format || 'TV'} • ${item.year || '2026'}`;
-            const escapedTitle = (item.title || '').replace(/'/g, "\\'");
-            document.getElementById('hero-btn-play').setAttribute('onclick', `window.pushNavigation('work', '${item.id}', '${escapedTitle}')`);
+            const btnPlay = document.getElementById('hero-btn-play');
+            btnPlay.setAttribute('data-nav-type', 'work');
+            btnPlay.setAttribute('data-nav-id', item.id);
+            btnPlay.setAttribute('data-nav-label', encodeURIComponent(item.title || ''));
+            btnPlay.onclick = function() { window.handleCardNavClick(this); };
+
             const btnDetails = document.getElementById('hero-btn-details');
             if (btnDetails) {
-                btnDetails.setAttribute('onclick', `window.pushNavigation('work', '${item.id}', '${escapedTitle}')`);
+                btnDetails.setAttribute('data-nav-type', 'work');
+                btnDetails.setAttribute('data-nav-id', item.id);
+                btnDetails.setAttribute('data-nav-label', encodeURIComponent(item.title || ''));
+                btnDetails.onclick = function() { window.handleCardNavClick(this); };
             }
             
             const aura = document.getElementById('hero-aura-bloom');
@@ -984,9 +991,14 @@
                     statusMeta = (item.kind || item.format || '').toUpperCase();
                 }
 
+                const safeTitle = encodeURIComponent(item.title || item.name || '');
+
                 return `
                 <div class="group relative flex flex-col rounded-2xl overflow-hidden border border-theme-default bg-theme-card transition-all duration-300 cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:border-theme-highlight"
-                     onclick="window.pushNavigation('${navType}', '${item.id}', '${(item.title || item.name || '').replace(/'/g, "\\'")}')">
+                     data-nav-type="${navType}"
+                     data-nav-id="${item.id}"
+                     data-nav-label="${safeTitle}"
+                     onclick="window.handleCardNavClick(this)">
                     <div class="relative w-full aspect-[3/4] overflow-hidden bg-black/40">
                         <img src="${item.image || '/assets/icons/actions/search.png'}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='/assets/icons/actions/search.png'" loading="lazy">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
@@ -999,7 +1011,10 @@
                         </span>
                         ` : ''}
                         <button type="button"
-                                onclick="window.toggleCardFavorite(event, '${item.id}', '${navType}', '${(item.title || item.name || '').replace(/'/g, "\'")}')"
+                                data-fav-id="${item.id}"
+                                data-fav-type="${navType}"
+                                data-fav-label="${safeTitle}"
+                                onclick="window.handleCardFavClick(event, this)"
                                 class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 border border-white/10 flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${window.userPreferences && window.userPreferences[item.id] && window.userPreferences[item.id].bookmarked ? 'text-theme-accent border-theme-accent/40 shadow-sm' : 'text-theme-muted hover:text-theme-accent'}"
                                 title="${window.currentUser ? 'Favoritar' : 'Faça login para favoritar'}">
                             ★
@@ -1122,9 +1137,14 @@
                 const isWatched = pref && (pref.status === 'completed' || (pref.progress_seconds && pref.progress_seconds > 0));
                 const isWatching = pref && pref.status === 'watching';
 
+                const safeCalTitle = encodeURIComponent(item.title || '');
+
                 return `
                 <div class="group relative min-h-0 min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#0E1118]/80 text-left flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-theme-accent/40 cursor-pointer"
-                     onclick="window.pushNavigation('work', '${item.id}', '${item.title.replace(/'/g, "\\'")}')">
+                     data-nav-type="work"
+                     data-nav-id="${item.id}"
+                     data-nav-label="${safeCalTitle}"
+                     onclick="window.handleCardNavClick(this)">
                     <div class="relative w-full aspect-[4/3] overflow-hidden shrink-0 bg-black/20">
                         <img src="${item.image}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy">
                         
@@ -1166,7 +1186,23 @@
             }).join('');
         };
 
-                // 5. PILHA DE NAVEGAÇÃO DETERMINÍSTICA DINÂMICA DO TGCODE (Histórico Vivo de Navegação pelas Entidades)
+                // Helper para navegação segura contra aspas ou caracteres especiais
+        window.handleCardNavClick = function(el) {
+            const type = el.getAttribute('data-nav-type');
+            const id = el.getAttribute('data-nav-id');
+            const label = decodeURIComponent(el.getAttribute('data-nav-label') || '');
+            window.pushNavigation(type, id, label);
+        };
+
+        window.handleCardFavClick = function(e, btn) {
+            if (e) e.stopPropagation();
+            const id = btn.getAttribute('data-fav-id');
+            const type = btn.getAttribute('data-fav-type');
+            const label = decodeURIComponent(btn.getAttribute('data-fav-label') || '');
+            window.toggleCardFavorite(e, id, type, label);
+        };
+
+        // 5. PILHA DE NAVEGAÇÃO DETERMINÍSTICA DINÂMICA DO TGCODE (Histórico Vivo de Navegação pelas Entidades)
         window.navStack = [];
 
         window.pushNavigation = function(type, id, label) {
@@ -1486,12 +1522,16 @@ if (window.i18n) window.i18n.applyToDOM();
             }
 
             container.innerHTML = filtered.map(item => {
-                const title = item.title || item.target_id;
+                const title = item.title || item.target_id || '';
+                const safeTitle = encodeURIComponent(title);
                 const statusBadge = item.status ? `<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-theme-accent/20 text-theme-accent border border-theme-accent/30">${item.status}</span>` : '';
                 const scoreBadge = item.user_score ? `<span class="text-xs font-mono font-bold text-theme-accent">★ ${item.user_score}/10</span>` : '';
                 return `
                     <div class="p-3.5 rounded-2xl bg-theme-raised border border-theme-default flex items-center justify-between hover:border-theme-highlight transition-all cursor-pointer group"
-                         onclick="window.closeProfileModal(); window.pushNavigation('${item.target_type || 'work'}', '${item.target_id}', '${(title || '').replace(/'/g, "\\'")}')">
+                         data-nav-type="${item.target_type || 'work'}"
+                         data-nav-id="${item.target_id}"
+                         data-nav-label="${safeTitle}"
+                         onclick="window.closeProfileModal(); window.handleCardNavClick(this)">
                         <div class="flex items-center gap-3 min-w-0">
                             <span class="w-2 h-2 rounded-full bg-theme-accent"></span>
                             <div class="min-w-0">
@@ -1530,9 +1570,13 @@ if (window.i18n) window.i18n.applyToDOM();
 
             container.innerHTML = condensedList.map(item => {
                 const uTitle = item.universe_name || item.title || 'Universo Conectado';
+                const safeUTitle = encodeURIComponent(uTitle);
                 return `
                     <div class="p-4 rounded-2xl bg-theme-raised border border-theme-default flex items-center justify-between hover:border-theme-accent transition-all cursor-pointer group"
-                         onclick="window.closeProfileModal(); window.pushNavigation('universe', '${item.universe_id || item.target_id}', '${uTitle.replace(/'/g, "\\'")}')">
+                         data-nav-type="universe"
+                         data-nav-id="${item.universe_id || item.target_id}"
+                         data-nav-label="${safeUTitle}"
+                         onclick="window.closeProfileModal(); window.handleCardNavClick(this)">
                         <div class="flex items-center gap-3 min-w-0">
                             <div class="w-10 h-10 rounded-xl bg-theme-pill border border-theme-default flex items-center justify-center text-base shrink-0">
                                 🌌
