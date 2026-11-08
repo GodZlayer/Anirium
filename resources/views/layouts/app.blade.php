@@ -44,35 +44,79 @@
 </head>
 <body class="h-full w-full overflow-hidden antialiased bg-theme-base text-theme-primary font-sans">
     <!-- HUD DE CARREGAMENTO INICIAL DETERMINÍSTICO (Padrão TGCode: Frame 0 com mascote oficial e spinner ouro) -->
-    <div id="global-site-loader" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0B0B0D] select-none pointer-events-auto transition-opacity duration-500 ease-out">
-        <div class="relative flex flex-col items-center justify-center gap-6 p-8">
+    <style>
+        #global-site-loader {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 999999 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background-color: #0B0B0D !important;
+            opacity: 1;
+            transition: opacity 0.5s ease-out;
+            pointer-events: auto;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #global-site-loader.loader-hidden {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+        @keyframes aniriumOrbitSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes aniriumPulseGlow {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.08); opacity: 1; }
+        }
+        .anirium-orbit-ring {
+            width: 72px;
+            height: 72px;
+            border-radius: 9999px;
+            border: 2px solid rgba(255, 199, 102, 0.15);
+            border-top: 2px solid #FFC766;
+            animation: aniriumOrbitSpin 1s linear infinite;
+        }
+        .anirium-mascot-glow {
+            animation: aniriumPulseGlow 2s ease-in-out infinite;
+        }
+    </style>
+
+    <div id="global-site-loader">
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 32px;">
             <!-- Glow Cósmico Dourado de Fundo -->
-            <div class="absolute -inset-4 bg-[#FFC766]/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+            <div style="position: absolute; inset: -16px; background-color: rgba(255, 199, 102, 0.1); border-radius: 9999px; filter: blur(32px); pointer-events: none;"></div>
 
             <!-- Mascote Oficial Anirium com Anel de Órbita -->
-            <div class="relative w-20 h-20 flex items-center justify-center">
-                <div class="absolute inset-0 rounded-full border-2 border-[#FFC766]/20 border-t-[#FFC766] animate-spin"></div>
+            <div style="position: relative; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center;">
+                <div class="anirium-orbit-ring" style="position: absolute; inset: 0;"></div>
                 <img src="/assets/logos/Anirium-favicon.png"
                      alt="Anirium"
-                     class="w-12 h-12 object-contain drop-shadow-[0_0_15px_rgba(255,199,102,0.6)] animate-pulse">
+                     class="anirium-mascot-glow"
+                     style="width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 0 12px rgba(255,199,102,0.6));">
             </div>
 
             <!-- Identidade & Status de Sincronização -->
-            <div class="flex flex-col items-center gap-2 text-center">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;">
                 <img src="/assets/logos/Anirium-Textlogo.png"
                      alt="Anirium"
-                     class="h-6 w-auto object-contain filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-                <div class="flex items-center gap-2">
-                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-[#FFC766] animate-ping"></span>
-                    <span class="text-[11px] font-mono tracking-widest uppercase font-bold text-[#FFC766]" id="global-loader-text">
+                     style="height: 24px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.8));">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background-color: #FFC766;"></span>
+                    <span id="global-loader-text" style="font-size: 11px; font-family: monospace; letter-spacing: 0.15em; text-transform: uppercase; font-weight: bold; color: #FFC766;">
                         Sincronizando Plataforma...
                     </span>
                 </div>
             </div>
 
-            <!-- Barra de Progresso Sutil -->
-            <div class="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
-                <div id="global-loader-bar" class="h-full bg-gradient-to-r from-[#FFC766] to-[#FFA726] rounded-full w-1/3 transition-all duration-300"></div>
+            <!-- Barra de Progresso Determinística -->
+            <div style="width: 200px; height: 4px; background-color: rgba(255, 255, 255, 0.1); border-radius: 9999px; overflow: hidden;">
+                <div id="global-loader-bar" style="height: 100%; background: linear-gradient(90deg, #FFC766, #FFA726); border-radius: 9999px; width: 25%; transition: width 0.3s ease;"></div>
             </div>
         </div>
     </div>
@@ -88,13 +132,13 @@
 
         window.hideGlobalSiteLoader = function() {
             const loader = document.getElementById('global-site-loader');
-            if (loader && !loader.classList.contains('opacity-0')) {
+            if (loader && !loader.classList.contains('loader-hidden')) {
                 window.updateGlobalSiteLoader(100, 'Catálogo Pronto!');
                 setTimeout(() => {
-                    loader.classList.add('opacity-0', 'pointer-events-none');
+                    loader.classList.add('loader-hidden');
                     setTimeout(() => {
                         loader.style.display = 'none';
-                    }, 600);
+                    }, 550);
                 }, 250);
             }
         };
