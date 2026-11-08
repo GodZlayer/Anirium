@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Support\CatalogContextLookup;
+use App\Support\CatalogGraphVisibility;
 use App\Support\CatalogSearch;
 use App\Support\CatalogUnavailable;
 use App\Support\CatalogWorkGraph;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class CatalogGraphController extends Controller
@@ -21,14 +23,21 @@ class CatalogGraphController extends Controller
         if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $cleanId)) {
             if ($kind === 'work' || $kind === 'manga') {
                 $isWork = DB::table('catalog_works')->where('id', $cleanId)->exists();
-                if ($isWork) return $cleanId;
-                
+                if ($isWork) {
+                    return $cleanId;
+                }
+
                 // Se o UUID pertencer a um episódio ou arco, redireciona para a obra
                 $epWorkId = DB::table('catalog_episodes')->where('id', $cleanId)->value('work_id');
-                if ($epWorkId) return $epWorkId;
+                if ($epWorkId) {
+                    return $epWorkId;
+                }
                 $arcWorkId = DB::table('catalog_arc_works')->where('arc_id', $cleanId)->value('work_id');
-                if ($arcWorkId) return $arcWorkId;
+                if ($arcWorkId) {
+                    return $arcWorkId;
+                }
             }
+
             return $cleanId;
         }
 
@@ -38,27 +47,33 @@ class CatalogGraphController extends Controller
 
         if ($kind === 'manga') {
             $query->where('namespace', 'like', 'manga%')
-                  ->orderByRaw("CASE WHEN provider = 'mal' THEN 1 WHEN provider = 'shikimori' THEN 2 WHEN provider = 'anilist' THEN 3 ELSE 4 END");
+                ->orderByRaw("CASE WHEN provider = 'mal' THEN 1 WHEN provider = 'shikimori' THEN 2 WHEN provider = 'anilist' THEN 3 ELSE 4 END");
         } elseif ($kind === 'work' || $kind === 'anime') {
             $query->where('namespace', 'like', 'anime%')
-                  ->orderByRaw("CASE WHEN provider = 'mal' THEN 1 WHEN provider = 'shikimori' THEN 2 WHEN provider = 'anilist' THEN 3 ELSE 4 END");
+                ->orderByRaw("CASE WHEN provider = 'mal' THEN 1 WHEN provider = 'shikimori' THEN 2 WHEN provider = 'anilist' THEN 3 ELSE 4 END");
         }
 
         $ext = $query->value('entity_id');
-        if ($ext) return $ext;
+        if ($ext) {
+            return $ext;
+        }
 
         // Fallback amplo caso não encontre no namespace restrito
         $fallbackExt = DB::table('catalog_external_identities')
             ->where('external_id', $cleanId)
             ->value('entity_id');
-        if ($fallbackExt) return $fallbackExt;
+        if ($fallbackExt) {
+            return $fallbackExt;
+        }
 
         // 3. Fallback: busca por prefixo se não for UUID
         if (($kind === 'work' || $kind === 'manga') && strlen($cleanId) >= 3) {
             $workId = DB::table('catalog_works')
                 ->where('id', 'like', "{$cleanId}%")
                 ->value('id');
-            if ($workId) return $workId;
+            if ($workId) {
+                return $workId;
+            }
         }
 
         return $cleanId;
@@ -88,10 +103,12 @@ class CatalogGraphController extends Controller
             );
 
             // Cache atômico em memória para o grafo estático da obra (reduz de 6s para 0ms)
-            $cacheKey = "catalog:work:graph:payload:v2:{$realId}:" . ($allowAdult ? '1' : '0');
-            $result = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($graph, $realId, $allowAdult) {
+            $cacheKey = "catalog:work:graph:payload:v2:{$realId}:".($allowAdult ? '1' : '0');
+            $result = Cache::remember($cacheKey, 3600, function () use ($graph, $realId, $allowAdult) {
                 $res = $graph->read($realId, $allowAdult);
-                if (!$res) return null;
+                if (! $res) {
+                    return null;
+                }
 
                 // Injetar relações de Universo Canônico
                 $universeWork = DB::table('catalog_universe_works')
@@ -147,14 +164,14 @@ class CatalogGraphController extends Controller
                 return json_decode(json_encode($res), true);
             });
 
-            if (!$result) {
+            if (! $result) {
                 return response()->json(['error' => 'entity_not_found'], 404);
             }
 
-            $creators = collect($result['creators'] ?? [])->map(fn($c) => (object)$c);
-            $studios = collect($result['studios'] ?? [])->map(fn($s) => (object)$s);
-            $tracks = collect($result['tracks'] ?? [])->map(fn($t) => (object)$t);
-            $universe = !empty($result['universe']) ? (object)$result['universe'] : null;
+            $creators = collect($result['creators'] ?? [])->map(fn ($c) => (object) $c);
+            $studios = collect($result['studios'] ?? [])->map(fn ($s) => (object) $s);
+            $tracks = collect($result['tracks'] ?? [])->map(fn ($t) => (object) $t);
+            $universe = ! empty($result['universe']) ? (object) $result['universe'] : null;
 
             // Se for requisição pedindo HTML/Blade ou HTMX, retorna a view compilada diretamente pelo PHP
             if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
@@ -168,8 +185,8 @@ class CatalogGraphController extends Controller
                 }
 
                 $workObj = (object) ($result['entity'] ?? []);
-                $arcsObj = collect($result['arcs'] ?? [])->map(fn($a) => (object)$a);
-                $episodesObj = collect($result['episodes'] ?? [])->map(fn($e) => (object)$e);
+                $arcsObj = collect($result['arcs'] ?? [])->map(fn ($a) => (object) $a);
+                $episodesObj = collect($result['episodes'] ?? [])->map(fn ($e) => (object) $e);
 
                 return response()->view('partials.context-card', [
                     'work' => $workObj,
@@ -198,13 +215,15 @@ class CatalogGraphController extends Controller
         $realId = $this->resolveUuid($id, 'universe');
         $allowAdult = (bool) ($request->user()?->adult_content_enabled || $request->query('adult') === '1');
 
-        $cacheKey = "catalog:universe:graph:payload:v5:{$realId}:" . ($allowAdult ? '1' : '0');
-        $data = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($realId, $allowAdult) {
+        $cacheKey = "catalog:universe:graph:payload:v5:{$realId}:".($allowAdult ? '1' : '0');
+        $data = Cache::remember($cacheKey, 3600, function () use ($realId, $allowAdult) {
             $universe = DB::table('catalog_universes')->where('id', $realId)->first();
-            if (!$universe) return null;
+            if (! $universe) {
+                return null;
+            }
 
             $allWorkIds = DB::table('catalog_universe_works')->where('universe_id', $realId)->pluck('work_id')->all();
-            $visibility = app(\App\Support\CatalogGraphVisibility::class);
+            $visibility = app(CatalogGraphVisibility::class);
             $visibleWorkIds = $visibility->works($allWorkIds, $allowAdult);
 
             // Buscar todas as obras vinculadas a este universo
@@ -295,7 +314,7 @@ class CatalogGraphController extends Controller
             // Poster/Lead Image da franquia
             $universeLeadImage = $works[0]->image_url ?? '/assets/icons/actions/search.png';
             foreach ($works as $w) {
-                if (strcasecmp($w->title, $universe->name) === 0 && !empty($w->image_url)) {
+                if (strcasecmp($w->title, $universe->name) === 0 && ! empty($w->image_url)) {
                     $universeLeadImage = $w->image_url;
                     break;
                 }
@@ -308,7 +327,7 @@ class CatalogGraphController extends Controller
                 ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
                 ->where('uw.universe_id', $realId)
                 ->where('w.media', 'manga');
-            if (!empty($visibleWorkIds)) {
+            if (! empty($visibleWorkIds)) {
                 $mangasQuery->whereIn('w.id', $visibleWorkIds);
             }
             $mangas = $mangasQuery->get(['w.id', 'w.title', 'w.format', 'w.status', 'wa.image_url']);
@@ -365,18 +384,18 @@ class CatalogGraphController extends Controller
                   AND r.relation_type IN ('prequel', 'sequel', 'side_story', 'spin_off', 'parent_story') 
                 GROUP BY w2.id, r.relation_type
             ", [$realId, $realId]))
-            ->map(fn($item) => (array) $item)
-            ->toArray();
+                ->map(fn ($item) => (array) $item)
+                ->toArray();
 
             return [
                 'universe' => (array) $universe,
-                'works' => $works->map(fn($w) => (array)$w)->toArray(),
-                'mangas' => $mangas->map(fn($m) => (array)$m)->toArray(),
+                'works' => $works->map(fn ($w) => (array) $w)->toArray(),
+                'mangas' => $mangas->map(fn ($m) => (array) $m)->toArray(),
                 'arcs' => $arcs,
                 'genealogy' => $genealogyRaw,
-                'authors' => $authors->map(fn($a) => (array)$a)->toArray(),
-                'studios' => $studios->map(fn($s) => (array)$s)->toArray(),
-                'formats' => $formats->map(fn($f) => (array)$f)->toArray(),
+                'authors' => $authors->map(fn ($a) => (array) $a)->toArray(),
+                'studios' => $studios->map(fn ($s) => (array) $s)->toArray(),
+                'formats' => $formats->map(fn ($f) => (array) $f)->toArray(),
                 'totalEpisodes' => $totalEpisodes,
                 'totalChapters' => $totalChapters,
                 'totalVolumes' => $totalVolumes,
@@ -384,18 +403,18 @@ class CatalogGraphController extends Controller
             ];
         });
 
-        if (!$data) {
+        if (! $data) {
             return response()->json(['error' => 'entity_not_found'], 404);
         }
 
         $universe = (object) $data['universe'];
-        $works = collect($data['works'])->map(fn($w) => (object)$w);
-        $mangas = collect($data['mangas'])->map(fn($m) => (object)$m);
-        $arcs = collect($data['arcs'])->map(fn($a) => (object)$a);
-        $genealogy = collect($data['genealogy'] ?? [])->map(fn($g) => (object)$g);
-        $authors = collect($data['authors'] ?? ($data['creators'] ?? []))->map(fn($a) => (object)$a);
-        $studios = collect($data['studios'])->map(fn($s) => (object)$s);
-        $formats = collect($data['formats'] ?? [])->map(fn($f) => (object)$f);
+        $works = collect($data['works'])->map(fn ($w) => (object) $w);
+        $mangas = collect($data['mangas'])->map(fn ($m) => (object) $m);
+        $arcs = collect($data['arcs'])->map(fn ($a) => (object) $a);
+        $genealogy = collect($data['genealogy'] ?? [])->map(fn ($g) => (object) $g);
+        $authors = collect($data['authors'] ?? ($data['creators'] ?? []))->map(fn ($a) => (object) $a);
+        $studios = collect($data['studios'])->map(fn ($s) => (object) $s);
+        $formats = collect($data['formats'] ?? [])->map(fn ($f) => (object) $f);
         $totalEpisodes = $data['totalEpisodes'] ?? 0;
         $totalChapters = $data['totalChapters'] ?? 0;
         $totalVolumes = $data['totalVolumes'] ?? 0;
@@ -433,7 +452,7 @@ class CatalogGraphController extends Controller
         return response()->json([
             'universe' => $universe,
             'work_ids' => $visibleWorkIds,
-            'works' => collect($visibleWorkIds)->map(fn($wid) => [
+            'works' => collect($visibleWorkIds)->map(fn ($wid) => [
                 'work_id' => $wid,
                 'universe_identity_version' => 1,
                 'universe_v2_id' => $realId,
@@ -448,7 +467,7 @@ class CatalogGraphController extends Controller
     {
         $realId = $this->resolveUuid($id, 'creator');
         $creator = DB::table('catalog_creators')->where('id', $realId)->first();
-        if (!$creator) {
+        if (! $creator) {
             return response()->json(['error' => 'entity_not_found'], 404);
         }
 
@@ -469,7 +488,9 @@ class CatalogGraphController extends Controller
                 ->first();
             if ($uWork) {
                 $universe = DB::table('catalog_universes')->where('id', $uWork->universe_id)->first();
-                if ($universe) $universe->name = $works[0]->title . ' Universe';
+                if ($universe) {
+                    $universe->name = $works[0]->title.' Universe';
+                }
             }
         }
 
@@ -503,7 +524,7 @@ class CatalogGraphController extends Controller
     {
         $realId = $this->resolveUuid($id, 'studio');
         $studio = DB::table('catalog_studios')->where('id', $realId)->first();
-        if (!$studio) {
+        if (! $studio) {
             return response()->json(['error' => 'entity_not_found'], 404);
         }
 
@@ -541,7 +562,7 @@ class CatalogGraphController extends Controller
     {
         $realId = $this->resolveUuid($id, 'track');
         $track = DB::table('catalog_tracks')->where('id', $realId)->first();
-        if (!$track) {
+        if (! $track) {
             return response()->json(['error' => 'entity_not_found'], 404);
         }
 
@@ -564,7 +585,9 @@ class CatalogGraphController extends Controller
                 ->first();
             if ($uWork) {
                 $universe = DB::table('catalog_universes')->where('id', $uWork->universe_id)->first();
-                if ($universe) $universe->name = $works[0]->title . ' Universe';
+                if ($universe) {
+                    $universe->name = $works[0]->title.' Universe';
+                }
             }
         }
 
@@ -598,7 +621,7 @@ class CatalogGraphController extends Controller
     {
         $realId = $this->resolveUuid($id, 'arc');
         $arc = DB::table('catalog_arcs')->where('id', $realId)->first();
-        if (!$arc) {
+        if (! $arc) {
             return response()->json(['error' => 'entity_not_found'], 404);
         }
 
@@ -614,7 +637,7 @@ class CatalogGraphController extends Controller
         if ($arc->universe_id) {
             $universe = DB::table('catalog_universes')->where('id', $arc->universe_id)->first();
             if ($universe && $work) {
-                $universe->name = $work->title . ' Universe';
+                $universe->name = $work->title.' Universe';
             }
         } elseif ($work) {
             $uWork = DB::table('catalog_universe_works as uw')
@@ -622,7 +645,9 @@ class CatalogGraphController extends Controller
                 ->first();
             if ($uWork) {
                 $universe = DB::table('catalog_universes')->where('id', $uWork->universe_id)->first();
-                if ($universe) $universe->name = $work->title . ' Universe';
+                if ($universe) {
+                    $universe->name = $work->title.' Universe';
+                }
             }
         }
 
@@ -666,7 +691,7 @@ class CatalogGraphController extends Controller
     {
         $realId = $this->resolveUuid($id, 'episode');
         $episode = DB::table('catalog_episodes')->where('id', $realId)->first();
-        if (!$episode) {
+        if (! $episode) {
             return response()->json(['error' => 'entity_not_found'], 404);
         }
 
@@ -687,6 +712,7 @@ class CatalogGraphController extends Controller
                 if ($currentArc) {
                     $viewData['currentArc'] = $currentArc;
                 }
+
                 return response()->view('partials.context-card', $viewData);
             }
         }
@@ -701,18 +727,20 @@ class CatalogGraphController extends Controller
     public function strings(string $locale = 'pt-BR')
     {
         $path = public_path("i18n/{$locale}.json");
-        if (!file_exists($path)) {
-            $path = public_path("i18n/pt-BR.json");
+        if (! file_exists($path)) {
+            $path = public_path('i18n/pt-BR.json');
         }
+
         return response()->file($path, ['Content-Type' => 'application/json']);
     }
 
     public function theme(string $name = 'black')
     {
         $path = public_path("themes/{$name}.json");
-        if (!file_exists($path)) {
-            $path = public_path("themes/black.json");
+        if (! file_exists($path)) {
+            $path = public_path('themes/black.json');
         }
+
         return response()->file($path, ['Content-Type' => 'application/json']);
     }
 }

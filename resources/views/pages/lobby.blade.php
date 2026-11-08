@@ -440,7 +440,7 @@
 
         // Local-First Catalog Engine via IndexedDB (Zero bloqueio de thread, Zero JSON de 34MB)
         const DB_NAME = 'anirium_local_catalog';
-        const DB_VERSION = 2;
+        const DB_VERSION = 3;
         const STORE_NAME = 'works';
 
         function openCatalogDB() {
@@ -571,8 +571,9 @@
             if (fmt === 'HENTAI' || fmt === 'DOUJINSHI' || fmt === 'EROTICA') return true;
             const title = (item.title || item.name || '').toLowerCase();
             const rels = (item.rel_works || []).join(' ').toLowerCase();
-            if (/\b(hentai|erotica|ecchi|doujinshi|ero-anime|18\+|nsfw|r18|smut|yaoi|yuri|sukumizu|oppai|futanari|milf|chikan|netorare|ntr|ahegao|rape|incest|creampie|blowjob|anal|bondage|bdsm|uncensored|r-18|x-rated)\b/i.test(title)) return true;
-            if (/\b(hentai|erotica|ecchi|doujinshi|ero-anime|18\+|nsfw|r18|smut|yaoi|yuri|sukumizu|oppai|futanari|milf|chikan|netorare|ntr|ahegao|rape|incest|creampie|blowjob|anal|bondage|bdsm|uncensored|r-18|x-rated)\b/i.test(rels)) return true;
+            const adultKeywords = /\b(hentai|erotica|ecchi|doujinshi|ero-anime|18\+|nsfw|r18|r-18|smut|yaoi|yuri|sukumizu|oppai|futanari|milf|chikan|netorare|ntr|ahegao|rape|incest|creampie|blowjob|anal|bondage|bdsm|uncensored|x-rated|bakunyuu|kyonyuu|kairaku|chijoku|inma|inran|taimanin|succubus|ejaculation|orgasm|dildo|masturbation|hardcore|pako|off-pako|seiyoku|sex|sexual|porno|eromanga|furete\s*mo\s*ii\s*yo)\b/i;
+            if (adultKeywords.test(title)) return true;
+            if (adultKeywords.test(rels)) return true;
             return false;
         };
 
@@ -777,7 +778,12 @@
             });
 
             // Ordenação Sempre Alfabética (A-Z)
-            filtered.sort((a, b) => (a.title || a.name || "").localeCompare(b.title || b.name || ""));
+            const normalizeSortKey = (t) => (t || '').toLowerCase().replace(/^[\s"'«»"''""_\-\.\[\]()!?~*#@]+/g, '');
+            filtered.sort((a, b) => {
+                const keyA = normalizeSortKey(a.title || a.name);
+                const keyB = normalizeSortKey(b.title || b.name);
+                return keyA.localeCompare(keyB);
+            });
 
             const total = filtered.length;
             const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
