@@ -177,59 +177,94 @@
                 </div>
             </div>
 
-            <!-- ABA 4: ADD-ONS & COMPATIBILIDADE STREMIO -->
+            <!-- ABA 4: ADD-ONS & ARQUITETURA MODULAR ABERTA -->
             <div id="profile-panel-addons" class="profile-panel hidden flex flex-col gap-5">
+                <!-- Aviso Arquitetural Claro -->
+                <div class="p-3.5 rounded-2xl bg-theme-raised/60 border border-theme-default text-[11px] font-mono text-theme-muted leading-relaxed">
+                    🧩 <strong class="text-theme-primary">Sistema Aberto de Extensões:</strong> O Anirium opera exclusivamente como catálogo ontológico. O slot de reprodução é modular e aberto: qualquer membro pode instalar e criar add-ons da comunidade (protocolo Stremio/JSON), enquanto assinantes <strong class="text-theme-accent">Anirium+</strong> contam também com o add-on oficial <strong>Anirium Player Pro + Anirium+ Service</strong>.
+                </div>
+
                 <!-- Seção 1: Add-ons Oficiais Anirium+ -->
-                <div class="flex flex-col gap-2">
-                    <h4 class="text-xs font-mono uppercase font-bold text-theme-accent tracking-wider" data-i18n="profile.official_addons">
-                        Add-ons Oficiais Anirium+
-                    </h4>
+                <div class="flex flex-col gap-2.5">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-mono uppercase font-bold text-theme-accent tracking-wider" data-i18n="profile.official_addons">
+                            Extensão Oficial Anirium+ (Exclusivo Assinantes)
+                        </h4>
+                        <span id="profile-service-health-pill" class="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-theme-pill text-theme-muted border-theme-default">
+                            Service 4004: Verificando...
+                        </span>
+                    </div>
                     
-                    <div class="p-4 rounded-2xl bg-theme-raised border border-theme-default flex items-center justify-between gap-4">
-                        <div class="flex items-center gap-3 min-w-0">
-                            <div class="w-10 h-10 rounded-xl bg-theme-accent/10 border border-theme-accent/30 flex items-center justify-center text-theme-accent shrink-0">
-                                ⚡
-                            </div>
-                            <div class="min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <h5 class="text-xs font-bold text-theme-primary truncate" data-i18n="profile.player_pro">Anirium Player Pro</h5>
-                                    <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-theme-accent/20 text-theme-accent border border-theme-accent/30" data-i18n="profile.role_plus">PLUS</span>
+                    <div class="p-4 rounded-2xl bg-theme-raised border border-theme-default flex flex-col gap-3">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-10 h-10 rounded-xl bg-theme-accent/10 border border-theme-accent/30 flex items-center justify-center text-theme-accent shrink-0">
+                                    ⚡
                                 </div>
-                                <p class="text-[10px] text-theme-muted truncate mt-0.5" data-i18n="profile.player_pro_desc">Engine P2P com streaming multi-dub e legendas sincronizadas.</p>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h5 class="text-xs font-bold text-theme-primary truncate" data-i18n="profile.player_pro">Anirium Player Pro (v1.0.0)</h5>
+                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-theme-accent/20 text-theme-accent border border-theme-accent/30" data-i18n="profile.role_plus">ANIRIUM+</span>
+                                    </div>
+                                    <p class="text-[10px] text-theme-muted truncate mt-0.5" data-i18n="profile.player_pro_desc">Add-on oficial com suporte ao Anirium+ Service (127.0.0.1:4004), multi-áudio e legendas sincronizadas.</p>
+                                </div>
+                            </div>
+
+                            <div class="shrink-0">
+                                @if($isAdmin || $isPlus)
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="addon-toggle-player-pro" checked onchange="window.toggleAddon('player-pro', this.checked)" class="sr-only peer">
+                                        <div class="w-9 h-5 bg-theme-pill border border-theme-default peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-theme-accent"></div>
+                                    </label>
+                                @else
+                                    <span class="px-2.5 py-1 rounded-lg bg-theme-pill border border-theme-default text-[10px] font-mono text-theme-muted" data-i18n="profile.addon_unauthorized">Requer Anirium+</span>
+                                @endif
                             </div>
                         </div>
 
-                        <div>
-                            @if($isAdmin || $isPlus)
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="addon-toggle-player-pro" checked onchange="window.toggleAddon('player-pro', this.checked)" class="sr-only peer">
-                                    <div class="w-9 h-5 bg-theme-pill border border-theme-default peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-theme-accent"></div>
-                                </label>
-                            @else
-                                <span class="text-[10px] font-mono text-theme-muted" data-i18n="profile.addon_unauthorized">Requer Anirium+</span>
-                            @endif
+                        <!-- Controle e Download do Daemon Local Anirium+ Service -->
+                        <div class="pt-2.5 border-t border-theme-default/60 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
+                            <span class="text-theme-muted">Daemon Local: <code class="text-theme-accent">http://127.0.0.1:4004</code></span>
+                            <div class="flex items-center gap-2">
+                                <button type="button"
+                                        onclick="window.checkAniriumServiceHealth()"
+                                        class="px-2.5 py-1 rounded-lg bg-theme-pill hover:bg-white/10 border border-theme-default text-theme-primary cursor-pointer transition-all">
+                                    🔄 Testar Conexão
+                                </button>
+                                <a href="ms-windows-store://pdp/?productid=9MV35DDQ6SBD"
+                                   class="px-2.5 py-1 rounded-lg bg-theme-accent/15 hover:bg-theme-accent/25 border border-theme-accent/40 text-theme-accent font-bold transition-all">
+                                    🪟 Microsoft Store
+                                </a>
+                                <a href="/download/service"
+                                   class="px-2.5 py-1 rounded-lg bg-theme-pill hover:bg-white/10 border border-theme-default text-theme-muted hover:text-white transition-all">
+                                    ⬇ Instalador (.exe)
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Seção 2: Add-ons da Comunidade (Stremio & Manifests) -->
+                <!-- Seção 2: Add-ons da Comunidade (Stremio & Manifests Abertos para Todos) -->
                 <div class="flex flex-col gap-2">
                     <div class="flex items-center justify-between">
-                        <h4 class="text-xs font-mono uppercase font-bold text-theme-muted tracking-wider" data-i18n="profile.community_addons">
-                            Add-ons da Comunidade (Stremio)
-                        </h4>
+                        <div>
+                            <h4 class="text-xs font-mono uppercase font-bold text-emerald-400 tracking-wider" data-i18n="profile.community_addons">
+                                Add-ons da Comunidade (Aberto para Todos os Usuários)
+                            </h4>
+                            <p class="text-[10px] font-mono text-theme-muted">Compatível com manifestos Stremio e extensões criadas pela comunidade</p>
+                        </div>
                         <button type="button"
                                 onclick="window.toggleInstallAddonForm()"
-                                class="px-2.5 py-1 rounded-lg bg-theme-pill border border-theme-default hover:border-theme-accent text-theme-accent text-[10px] font-mono font-bold transition-all cursor-pointer">
+                                class="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500 hover:text-black text-emerald-300 text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0">
                             + <span data-i18n="profile.install_addon">Instalar Add-on</span>
                         </button>
                     </div>
 
-                    <!-- Formulário Expansível de Instalação Stremio -->
+                    <!-- Formulário Expansível de Instalação Stremio / Comunidade -->
                     <div id="addon-install-form" class="hidden p-4 rounded-2xl bg-theme-card border border-theme-default flex flex-col gap-3">
                         <input type="text"
                                id="addon-manifest-url"
-                               placeholder="Cole a URL stremio:// ou https://.../manifest.json"
+                               placeholder="Cole a URL stremio://, https://.../manifest.json ou JSON de manifesto da comunidade"
                                data-i18n-placeholder="profile.addon_manifest_placeholder"
                                class="w-full px-3 py-2 rounded-xl bg-theme-surface border border-theme-default text-xs font-mono text-theme-primary placeholder-theme-muted outline-none focus:border-theme-accent">
                         <div class="flex justify-end gap-2">

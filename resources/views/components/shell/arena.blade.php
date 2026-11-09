@@ -85,8 +85,8 @@
                         id="hero-btn-play"
                         onclick="window.pushNavigation('work', '{{ $work['id'] ?? '' }}', '{{ addslashes($work['title'] ?? '') }}')"
                         class="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shadow-xl bg-theme-accent text-theme-inverse">
-                    <svg class="w-4 h-4 fill-current ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    <span><span data-i18n="hero.watch_episode">Assistir Episódio</span> <span id="hero-btn-ep">{{ $latestEp }}</span></span>
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span><span data-i18n="hero.explore_work">Explorar Obra</span> • Ep. <span id="hero-btn-ep">{{ $latestEp }}</span></span>
                 </button>
 
                 <button type="button"

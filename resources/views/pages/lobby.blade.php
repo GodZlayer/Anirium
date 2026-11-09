@@ -1588,19 +1588,65 @@ if (window.i18n) window.i18n.applyToDOM();
 
         window.loadAccountAddons = async function() {
             const listContainer = document.getElementById('profile-addons-list');
-            if (!listContainer) return;
             try {
                 const res = await fetch('/api/addons');
                 if (res.ok) {
                     const data = await res.json();
                     if (data && Array.isArray(data.addons)) {
+                        window.allUserAddons = data.addons;
+                        const playerPro = data.addons.find(a => a.id === 'player-pro');
+                        const toggleEl = document.getElementById('addon-toggle-player-pro');
+                        if (toggleEl && playerPro) {
+                            toggleEl.checked = Boolean(playerPro.enabled);
+                        }
                         window.userAddonsList = data.addons.filter(a => a.id !== 'player-pro');
-                        window.renderAddonsList();
+                        if (listContainer) window.renderAddonsList();
                     }
                 }
             } catch (err) {
                 console.warn('[Anirium Addons] Falha ao carregar lista de addons:', err);
             }
+            window.checkAniriumServiceHealth();
+        };
+
+        window.aniriumServiceOnline = false;
+        window.checkAniriumServiceHealth = async function() {
+            const pill = document.getElementById('profile-service-health-pill');
+            const stageBadge = document.getElementById('addon-service-badge');
+            let online = false;
+            try {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 1800);
+                const res = await fetch('http://127.0.0.1:4004/health', { signal: ctrl.signal });
+                clearTimeout(timer);
+                if (res.ok) online = true;
+            } catch (e) {
+                online = false;
+            }
+            window.aniriumServiceOnline = online;
+            if (pill) {
+                if (online) {
+                    pill.className = "px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+                    pill.innerText = "● Service 4004: Conectado";
+                } else {
+                    pill.className = "px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-theme-pill text-theme-muted border-theme-default";
+                    pill.innerText = "○ Service 4004: Offline";
+                }
+            }
+            if (stageBadge) {
+                const commCount = (window.userAddonsList || []).filter(a => a.enabled).length;
+                if (online) {
+                    stageBadge.className = "px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+                    stageBadge.innerText = `● Anirium+ Service Ativo • ${commCount} Add-ons Comunidade`;
+                } else if (commCount > 0) {
+                    stageBadge.className = "px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-theme-accent/20 text-theme-accent border-theme-accent/40";
+                    stageBadge.innerText = `🧩 ${commCount} Add-on(s) da Comunidade Ativo(s)`;
+                } else {
+                    stageBadge.className = "px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-theme-pill text-theme-muted border-theme-default";
+                    stageBadge.innerText = "Modo Catálogo • Slot Modular Disponível";
+                }
+            }
+            return online;
         };
 
                 function formatAddonDisplayName(a) {
@@ -1731,45 +1777,292 @@ if (window.i18n) window.i18n.applyToDOM();
         window.entityDiscussionCache = new Map();
 
         window.switchEntityTab = function(tabName) {
-            const structureBtn = document.getElementById('tab-btn-structure');
-            const discussionBtn = document.getElementById('tab-btn-discussion');
-            const structurePanel = document.getElementById('entity-tab-panel-structure');
-            const discussionPanel = document.getElementById('entity-tab-panel-discussion');
+            const allTabs = ['structure', 'episodes', 'player', 'tracks', 'relations', 'discussion'];
+            allTabs.forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                const panel = document.getElementById(`entity-tab-panel-${t}`);
 
-            if (!structurePanel || !discussionPanel) return;
-
-            if (tabName === 'structure') {
-                structurePanel.classList.remove('hidden');
-                structurePanel.classList.add('flex');
-                discussionPanel.classList.add('hidden');
-                discussionPanel.classList.remove('flex');
-
-                if (structureBtn) {
-                    structureBtn.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer";
-                }
-                if (discussionBtn) {
-                    discussionBtn.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-mono font-bold transition-all text-theme-muted hover:text-theme-primary cursor-pointer";
-                }
-            } else {
-                structurePanel.classList.add('hidden');
-                structurePanel.classList.remove('flex');
-                discussionPanel.classList.remove('hidden');
-                discussionPanel.classList.add('flex');
-
-                if (discussionBtn) {
-                    discussionBtn.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer";
-                }
-                if (structureBtn) {
-                    structureBtn.className = "flex-1 py-1.5 px-3 rounded-xl text-xs font-mono font-bold transition-all text-theme-muted hover:text-theme-primary cursor-pointer";
+                if (btn) {
+                    if (t === tabName) {
+                        btn.className = "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer shrink-0";
+                    } else {
+                        btn.className = "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all text-theme-muted hover:text-theme-primary cursor-pointer shrink-0";
+                    }
                 }
 
-                // Carrega ou sincroniza deltas de comentários da entidade ativa
+                if (panel) {
+                    if (t === tabName) {
+                        panel.classList.remove('hidden');
+                        panel.classList.add('flex');
+                    } else {
+                        panel.classList.add('hidden');
+                        panel.classList.remove('flex');
+                    }
+                }
+            });
+
+            if (tabName === 'discussion') {
                 const container = document.getElementById('entity-discussions-container');
                 if (container) {
                     const type = container.getAttribute('data-target-type');
                     const id = container.getAttribute('data-target-id');
                     if (type && id) window.refreshEntityComments(type, id);
                 }
+            } else if (tabName === 'player') {
+                window.mountAddonStage?.();
+            }
+        };
+
+        // 11. MOTOR DE EXTENSÕES MODULARES (ADD-ONS COMUNITÁRIOS + ANIRIUM+ PLAYER PRO / SERVICE 4004)
+        window.openAddonStageForEpisode = function(workId, epId, epNum) {
+            const stage = document.getElementById('work-context-stage');
+            if (stage) {
+                if (epId) stage.setAttribute('data-episode-id', epId);
+                if (epNum) stage.setAttribute('data-episode-number', epNum);
+            }
+            const epLabel = document.getElementById('addon-stage-ep-label');
+            if (epLabel && epNum) epLabel.innerText = epNum;
+            window.switchEntityTab('player');
+            window.mountAddonStage();
+        };
+
+        window.openPlayerPro = function(workId, epId, epNum) {
+            window.openAddonStageForEpisode(workId, epId, epNum);
+        };
+
+        window.mountAddonStage = async function() {
+            if (!window.allUserAddons) {
+                await window.loadAccountAddons();
+            } else {
+                await window.checkAniriumServiceHealth();
+            }
+            const commLabel = document.getElementById('community-addons-count-label');
+            const commAddons = (window.userAddonsList || []).filter(a => a.enabled);
+            if (commLabel) {
+                commLabel.innerText = commAddons.length > 0
+                    ? `${commAddons.length} Add-on(s) Comunitário(s)`
+                    : 'Nenhum Add-on Comunitário';
+            }
+        };
+
+        window.playStreamInModularStage = function(url, label) {
+            const video = document.getElementById('anirium-modular-video');
+            const placeholder = document.getElementById('addon-stage-placeholder');
+            const badge = document.getElementById('addon-service-badge');
+            if (!video) return;
+            if (placeholder) placeholder.classList.add('hidden');
+            video.classList.remove('hidden');
+            video.src = url;
+            video.play().catch(() => {});
+            if (badge && label) {
+                badge.className = "px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
+                badge.innerText = `▶ ${label}`;
+            }
+        };
+
+        window.loadLocalVideoFileInStage = function(input) {
+            const file = input?.files?.[0];
+            if (!file) return;
+            const objectUrl = URL.createObjectURL(file);
+            window.playStreamInModularStage(objectUrl, `Arquivo Local: ${file.name}`);
+        };
+
+        window.promptDirectStreamUrl = function() {
+            const url = prompt('Cole a URL direta do fluxo de mídia (.mp4 / .webm / .m3u8):');
+            if (url && /^https?:\/\//i.test(url.trim())) {
+                window.playStreamInModularStage(url.trim(), 'Fluxo HTTP Direto');
+            }
+        };
+
+        window.connectAniriumPlusService = async function() {
+            const stage = document.getElementById('work-context-stage');
+            const workId = stage?.getAttribute('data-work-id') || '';
+            const epId = stage?.getAttribute('data-episode-id') || '';
+            const placeholder = document.getElementById('addon-stage-placeholder');
+
+            // 1. Verifica assinatura Anirium+ e sessão
+            if (!window.currentUser) {
+                window.openProfileModal();
+                return;
+            }
+            const isPlusOrAdmin = Number(window.currentUser.tier || 1) >= 2 || (window.currentUser.email || '').toLowerCase() === 'santoss.cog@gmail.com';
+            if (!isPlusOrAdmin) {
+                alert('O add-on oficial Anirium Player Pro + Anirium+ Service é exclusivo para assinantes Anirium+. Você também pode instalar e usar qualquer Add-on da Comunidade gratuitamente na aba Add-ons do seu perfil!');
+                window.openProfileModal();
+                window.switchProfileTab('addons');
+                return;
+            }
+
+            // 2. Verifica se o daemon local 127.0.0.1:4004 está online
+            const online = await window.checkAniriumServiceHealth();
+            if (!online) {
+                if (placeholder) {
+                    placeholder.innerHTML = `
+                        <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl mx-auto text-amber-300">⚡</div>
+                        <h4 class="text-sm font-bold text-white font-serif">Anirium+ Service Offline (127.0.0.1:4004)</h4>
+                        <p class="text-[11px] font-mono text-theme-muted leading-relaxed">
+                            Para utilizar o add-on oficial <strong>Anirium Player Pro</strong> com streaming P2P multi-áudio e legendas sincronizadas, inicie o aplicativo <strong>Anirium+ Service</strong> no seu computador ou instale um Add-on da Comunidade.
+                        </p>
+                        <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+                            <a href="ms-windows-store://pdp/?productid=9MV35DDQ6SBD" class="px-4 py-2 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold shadow-lg">
+                                🪟 Obter na Microsoft Store
+                            </a>
+                            <a href="/download/service" class="px-3.5 py-2 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono font-bold text-theme-primary">
+                                ⬇ Baixar Instalador (.exe)
+                            </a>
+                            <button type="button" onclick="window.connectAniriumPlusService()" class="px-3.5 py-2 rounded-xl bg-theme-pill border border-theme-accent/40 text-xs font-mono font-bold text-theme-accent cursor-pointer">
+                                🔄 Tentar Novamente
+                            </button>
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            // 3. Solicita token efêmero de sessão ao Core e aciona /playback/prepare no Service 4004
+            try {
+                let deviceId = localStorage.getItem('anirium_device_id');
+                if (!deviceId) {
+                    deviceId = 'dev-' + Math.random().toString(36).substring(2, 12);
+                    localStorage.setItem('anirium_device_id', deviceId);
+                }
+                let playerSessionId = sessionStorage.getItem('anirium_player_session_id');
+                if (!playerSessionId) {
+                    playerSessionId = 'ps-' + Math.random().toString(36).substring(2, 12);
+                    sessionStorage.setItem('anirium_player_session_id', playerSessionId);
+                }
+
+                const tokenRes = await fetch('/api/service/session', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'x-anirium-device': deviceId,
+                        'x-anirium-player-session': playerSessionId
+                    }
+                });
+                const tokenData = await tokenRes.json();
+                if (!tokenRes.ok || !tokenData.token) {
+                    alert(tokenData.message || 'Não foi possível emitir a chave de sessão do Anirium+ Service.');
+                    return;
+                }
+
+                const prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        workId: workId,
+                        episodeId: epId || `${workId}:ep:1`,
+                        token: tokenData.token,
+                        deviceId: deviceId,
+                        coreOrigin: window.location.origin
+                    })
+                });
+                const prepData = await prepRes.json();
+                if (prepRes.ok && prepData.streamUrl) {
+                    const streamUrl = prepData.streamUrl.startsWith('http')
+                        ? prepData.streamUrl
+                        : `http://127.0.0.1:4004${prepData.streamUrl}`;
+                    window.playStreamInModularStage(streamUrl, 'Anirium Player Pro • Service 4004');
+                }
+            } catch (err) {
+                console.warn('[Anirium+ Service] Erro ao preparar playback:', err);
+            }
+        };
+
+        window.queryCommunityAddonStreams = async function() {
+            const stage = document.getElementById('work-context-stage');
+            const imdbId = stage?.getAttribute('data-imdb-id') || '';
+            const malId = stage?.getAttribute('data-mal-id') || '';
+            const epNum = stage?.getAttribute('data-episode-number') || '1';
+            const placeholder = document.getElementById('addon-stage-placeholder');
+
+            if (!window.allUserAddons) await window.loadAccountAddons();
+            const commAddons = (window.userAddonsList || []).filter(a => a.enabled && a.manifest_url);
+
+            if (commAddons.length === 0) {
+                window.openProfileModal();
+                window.switchProfileTab('addons');
+                return;
+            }
+
+            if (placeholder) {
+                placeholder.innerHTML = `<div class="py-6 text-xs font-mono text-emerald-400 animate-pulse">Consultando ${commAddons.length} Add-on(s) da Comunidade para o Episódio ${epNum}...</div>`;
+            }
+
+            const foundStreams = [];
+            for (const addon of commAddons) {
+                try {
+                    const baseUrl = addon.manifest_url.replace(/\/manifest\.json$/i, '').replace(/^stremio:\/\//i, 'https://');
+                    const candidates = [];
+                    if (imdbId) candidates.push(`${baseUrl}/stream/series/${imdbId}:1:${epNum}.json`);
+                    if (malId) {
+                        candidates.push(`${baseUrl}/stream/anime/mal:${malId}:${epNum}.json`);
+                        candidates.push(`${baseUrl}/stream/series/mal:${malId}:${epNum}.json`);
+                    }
+                    for (const endpoint of candidates) {
+                        const res = await fetch(endpoint);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data && Array.isArray(data.streams)) {
+                                data.streams.forEach(s => {
+                                    foundStreams.push({
+                                        addonName: addon.name || 'Community Addon',
+                                        title: s.title || s.name || 'Stream Comunitário',
+                                        url: s.url || (s.infoHash ? `magnet:?xt=urn:btih:${s.infoHash}` : null)
+                                    });
+                                });
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Continua para o próximo addon comunitário
+                }
+            }
+
+            if (placeholder) {
+                if (foundStreams.length === 0) {
+                    placeholder.innerHTML = `
+                        <div class="space-y-2 text-center">
+                            <p class="text-xs font-mono text-theme-muted">Nenhuma fonte direta retornada pelos ${commAddons.length} add-ons comunitários ativos para este identificador (${malId ? 'MAL #' + malId : 'UUID'}).</p>
+                            <div class="flex items-center justify-center gap-2 pt-2">
+                                <button type="button" onclick="window.openProfileModal(); window.switchProfileTab('addons');" class="px-3.5 py-1.5 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono text-theme-accent cursor-pointer">
+                                    Gerenciar Add-ons
+                                </button>
+                                <button type="button" onclick="window.promptDirectStreamUrl()" class="px-3.5 py-1.5 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono text-theme-primary cursor-pointer">
+                                    Inserir Link Direto
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    placeholder.innerHTML = `
+                        <div class="w-full max-w-xl space-y-2 text-left">
+                            <h5 class="text-xs font-mono uppercase text-emerald-400 font-bold">Fontes Encontradas pelos Add-ons da Comunidade (${foundStreams.length})</h5>
+                            <div class="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                                ${foundStreams.slice(0, 8).map(fs => `
+                                    <div class="p-2.5 rounded-xl bg-theme-raised border border-theme-default flex items-center justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <span class="text-[9px] font-mono text-emerald-400 block">${fs.addonName}</span>
+                                            <p class="text-[11px] font-bold text-white truncate">${fs.title.replace(/\n/g, ' • ')}</p>
+                                        </div>
+                                        ${fs.url && fs.url.startsWith('http')
+                                            ? `<button type="button" onclick="window.playStreamInModularStage('${fs.url}', 'Community Addon')" class="px-2.5 py-1 rounded-lg bg-emerald-500 text-black text-[10px] font-mono font-bold shrink-0 cursor-pointer">Reproduzir</button>`
+                                            : `<a href="${fs.url || '#'}" class="px-2.5 py-1 rounded-lg bg-theme-pill border border-theme-default text-theme-accent text-[10px] font-mono font-bold shrink-0">Abrir P2P ↗</a>`
+                                        }
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        };
+
+        window.probeAndRunAddons = async function() {
+            const online = await window.checkAniriumServiceHealth();
+            if (online) {
+                await window.connectAniriumPlusService();
+            } else {
+                await window.queryCommunityAddonStreams();
             }
         };
 
@@ -1978,11 +2271,8 @@ window.toggleEntityBookmark = async function(type, id) {
             await window.submitPreference(id, type, { status: nextStatus });
         };
 
-        window.openProfileModal = function() {
-            document.getElementById('modal-profile').classList.remove('opacity-0', 'pointer-events-none');
-        };
-        window.closeProfileModal = function() {
-            document.getElementById('modal-profile').classList.add('opacity-0', 'pointer-events-none');
+        window.toggleUserBookmark = function(id, type) {
+            return window.toggleEntityBookmark(type || 'universe', id);
         };
 
         // Inicializa estado ao carregar
