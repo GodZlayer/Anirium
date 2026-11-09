@@ -43,34 +43,34 @@
 
 <div class="w-full h-full flex flex-col overflow-hidden select-none bg-theme-base text-theme-primary">
     <!-- BARRA SUPERIOR: NAVEGAÇÃO ONTOLÓGICA -->
-    <header class="h-14 w-full flex items-center justify-between px-6 lg:px-8 border-b border-theme-default bg-theme-header shrink-0 z-20">
-        <div class="flex items-center gap-4 min-w-0">
+    <header class="h-14 w-full flex items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-theme-default bg-theme-header shrink-0 z-20 gap-2">
+        <div class="flex items-center gap-2 sm:gap-4 min-w-0">
             <button type="button"
                     onclick="window.popNavigation()"
-                    class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-theme-accent hover:text-white text-xs font-bold font-mono transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg shrink-0">
+                    class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-theme-accent hover:text-white text-xs font-bold font-mono transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg shrink-0">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                 <span data-i18n="nav.back">Voltar</span>
             </button>
 
-            <nav id="entity-dynamic-breadcrumb" class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar py-1">
+            <nav id="entity-dynamic-breadcrumb" class="flex items-center gap-1.5 sm:gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar py-1">
                 <button type="button" onclick="window.clearNavigation()" class="hover:text-theme-accent transition-colors shrink-0" data-i18n="nav.home">Lobby</button>
                 <span class="opacity-40">❯</span>
-                <span class="text-theme-accent font-bold truncate max-w-[220px]">{{ $title }}</span>
+                <span class="text-theme-accent font-bold truncate max-w-[140px] sm:max-w-[220px]">{{ $title }}</span>
             </nav>
         </div>
 
-        <div class="flex items-center gap-3 shrink-0">
+        <div class="hidden sm:flex items-center gap-3 shrink-0">
             <span class="px-3 py-1 rounded-full border text-[11px] font-bold tracking-wider uppercase font-mono {{ $isFiller ? 'bg-[var(--color-state-filler,#F43F5E)]/20 text-[var(--color-state-filler,#F43F5E)] border-[var(--color-state-filler,#F43F5E)]/30' : 'bg-[var(--color-state-canon,#10B981)]/20 text-[var(--color-state-canon,#10B981)] border-[var(--color-state-canon,#10B981)]/30' }}">
                 📜 ARCO {{ strtoupper($classification) }}
             </span>
         </div>
     </header>
 
-    <!-- HUB DO ARCO: VIEWPORT 100VH FIXO SEM SCROLL VERTICAL CEGO -->
-    <div class="flex-1 overflow-hidden flex flex-col lg:flex-row gap-5 p-4 lg:p-6 min-h-0">
+    <!-- HUB DO ARCO: VIEWPORT 100VH FIXO NO DESKTOP & FLUIDO NO MOBILE -->
+    <div class="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row gap-4 lg:gap-5 p-3 sm:p-4 lg:p-6 min-h-0">
 
         <!-- COLUNA PRINCIPAL: HERO PANORÂMICO FIXO + ABAS INTERCAMBIÁVEIS -->
-        <main class="flex-1 min-w-0 flex flex-col gap-4 overflow-hidden">
+        <main class="shrink-0 lg:flex-1 min-w-0 flex flex-col gap-3 lg:gap-4 lg:overflow-hidden">
 
             <!-- 1. HERO PANORÂMICO DO ARCO (IDÊNTICO AO UNIVERSO: min-h-[175px] max-h-[210px]) -->
             <section class="relative w-full rounded-3xl overflow-hidden border border-theme-default bg-theme-raised shadow-xl min-h-[175px] max-h-[210px] flex flex-col justify-end p-5 md:p-6 group shrink-0">
@@ -173,7 +173,7 @@
             </nav>
 
             <!-- 3. CONTAINER DE CONTEÚDO DAS ABAS (TRILHOS HORIZONTAIS FLUIDOS) -->
-            <div class="flex-1 overflow-hidden min-h-0 flex flex-col justify-center">
+            <div class="min-h-[245px] lg:min-h-0 lg:flex-1 overflow-hidden flex flex-col justify-center">
 
                 <!-- ABA 1: EPISÓDIOS DO ARCO (TRILHO HORIZONTAL DE CARDS h-[210px]) -->
                 <div id="arc-tab-pane-episodes" class="arc-tab-pane flex flex-col justify-between h-full gap-2">

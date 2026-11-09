@@ -255,16 +255,54 @@
         <x-shell.arena :work="$hero" :roll="$featuredRoll" />
     </section>
 
-    <!-- PALCO 2: VIEW EXPLORAR (Limpo em Linha Única na Navbar, sem duplicações) -->
-    <section id="view-explore" class="view-stage {{ $initialTab === 'explore' ? '' : 'hidden' }} flex-1 min-h-0 flex flex-col gap-3 p-4 overflow-hidden">
-        <!-- Barra de Cabeçalho do Explorar (Contador e Indicador de Filtro Ativo) -->
-        <div class="px-4 py-2.5 rounded-2xl border border-theme-default bg-theme-card backdrop-blur-xl flex items-center justify-between flex-none">
-            <div class="flex items-center gap-2 text-xs font-mono text-theme-muted">
-                <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-state-canon,#10B981)]"></span>
-                <span id="client-explore-count" class="text-white font-bold">{{ number_format($explore['total'] ?? 39328, 0, ',', '.') }}</span>
-                <span data-i18n="explore.results_count">resultados ordenados alfabeticamente</span>
+    <!-- PALCO 2: VIEW EXPLORAR (Limpo em Linha Única na Navbar no Desktop + Barra Responsiva Completa no Mobile) -->
+    <section id="view-explore" class="view-stage {{ $initialTab === 'explore' ? '' : 'hidden' }} flex-1 min-h-0 flex flex-col gap-2.5 sm:gap-3 p-3 sm:p-4 overflow-hidden">
+        <!-- BARRA MOBILE DE BUSCA E PÍLULAS ONTOLÓGICAS (Visível em celulares < 768px onde a navbar compacta as oculta) -->
+        <div class="flex md:hidden flex-col gap-2 flex-none">
+            <div class="flex items-center gap-2 px-3 py-2 rounded-2xl border border-theme-default bg-theme-pill text-xs focus-within:border-theme-highlight transition-all">
+                <svg class="w-4 h-4 text-theme-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text"
+                       id="mobile-search-input" data-i18n-placeholder="search.placeholder"
+                       placeholder="Buscar universo, obra, mangá, arco, autor, música..."
+                       class="bg-transparent border-none outline-none flex-1 text-xs text-white placeholder-slate-500 font-medium"
+                       oninput="window.syncSearch(this.value)">
             </div>
-            <div class="text-[11px] font-mono text-theme-muted">
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 text-[11px] font-mono">
+                <button type="button" onclick="window.setExploreKind('universe')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="universe">
+                    <span>🌌</span> <span data-i18n="entity.universe">Universo</span>
+                </button>
+                <button type="button" onclick="window.setExploreKind('work')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm whitespace-nowrap shrink-0" data-kind="work">
+                    <span>🎬</span> <span data-i18n="entity.work">Obra</span>
+                </button>
+                <button type="button" onclick="window.setExploreKind('manga')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="manga">
+                    <span>📖</span> <span data-i18n="entity.manga">Mangá</span>
+                </button>
+                <button type="button" onclick="window.setExploreKind('arc')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="arc">
+                    <span>📜</span> <span data-i18n="entity.arc">Arco</span>
+                </button>
+                <button type="button" onclick="window.setExploreKind('author')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="author">
+                    <span>✍️</span> <span data-i18n="entity.author">Autor</span>
+                </button>
+                <button type="button" onclick="window.setExploreKind('director')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="director">
+                    <span>🎥</span> <span data-i18n="entity.director">Diretor</span>
+                </button>
+                <button type="button" onclick="window.setExploreKind('studio')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="studio">
+                    <span>🏢</span> <span data-i18n="entity.studio">Produtora</span>
+                </button>
+                <button type="button" onclick="window.setExploreKind('music')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="music">
+                    <span>🎵</span> <span data-i18n="entity.music">Música</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Barra de Cabeçalho do Explorar (Contador e Indicador de Filtro Ativo) -->
+        <div class="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl border border-theme-default bg-theme-card backdrop-blur-xl flex items-center justify-between flex-none">
+            <div class="flex items-center gap-2 text-[11px] sm:text-xs font-mono text-theme-muted truncate">
+                <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-state-canon,#10B981)] shrink-0"></span>
+                <span id="client-explore-count" class="text-white font-bold">{{ number_format($explore['total'] ?? 39328, 0, ',', '.') }}</span>
+                <span data-i18n="explore.results_count" class="truncate">resultados ordenados alfabeticamente</span>
+            </div>
+            <div class="hidden sm:block text-[11px] font-mono text-theme-muted shrink-0">
                 <span data-i18n="explore.order_label">Ordem: </span><span class="text-theme-accent font-bold uppercase">Alfabética (A-Z)</span>
             </div>
         </div>
@@ -841,9 +879,9 @@
             window.exploreKindFilter = kind;
             document.querySelectorAll('.explore-kind-btn').forEach(btn => {
                 if (btn.getAttribute('data-kind') === kind) {
-                    btn.className = "explore-kind-btn px-2.5 py-1 rounded-full font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm";
+                    btn.className = "explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 md:py-1 rounded-full font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm whitespace-nowrap shrink-0";
                 } else {
-                    btn.className = "explore-kind-btn px-2.5 py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60";
+                    btn.className = "explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 md:py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0";
                 }
             });
             window.explorePage = 1;
@@ -886,13 +924,17 @@
         };
 
         window.syncSearch = function(val) {
+            const topInput = document.getElementById('topbar-search-input');
+            const mobInput = document.getElementById('mobile-search-input');
+            if (topInput && topInput.value !== val) topInput.value = val;
+            if (mobInput && mobInput.value !== val) mobInput.value = val;
             if (window.exploreKindFilter === 'work' && !window.fullCatalogSynced && typeof window.ensureFullCatalogSynced === 'function') window.ensureFullCatalogSynced();
             window.explorePage = 1;
             window.runClientSideCatalogFilter();
         };
 
         window.runClientSideCatalogFilter = function() {
-            const query = (document.getElementById('topbar-search-input')?.value || '').toLowerCase().trim();
+            const query = (document.getElementById('topbar-search-input')?.value || document.getElementById('mobile-search-input')?.value || '').toLowerCase().trim();
             // Trava +24 Anos é estritamente baseada no perfil da conta logada (sem botão no catálogo público)
             const allowAdult = window.isAdultContentAllowed();
 
@@ -1298,6 +1340,7 @@
             nav.innerHTML = html;
         };
 
+        const ENTITY_VIEW_SCHEMA_V = 'v4';
         window.entityHtmlCache = new Map();
 
         window.renderCurrentState = async function() {
@@ -1312,7 +1355,7 @@
             
             const container = document.getElementById('context-blade-container');
             const isAdultAllowed = (window.currentUser && window.currentUser.adult_content_enabled) ? '1' : '0';
-            const cacheKey = `${current.type}:${current.id}:${isAdultAllowed}`;
+            const cacheKey = `${ENTITY_VIEW_SCHEMA_V}:${current.type}:${current.id}:${isAdultAllowed}`;
 
             // LOCAL-FIRST: Renderização instantânea se já estiver no cache local da sessão
             if (window.entityHtmlCache.has(cacheKey)) {
@@ -1338,23 +1381,24 @@
             `;
 
             try {
-                let endpoint = `/api/catalog/graph/work/${current.id}?render=blade&adult=${isAdultAllowed}&kind=${current.type || 'work'}`;
+                let endpoint = `/api/catalog/graph/work/${current.id}?render=blade&adult=${isAdultAllowed}&kind=${current.type || 'work'}&v=${ENTITY_VIEW_SCHEMA_V}`;
                 if (current.type === 'manga' || current.type === 'work') {
-                    endpoint = `/api/catalog/graph/work/${current.id}?render=blade&adult=${isAdultAllowed}&kind=${current.type}`;
+                    endpoint = `/api/catalog/graph/work/${current.id}?render=blade&adult=${isAdultAllowed}&kind=${current.type}&v=${ENTITY_VIEW_SCHEMA_V}`;
                 } else if (current.type === 'episode') {
-                    endpoint = `/api/catalog/graph/episode/${current.id}?render=blade&adult=${isAdultAllowed}`;
+                    endpoint = `/api/catalog/graph/episode/${current.id}?render=blade&adult=${isAdultAllowed}&v=${ENTITY_VIEW_SCHEMA_V}`;
                 } else if (current.type === 'universe') {
-                    endpoint = `/api/catalog/graph/universe/${current.id}?render=blade&adult=${isAdultAllowed}`;
+                    endpoint = `/api/catalog/graph/universe/${current.id}?render=blade&adult=${isAdultAllowed}&v=${ENTITY_VIEW_SCHEMA_V}`;
                 } else if (current.type === 'arc') {
-                    endpoint = `/api/catalog/graph/arc/${current.id}?render=blade&adult=${isAdultAllowed}`;
+                    endpoint = `/api/catalog/graph/arc/${current.id}?render=blade&adult=${isAdultAllowed}&v=${ENTITY_VIEW_SCHEMA_V}`;
                 } else if (current.type === 'author' || current.type === 'director' || current.type === 'creator') {
-                    endpoint = `/api/catalog/graph/creator/${current.id}?render=blade&adult=${isAdultAllowed}`;
+                    endpoint = `/api/catalog/graph/creator/${current.id}?render=blade&adult=${isAdultAllowed}&v=${ENTITY_VIEW_SCHEMA_V}`;
                 } else if (current.type === 'studio') {
-                    endpoint = `/api/catalog/graph/studio/${current.id}?render=blade&adult=${isAdultAllowed}`;
+                    endpoint = `/api/catalog/graph/studio/${current.id}?render=blade&adult=${isAdultAllowed}&v=${ENTITY_VIEW_SCHEMA_V}`;
                 } else if (current.type === 'music' || current.type === 'track') {
-                    endpoint = `/api/catalog/graph/track/${current.id}?render=blade&adult=${isAdultAllowed}`;
+                    endpoint = `/api/catalog/graph/track/${current.id}?render=blade&adult=${isAdultAllowed}&v=${ENTITY_VIEW_SCHEMA_V}`;
                 }
                 const res = await fetch(endpoint, {
+                    cache: 'no-store',
                     headers: { 'HX-Request': 'true' }
                 });
                 if (res.ok) {

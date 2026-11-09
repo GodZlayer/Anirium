@@ -64,7 +64,7 @@ class LobbyController extends Controller
                 ->toArray();
         }
 
-        return view('pages.lobby', [
+        return response()->view('pages.lobby', [
             'hero' => $hero,
             'featuredRoll' => $featuredRoll,
             'calendar' => $calendar,
@@ -73,6 +73,7 @@ class LobbyController extends Controller
             'userPreferences' => $userPreferences,
             'activeTheme' => 'black',
             'locale' => app()->getLocale(),
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache');
     }
 }
