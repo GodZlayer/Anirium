@@ -23,12 +23,11 @@
     $format = strtoupper($work->format ?? ($media === 'manga' ? 'MANGA' : 'TV'));
     $isManga = $media === 'manga' || in_array($format, ['MANGA', 'MANHWA', 'MANHUA', 'ONE_SHOT', 'DOUJINSHI', 'NOVEL', 'LIGHT_NOVEL', 'OEL'], true);
     $status = strtoupper($work->status ?? 'COMPLETED');
-    $score = $work->score ?? '8.5';
     $image = $work->image_url ?? '/assets/icons/actions/search.png';
     $synopsis = strip_tags($work->synopsis ?? 'Sinopse oficial catalogada na malha ontológica relacional.');
     $isEpisodeMode = !empty($currentEpisode);
     $epNum = $isEpisodeMode ? ($currentEpisode->number ?? 1) : 1;
-    $episodeTitle = $isEpisodeMode ? ('Episódio ' . $epNum) : null;
+    $episodeTitle = $isEpisodeMode ? (($isManga ? 'Capítulo ' : 'Episódio ') . $epNum) : null;
     $totalEpisodes = count($episodes) ?: ($work->episode_count ?? 0);
     $totalArcs = count($arcs);
     $totalRelations = count($relations);
@@ -39,13 +38,29 @@
     $imdbId = collect($externalIds)->firstWhere('provider', 'imdb')->external_id ?? null;
     $anilistId = collect($externalIds)->firstWhere('provider', 'anilist')->external_id ?? null;
 
-    // Aba padrão inteligente:
-    // - Se clicou em um episódio -> abre direto na aba 'player' (Slot de Extensões & Ficha do Episódio)
-    // - Se for obra com arcos -> 'structure'
-    // - Se não tiver arcos mas tiver episódios -> 'episodes'
-    $defaultTab = $isEpisodeMode
-        ? 'player'
-        : ($totalArcs > 0 || $totalRelations > 0 || $isManga ? 'structure' : ($totalEpisodes > 0 ? 'episodes' : 'structure'));
+    // Filtrar faixas OP/ED que se aplicam ao episódio atual (quando em modo Episódio)
+    $episodeTracks = collect($tracks);
+    if ($isEpisodeMode && $totalTracks > 0) {
+        $filtered = collect($tracks)->filter(function ($tr) use ($epNum) {
+            if (preg_match('/\(eps?\s*(\d+)\s*-\s*(\d+|\?)\)/i', $tr->title ?? '', $m)) {
+                $start = (int) $m[1];
+                $end = $m[2] === '?' ? 99999 : (int) $m[2];
+                return $epNum >= $start && $epNum <= $end;
+            }
+            return true;
+        });
+        if ($filtered->isNotEmpty()) {
+            $episodeTracks = $filtered->values();
+        }
+    }
+
+    // Aba padrão inteligente seguindo a natureza da entidade
+    $defaultTab = 'episodes';
+    if ($totalEpisodes === 0 && $totalArcs > 0) {
+        $defaultTab = 'arcs';
+    } elseif ($totalEpisodes === 0 && $totalRelations > 0) {
+        $defaultTab = 'relations';
+    }
 @endphp
 
 <div class="w-full h-full flex flex-col overflow-hidden select-none bg-theme-base text-theme-primary"
@@ -66,48 +81,55 @@
                     onclick="window.popNavigation()"
                     class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-theme-accent hover:text-white text-xs font-bold font-mono transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg shrink-0">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                <span id="btn-context-back-label" data-i18n="nav.back">Voltar</span>
+                <span data-i18n="nav.back">Voltar</span>
             </button>
 
+            <!-- Trilha Dinâmica Viva -->
             <nav id="entity-dynamic-breadcrumb" class="flex items-center gap-2 text-xs font-mono text-theme-muted overflow-x-auto no-scrollbar py-1">
                 <button type="button" onclick="window.clearNavigation()" class="hover:text-theme-accent transition-colors shrink-0" data-i18n="nav.home">Lobby</button>
+                <span class="opacity-40">❯</span>
+                <span class="text-theme-accent font-bold truncate max-w-[240px]">{{ $isEpisodeMode ? ($title . ' • ' . $episodeTitle) : $title }}</span>
             </nav>
         </div>
 
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex items-center gap-3 shrink-0">
             @if($isEpisodeMode)
-                <span class="px-2.5 py-1 rounded-full border border-theme-accent/40 text-[10px] font-mono font-bold text-theme-accent bg-theme-accent/15 uppercase">
-                    📺 {{ $episodeTitle }}
+                <span class="px-3 py-1 rounded-full bg-theme-accent/20 text-theme-accent border border-theme-accent/30 text-[11px] font-bold tracking-wider uppercase font-mono">
+                    📺 {{ strtoupper($episodeTitle) }} • {{ $format }}
+                </span>
+            @elseif($isManga)
+                <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-bold tracking-wider uppercase font-mono">
+                    📖 {{ $format }} ONTOLÓGICO
+                </span>
+            @else
+                <span class="px-3 py-1 rounded-full bg-theme-accent/20 text-theme-accent border border-theme-accent/30 text-[11px] font-bold tracking-wider uppercase font-mono">
+                    🎬 {{ $format }} • {{ $status === 'RELEASING' ? 'EM EXIBIÇÃO' : 'CATALOGADO' }}
                 </span>
             @endif
-            <span class="px-2.5 py-1 rounded-full border border-theme-default text-[10px] font-mono font-bold text-theme-accent bg-theme-pill uppercase">
-                {{ $isManga ? '📖 ' . $format : '🎬 ' . $format }}
-            </span>
-            <span class="px-2.5 py-1 rounded-full border text-[10px] font-mono font-bold uppercase {{ $status === 'RELEASING' ? 'bg-theme-accent/20 text-theme-accent border-theme-accent/30' : 'bg-[var(--color-state-canon,#10B981)]/20 text-[var(--color-state-canon,#10B981)] border-[var(--color-state-canon,#10B981)]/30' }}">
-                {{ $status === 'RELEASING' ? 'Em Exibição' : 'Catalogado' }}
-            </span>
         </div>
     </header>
 
-    <!-- HUB DA OBRA / MANGÁ / EPISÓDIO: VIEWPORT 100VH FIXO SEM SCROLL CEGO -->
+    <!-- HUB DE OBRA / MANGÁ / EPISÓDIO: VIEWPORT 100VH FIXO SEM SCROLL VERTICAL CEGO -->
     <div class="flex-1 overflow-hidden flex flex-col lg:flex-row gap-5 p-4 lg:p-6 min-h-0">
 
-        <!-- COLUNA PRINCIPAL: HERO PANORÂMICO + ABAS INTERCAMBIÁVEIS -->
+        <!-- COLUNA PRINCIPAL: HERO PANORÂMICO FIXO + ABAS INTERCAMBIÁVEIS -->
         <main class="flex-1 min-w-0 flex flex-col gap-4 overflow-hidden">
 
-            <!-- 1. HERO PANORÂMICO DA OBRA / EPISÓDIO -->
-            <section class="relative w-full rounded-3xl overflow-hidden border border-theme-default bg-theme-raised shadow-xl min-h-[185px] max-h-[225px] flex flex-col justify-end p-5 md:p-6 group shrink-0">
+            <!-- 1. HERO PANORÂMICO COMPACTO (EXATAMENTE NO PADRÃO DO UNIVERSO: 175px - 210px) -->
+            <section class="relative w-full rounded-3xl overflow-hidden border border-theme-default bg-theme-raised shadow-xl min-h-[175px] max-h-[210px] flex flex-col justify-end p-5 md:p-6 group shrink-0">
+                <!-- Imagem Panorâmica de Fundo com Fade -->
                 <div class="absolute inset-0 z-0">
-                    <img src="{{ $image }}" class="w-full h-full object-cover object-center filter brightness-[0.32] blur-[1px] group-hover:scale-105 transition-transform duration-1000" onerror="this.src='/assets/icons/actions/search.png'">
-                    <div class="absolute inset-0 bg-gradient-to-t from-theme-base via-theme-base/65 to-transparent"></div>
+                    <img src="{{ $image }}" class="w-full h-full object-cover object-center filter brightness-[0.35] blur-[1px] group-hover:scale-105 transition-transform duration-1000" onerror="this.src='/assets/icons/actions/search.png'">
+                    <div class="absolute inset-0 bg-gradient-to-t from-theme-base via-theme-base/60 to-transparent"></div>
                     <div class="absolute inset-0 bg-gradient-to-r from-theme-base via-transparent to-transparent"></div>
                 </div>
 
+                <!-- Conteúdo do Hero -->
                 <div class="relative z-10 flex flex-col md:flex-row items-start md:items-end justify-between gap-4">
-                    <div class="max-w-2xl space-y-2 min-w-0">
+                    <div class="max-w-xl space-y-2 min-w-0">
                         <div class="flex items-center gap-2 flex-wrap">
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider bg-theme-accent/25 text-theme-accent border border-theme-accent/40 shadow-sm">
-                                {{ $isEpisodeMode ? 'UNIDADE EPISÓDICA' : ($isManga ? 'OBRA IMPRESSA / MANGÁ' : 'OBRA ANIMADA') }}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider {{ $isManga ? 'bg-amber-500/30 text-amber-300 border border-amber-500/40' : 'bg-theme-accent/30 text-theme-accent border border-theme-accent/40' }} shadow-sm">
+                                {{ $isEpisodeMode ? strtoupper($episodeTitle) : ($isManga ? 'MANGÁ / IMPRESSO' : 'OBRA • ' . $format) }}
                             </span>
                             @if($currentArc)
                                 <span onclick="window.pushNavigation('arc', '{{ $currentArc->id }}', '{{ addslashes($currentArc->title) }}')"
@@ -115,238 +137,227 @@
                                     📜 {{ $currentArc->title }}
                                 </span>
                             @endif
-                            @if($malId)
-                                <span class="px-2 py-0.5 rounded text-[9px] font-mono text-theme-muted bg-black/50 border border-white/10">
-                                    MAL #{{ $malId }}
-                                </span>
-                            @endif
                         </div>
 
                         <h1 class="text-2xl md:text-3xl font-black font-serif tracking-tight text-white drop-shadow-md line-clamp-1">
-                            {{ $isEpisodeMode ? ($title . ' • ' . $episodeTitle) : $title }}
+                            {{ $isEpisodeMode ? ($episodeTitle . ' — ' . $title) : $title }}
                         </h1>
 
-                        <p class="text-[11px] md:text-xs text-theme-muted line-clamp-2 leading-relaxed max-w-xl">
+                        <p class="text-[11px] md:text-xs text-theme-muted line-clamp-2 leading-relaxed max-w-lg">
                             {{ $synopsis }}
                         </p>
 
-                        <!-- Ações Rápidas Ontológicas -->
+                        <!-- Ações Rápidas: OFICIAL (Sempre Visível) vs ADD-ON (Condicional por Capacidade) -->
                         <div class="flex items-center gap-2.5 pt-1 flex-wrap">
-                            @if(!$isManga && count($episodes) > 0)
-                                <button type="button"
-                                        onclick="window.switchEntityTab('episodes')"
-                                        class="px-3.5 py-1.5 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold transition-all hover:scale-105 active:scale-95 shadow-lg flex items-center gap-1.5 cursor-pointer">
-                                    <span>📺</span> <span>Ver Episódios ({{ count($episodes) }})</span>
-                                </button>
-                            @endif
-
                             @if(!$isManga)
+                                <!-- OFICIAL / LEGAL: Trailer Oficial no YouTube (Sempre visível para obras animadas/filmes) -->
                                 <button type="button"
-                                        onclick="window.openAddonStageForEpisode('{{ $work->id ?? '' }}', '{{ $currentEpisode->id ?? ($episodes[0]->id ?? '') }}', '{{ $epNum }}')"
-                                        class="px-3.5 py-1.5 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-accent/40 text-theme-accent text-xs font-mono font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-md">
-                                    <span>🧩</span> <span>Slot de Extensão / Add-ons (Ep. {{ $epNum }})</span>
+                                        onclick="window.openOfficialTrailerModal('{{ addslashes($title) }}')"
+                                        class="px-3.5 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500 border border-red-500/40 text-red-200 hover:text-white text-xs font-mono font-bold transition-all hover:scale-105 active:scale-95 shadow-lg flex items-center gap-1.5 cursor-pointer">
+                                    <span>🎬</span> <span>Trailer Oficial</span>
+                                </button>
+
+                                <!-- CONDICIONAL POR ADD-ON DE VÍDEO (Anirium Player Pro / Addon de Stream da Comunidade) -->
+                                <button type="button"
+                                        data-requires-addon-capability="video"
+                                        onclick="window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $currentEpisode->id ?? ($episodes[0]->id ?? '') }}', '{{ $epNum }}', '{{ addslashes($title) }}')"
+                                        class="hidden px-3.5 py-1.5 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold transition-all hover:scale-105 active:scale-95 shadow-lg items-center gap-1.5 cursor-pointer">
+                                    <span>▶</span>
+                                    <span>{{ $isEpisodeMode ? ('Tocar Episódio ' . $epNum) : ($format === 'MOVIE' ? 'Reproduzir Filme' : ('Tocar Ep. ' . $epNum)) }}</span>
+                                </button>
+                            @else
+                                <!-- CONDICIONAL POR ADD-ON DE LEITURA / MANGÁ (Manga Reader Pro / Addon Reader da Comunidade) -->
+                                <button type="button"
+                                        data-requires-addon-capability="manga"
+                                        onclick="window.launchExternalMangaAddon('{{ $work->id ?? '' }}', '{{ $epNum }}', '{{ addslashes($title) }}')"
+                                        class="hidden px-3.5 py-1.5 rounded-xl bg-amber-400 text-black text-xs font-mono font-bold transition-all hover:scale-105 active:scale-95 shadow-lg items-center gap-1.5 cursor-pointer">
+                                    <span>📖</span>
+                                    <span>{{ $isEpisodeMode ? ('Ler Capítulo ' . $epNum) : 'Ler Capítulos (Reader Add-on)' }}</span>
                                 </button>
                             @endif
 
-                            @if($universe)
-                                <button type="button"
-                                        onclick="window.pushNavigation('universe', '{{ $universe->id }}', '{{ addslashes($universe->name) }}')"
-                                        class="px-3 py-1.5 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-xs font-mono font-bold text-theme-primary transition-all cursor-pointer flex items-center gap-1.5">
-                                    <span>🌌</span> <span class="truncate max-w-[160px]">{{ $universe->name }}</span>
-                                </button>
-                            @endif
+                            <!-- Ação Oficial de Catálogo: Favoritar -->
+                            <button type="button"
+                                    onclick="window.toggleUserBookmark?.('{{ $isEpisodeMode ? ($currentEpisode->id ?? $work->id) : ($work->id ?? '') }}', '{{ $isEpisodeMode ? 'episode' : ($isManga ? 'manga' : 'work') }}')"
+                                    class="px-3 py-1.5 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono font-bold {{ !empty($isBookmarked) ? 'text-theme-accent border-theme-accent' : 'text-theme-muted hover:text-white' }} transition-all cursor-pointer flex items-center gap-1.5">
+                                <span>📌</span> <span data-i18n="action.bookmark">Favoritar</span>
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Poster Representativo com Tilt 3D -->
-                    <div class="hidden md:block flex-none w-28 aspect-[3/4] rounded-2xl overflow-hidden border-2 border-theme-default shadow-2xl bg-black transform hover:-rotate-1 transition-transform shrink-0">
+                    <!-- Poster Representativo com Tilt 3D (Idêntico ao Universo: w-28 aspect-[3/4]) -->
+                    <div class="hidden md:block flex-none w-28 aspect-[3/4] rounded-2xl overflow-hidden border-2 border-theme-default shadow-2xl bg-black transform hover:-rotate-1 transition-transform">
                         <img src="{{ $image }}" class="w-full h-full object-cover" onerror="this.src='/assets/icons/actions/search.png'">
                     </div>
                 </div>
             </section>
 
-            <!-- BARRA DE AÇÕES PESSOAIS DO USUÁRIO -->
-            <div class="shrink-0">
-                <x-shell.entity-actions
-                    :targetType="$isEpisodeMode ? 'episode' : ($isManga ? 'manga' : 'work')"
-                    :targetId="$isEpisodeMode ? ($currentEpisode->id ?? '') : ($work->id ?? '')"
-                    :targetTitle="$isEpisodeMode ? ($title . ' - ' . $episodeTitle) : $title"
-                    :isBookmarked="$isBookmarked ?? false"
-                    :isLiked="$isLiked ?? false"
-                    :userScore="$userScore ?? null"
-                    :userStatus="$userStatus ?? null"
-                    :isWatched="$isWatched ?? false" />
-            </div>
-
-            <!-- 2. NAVEGAÇÃO EM ABAS DA OBRA -->
+            <!-- 2. NAVEGAÇÃO EM ABAS DA OBRA / EPISÓDIO -->
             <nav class="flex items-center gap-2 p-1.5 rounded-2xl bg-theme-raised border border-theme-default overflow-x-auto no-scrollbar shrink-0">
                 <button type="button"
-                        onclick="window.switchEntityTab('structure')"
-                        id="tab-btn-structure"
-                        class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all {{ $defaultTab === 'structure' ? 'bg-theme-accent text-theme-inverse shadow-sm' : 'text-theme-muted hover:text-theme-primary' }} cursor-pointer shrink-0">
-                    <span>📜</span>
-                    <span>{{ $isManga ? 'Estrutura & Relações' : 'Sagas & Genealogia' }} ({{ $totalArcs + $totalRelations }})</span>
+                        onclick="window.switchWorkEntityTab('episodes')"
+                        id="work-tab-btn-episodes"
+                        class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all {{ $defaultTab === 'episodes' ? 'bg-theme-accent text-theme-inverse shadow-sm' : 'text-theme-muted hover:text-theme-primary' }} cursor-pointer shrink-0">
+                    <span>{{ $isManga ? '📖' : '📺' }}</span>
+                    <span>{{ $isEpisodeMode ? ($isManga ? 'Sequência de Capítulos' : 'Linha de Episódios da Temporada') : ($isManga ? 'Capítulos & Volumes' : 'Episódios') }} ({{ $totalEpisodes }})</span>
                 </button>
 
-                @if(count($episodes) > 0)
+                @if($totalArcs > 0)
                     <button type="button"
-                            onclick="window.switchEntityTab('episodes')"
-                            id="tab-btn-episodes"
-                            class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all {{ $defaultTab === 'episodes' ? 'bg-theme-accent text-theme-inverse shadow-sm' : 'text-theme-muted hover:text-theme-primary' }} cursor-pointer shrink-0">
-                        <span>📺</span>
-                        <span>{{ $isManga ? 'Capítulos' : 'Episódios' }} ({{ count($episodes) }})</span>
+                            onclick="window.switchWorkEntityTab('arcs')"
+                            id="work-tab-btn-arcs"
+                            class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all {{ $defaultTab === 'arcs' ? 'bg-theme-accent text-theme-inverse shadow-sm' : 'text-theme-muted hover:text-theme-primary' }} cursor-pointer shrink-0">
+                        <span>📜</span>
+                        <span>Sagas & Arcos ({{ $totalArcs }})</span>
                     </button>
                 @endif
 
-                @if(!$isManga)
+                @if($totalRelations > 0)
                     <button type="button"
-                            onclick="window.switchEntityTab('player'); window.mountAddonStage()"
-                            id="tab-btn-player"
-                            class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all {{ $defaultTab === 'player' ? 'bg-theme-accent text-theme-inverse shadow-sm' : 'text-theme-muted hover:text-theme-primary' }} cursor-pointer shrink-0">
-                        <span>🧩</span>
-                        <span>Extensões & Reprodução {{ $isEpisodeMode ? '(Ep. ' . $epNum . ')' : '' }}</span>
+                            onclick="window.switchWorkEntityTab('relations')"
+                            id="work-tab-btn-relations"
+                            class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all {{ $defaultTab === 'relations' ? 'bg-theme-accent text-theme-inverse shadow-sm' : 'text-theme-muted hover:text-theme-primary' }} cursor-pointer shrink-0">
+                        <span>🧬</span>
+                        <span>{{ $isManga ? 'Adaptações & Relações' : 'Genealogia & Relações' }} ({{ $totalRelations }})</span>
                     </button>
                 @endif
 
-                @if($totalTracks > 0)
+                @if(!$isManga && $totalTracks > 0)
                     <button type="button"
-                            onclick="window.switchEntityTab('tracks')"
-                            id="tab-btn-tracks"
+                            onclick="window.switchWorkEntityTab('tracks')"
+                            id="work-tab-btn-tracks"
                             class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all text-theme-muted hover:text-theme-primary cursor-pointer shrink-0">
                         <span>🎵</span>
-                        <span>Trilhas Sonoras ({{ $totalTracks }})</span>
+                        <span>{{ $isEpisodeMode ? 'Abertura & Ending do Episódio' : 'Aberturas & Endings' }} ({{ count($episodeTracks) }})</span>
                     </button>
                 @endif
 
                 <button type="button"
-                        onclick="window.switchEntityTab('discussion')"
-                        id="tab-btn-discussion"
+                        onclick="window.switchWorkEntityTab('discussion')"
+                        id="work-tab-btn-discussion"
                         class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all text-theme-muted hover:text-theme-primary cursor-pointer shrink-0">
                     <span>💬</span>
                     <span data-i18n="discussion.tab_label">Discussão</span>
                 </button>
             </nav>
 
-            <!-- 3. CONTAINER DE CONTEÚDO DAS ABAS -->
-            <div class="flex-1 overflow-hidden min-h-0 flex flex-col">
+            <!-- 3. CONTAINER DE CONTEÚDO DAS ABAS (TRILHOS HORIZONTAIS FLUIDOS SEM SCROLL VERTICAL NA PÁGINA) -->
+            <div class="flex-1 overflow-hidden min-h-0 flex flex-col justify-center">
 
-                <!-- ABA 1: SAGAS & ARCOS + RELAÇÕES GENEALÓGICAS -->
-                <div id="entity-tab-panel-structure" class="flex-1 min-h-0 {{ $defaultTab === 'structure' ? 'flex' : 'hidden' }} flex-col gap-3 p-4 rounded-3xl bg-theme-card border border-theme-default overflow-y-auto no-scrollbar">
-                    @if(count($arcs) > 0)
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-xs font-mono uppercase tracking-wider text-theme-accent font-bold">Sagas & Arcos Narrativos</h3>
-                                <span class="text-[11px] font-mono text-theme-muted">{{ count($arcs) }} arcos</span>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                                @foreach($arcs as $arc)
-                                    <div class="p-3.5 rounded-2xl border border-theme-default bg-theme-raised/60 hover:bg-theme-raised hover:border-theme-accent transition-all flex items-center justify-between cursor-pointer group"
-                                         onclick="window.pushNavigation('arc', '{{ $arc->id }}', '{{ addslashes($arc->title) }}')">
-                                        <div class="flex items-center gap-3 min-w-0">
-                                            <span class="w-2.5 h-2.5 rounded-full shrink-0 {{ ($arc->classification ?? '') === 'filler' ? 'bg-[var(--color-state-filler,#F43F5E)]' : 'bg-[var(--color-state-canon,#10B981)]' }}"></span>
-                                            <div class="min-w-0">
-                                                <h4 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors truncate">{{ $arc->title }}</h4>
-                                                <p class="text-[10px] font-mono text-theme-muted">Episódios {{ $arc->start_number ?? 1 }} a {{ $arc->end_number ?? '?' }}</p>
-                                            </div>
-                                        </div>
-                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase shrink-0 {{ ($arc->classification ?? '') === 'filler' ? 'bg-[var(--color-state-filler,#F43F5E)]/20 text-[var(--color-state-filler,#F43F5E)] border border-[var(--color-state-filler,#F43F5E)]/30' : 'bg-[var(--color-state-canon,#10B981)]/20 text-[var(--color-state-canon,#10B981)] border border-[var(--color-state-canon,#10B981)]/30' }}">
-                                            {{ strtoupper($arc->classification ?? 'CANON') }}
-                                        </span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    @if(count($relations) > 0)
-                        <div class="space-y-2 pt-1">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-xs font-mono uppercase tracking-wider text-theme-accent font-bold">Conexões & Obras Relacionadas</h3>
-                                <span class="text-[11px] font-mono text-theme-muted">{{ count($relations) }} relações</span>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                                @foreach($relations as $rel)
-                                    @php
-                                        $relKind = strtolower($rel->media ?? 'anime') === 'manga' ? 'manga' : 'work';
-                                        $relLabel = match($rel->relation_type ?? '') {
-                                            'prequel' => 'Prequel (Anterior)',
-                                            'sequel' => 'Sequência',
-                                            'adaptation' => 'Adaptação',
-                                            'side_story' => 'Side-Story',
-                                            'parent_story' => 'Obra Principal',
-                                            'spin_off' => 'Spin-Off',
-                                            default => strtoupper(str_replace('_', ' ', $rel->relation_type ?? 'Relacionado')),
-                                        };
-                                    @endphp
-                                    <div class="p-2.5 rounded-2xl border border-theme-default bg-theme-raised/60 hover:bg-theme-raised hover:border-theme-accent transition-all flex items-center justify-between gap-3 cursor-pointer group"
-                                         onclick="window.pushNavigation('{{ $relKind }}', '{{ $rel->id }}', '{{ addslashes($rel->title) }}')">
-                                        <div class="flex items-center gap-3 min-w-0">
-                                            <div class="w-11 h-14 rounded-xl overflow-hidden bg-black shrink-0 border border-theme-default">
-                                                <img src="{{ $rel->image_url ?? $image }}" class="w-full h-full object-cover" onerror="this.src='/assets/icons/actions/search.png'">
-                                            </div>
-                                            <div class="min-w-0">
-                                                <span class="inline-block px-1.5 py-0.2 rounded text-[8px] font-mono font-bold uppercase bg-theme-accent/15 text-theme-accent border border-theme-accent/30 mb-0.5">
-                                                    {{ $relLabel }}
-                                                </span>
-                                                <h4 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors truncate">{{ $rel->title }}</h4>
-                                                <p class="text-[10px] font-mono text-theme-muted">{{ strtoupper($rel->format ?? 'TV') }} {{ $rel->episode_count ? '• ' . $rel->episode_count . ' un.' : '' }}</p>
-                                            </div>
-                                        </div>
-                                        <span class="text-xs text-theme-muted group-hover:text-theme-accent shrink-0">❯</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    @if(count($arcs) === 0 && count($relations) === 0)
-                        <div class="p-4 rounded-2xl bg-theme-raised/50 border border-theme-default space-y-2">
-                            <h4 class="text-xs font-mono font-bold uppercase text-theme-accent">Ficha Técnica & Sinopse Completa</h4>
-                            <p class="text-xs text-theme-secondary leading-relaxed">{{ $synopsis }}</p>
-                            <div class="pt-2 flex flex-wrap gap-2 text-[10px] font-mono text-theme-muted">
-                                <span class="px-2.5 py-1 rounded-lg bg-theme-pill border border-theme-default">Formato: {{ $format }}</span>
-                                <span class="px-2.5 py-1 rounded-lg bg-theme-pill border border-theme-default">Status: {{ $status }}</span>
-                                @if($totalEpisodes > 0)
-                                    <span class="px-2.5 py-1 rounded-lg bg-theme-pill border border-theme-default">Unidades: {{ $totalEpisodes }}</span>
-                                @endif
-                            </div>
-                        </div>
-                    @endif
-                </div>
-
-                <!-- ABA 2: GRADE DE EPISÓDIOS -->
-                @if(count($episodes) > 0)
-                <div id="entity-tab-panel-episodes" class="flex-1 min-h-0 {{ $defaultTab === 'episodes' ? 'flex' : 'hidden' }} flex-col p-4 rounded-3xl bg-theme-card border border-theme-default overflow-hidden">
-                    <div class="flex items-center justify-between mb-3 flex-none">
-                        <h3 class="text-xs font-mono uppercase tracking-wider text-theme-accent font-bold">Índice de Episódios Catalogados</h3>
-                        <span class="text-[11px] font-mono text-theme-muted">{{ count($episodes) }} unidades</span>
+                <!-- ABA 1: EPISÓDIOS / CAPÍTULOS (TRILHO HORIZONTAL DE CARDS h-[210px]) -->
+                <div id="work-tab-pane-episodes" class="work-tab-pane {{ $defaultTab === 'episodes' ? 'flex' : 'hidden' }} flex-col justify-between h-full gap-2">
+                    <div class="flex items-center justify-between flex-none">
+                        <span class="text-xs font-mono text-theme-muted">
+                            {{ $isEpisodeMode ? ('Navegação contínua da temporada • Selecionado: ' . $episodeTitle) : ($isManga ? 'Volumes e capítulos catalogados desta publicação' : 'Unidades episódicas oficiais catalogadas nesta obra') }}
+                        </span>
+                        <span class="text-xs font-mono text-theme-accent font-bold">
+                            {{ $totalEpisodes }} {{ $isManga ? 'capítulos/un.' : 'episódios' }}
+                        </span>
                     </div>
-                    <div class="flex-1 overflow-y-auto no-scrollbar grid grid-cols-1 md:grid-cols-2 gap-2 pr-1">
-                        @foreach($episodes as $ep)
+
+                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
+                        @forelse($episodes as $ep)
                             @php
-                                $isActiveEp = $isEpisodeMode && ($currentEpisode->id ?? '') === $ep->id;
+                                $isCurrentEp = $isEpisodeMode && (($currentEpisode->id ?? '') === $ep->id || ($currentEpisode->number ?? 0) == $ep->number);
                             @endphp
-                            <div class="p-3 rounded-2xl border transition-all flex items-center justify-between cursor-pointer group {{ $isActiveEp ? 'border-theme-accent bg-theme-accent/15' : 'border-theme-default bg-theme-raised/60 hover:bg-theme-raised hover:border-theme-highlight' }}"
-                                 onclick="window.pushNavigation('episode', '{{ $ep->id }}', 'Episódio {{ $ep->number }}')">
-                                <div class="flex items-center gap-3 min-w-0">
-                                    <span class="w-7 h-7 rounded-xl {{ $isActiveEp ? 'bg-theme-accent text-theme-inverse' : 'bg-theme-pill text-theme-accent' }} flex items-center justify-center text-xs font-mono font-bold shrink-0">
-                                        {{ $ep->number }}
+                            <div class="flex-none w-52 h-[210px] rounded-2xl border {{ $isCurrentEp ? 'border-theme-accent ring-2 ring-theme-accent/30 bg-theme-raised' : 'border-theme-default bg-theme-raised/80 hover:border-theme-highlight' }} overflow-hidden cursor-pointer hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
+                                 onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($title) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')">
+                                <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
+                                    <img src="{{ $image }}" class="w-full h-full object-cover group-hover:scale-105 transition-all filter brightness-90" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
+                                    <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded {{ $isCurrentEp ? 'bg-theme-accent text-theme-inverse' : 'bg-black/80 text-theme-accent border border-white/10' }} uppercase">
+                                        {{ $isManga ? 'CAP. ' : 'EP. ' }}{{ $ep->number }}
                                     </span>
-                                    <div class="min-w-0">
-                                        <h4 class="text-xs font-bold {{ $isActiveEp ? 'text-theme-accent' : 'text-theme-primary group-hover:text-theme-accent' }} transition-colors truncate">
-                                            Episódio {{ $ep->number }}
-                                        </h4>
-                                        <p class="text-[10px] font-mono text-theme-muted">{{ $ep->air_date_utc ?? 'Catalogado' }}</p>
+                                    @if($isCurrentEp)
+                                        <span class="absolute top-2 right-2 text-[8px] font-bold font-mono px-1.5 py-0.5 rounded bg-emerald-500/90 text-black uppercase">
+                                            ATUAL
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
+                                    <div>
+                                        <h3 class="text-xs font-bold {{ $isCurrentEp ? 'text-theme-accent' : 'text-theme-primary group-hover:text-theme-accent' }} transition-colors truncate">
+                                            {{ $isManga ? 'Capítulo ' : 'Episódio ' }}{{ $ep->number }}
+                                        </h3>
+                                        <p class="text-[10px] font-mono text-theme-muted mt-0.5 truncate">
+                                            {{ $ep->air_date_utc ?? ($status === 'RELEASING' ? 'Em lançamento' : 'Catalogado') }}
+                                        </p>
+                                    </div>
+                                    <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
+                                        <span class="text-[9px] font-mono text-theme-muted">Ficha Ontológica ❯</span>
+                                        @if(!$isManga)
+                                            <button type="button"
+                                                    data-requires-addon-capability="video"
+                                                    onclick="event.stopPropagation(); window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $ep->id }}', '{{ $ep->number }}', '{{ addslashes($title) }}')"
+                                                    class="hidden px-2 py-0.5 rounded bg-theme-accent text-theme-inverse text-[9px] font-mono font-bold hover:scale-105 transition-transform">
+                                                ▶ Play
+                                            </button>
+                                        @else
+                                            <button type="button"
+                                                    data-requires-addon-capability="manga"
+                                                    onclick="event.stopPropagation(); window.launchExternalMangaAddon('{{ $work->id ?? '' }}', '{{ $ep->number }}', '{{ addslashes($title) }}')"
+                                                    class="hidden px-2 py-0.5 rounded bg-amber-400 text-black text-[9px] font-mono font-bold hover:scale-105 transition-transform">
+                                                📖 Ler
+                                            </button>
+                                        @endif
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    @if($isActiveEp)
-                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-theme-accent/20 text-theme-accent border border-theme-accent/30">
-                                            SELECIONADO
-                                        </span>
+                            </div>
+                        @empty
+                            <div class="w-full h-[210px] rounded-3xl bg-theme-raised/50 border border-theme-default p-5 flex items-center justify-between gap-6">
+                                <div class="space-y-2 max-w-xl">
+                                    <span class="text-[10px] font-mono uppercase text-theme-accent font-bold">Catálogo Editorial & Estrutural</span>
+                                    <h3 class="text-sm font-bold text-white">{{ $title }} ({{ $format }})</h3>
+                                    <p class="text-xs text-theme-muted line-clamp-3 leading-relaxed">{{ $synopsis }}</p>
+                                </div>
+                                <div class="flex flex-col gap-2 shrink-0">
+                                    @if(!$isManga)
+                                        <button type="button"
+                                                data-requires-addon-capability="video"
+                                                onclick="window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '', '1', '{{ addslashes($title) }}')"
+                                                class="hidden px-4 py-2 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold cursor-pointer">
+                                            ▶ Reproduzir via Add-on
+                                        </button>
                                     @else
-                                        <span class="text-[10px] font-mono text-theme-muted group-hover:text-theme-accent">Ficha & Add-ons ❯</span>
+                                        <button type="button"
+                                                data-requires-addon-capability="manga"
+                                                onclick="window.launchExternalMangaAddon('{{ $work->id ?? '' }}', '1', '{{ addslashes($title) }}')"
+                                                class="hidden px-4 py-2 rounded-xl bg-amber-400 text-black text-xs font-mono font-bold cursor-pointer">
+                                            📖 Abrir no Manga Reader Add-on
+                                        </button>
                                     @endif
+                                </div>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <!-- ABA 2: SAGAS & ARCOS DA OBRA (TRILHO HORIZONTAL DE CARDS h-[210px] IGUAL AO UNIVERSO) -->
+                @if($totalArcs > 0)
+                <div id="work-tab-pane-arcs" class="work-tab-pane {{ $defaultTab === 'arcs' ? 'flex' : 'hidden' }} flex-col justify-between h-full gap-2">
+                    <div class="flex items-center justify-between flex-none">
+                        <span class="text-xs font-mono text-theme-muted">Divisão de arcos narrativos canônicos e fillers desta obra</span>
+                        <span class="text-xs font-mono text-theme-accent font-bold">{{ $totalArcs }} arcos</span>
+                    </div>
+
+                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
+                        @foreach($arcs as $arc)
+                            <div class="flex-none w-64 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 hover:bg-theme-raised hover:border-theme-accent transition-all cursor-pointer shadow-md group flex flex-col justify-between"
+                                 onclick="window.pushNavigation('arc', '{{ $arc->id }}', '{{ addslashes($arc->title) }}')">
+                                <div>
+                                    <div class="flex items-center justify-between gap-2 mb-2">
+                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase {{ ($arc->classification ?? '') === 'filler' ? 'bg-[var(--color-state-filler,#F43F5E)]/20 text-[var(--color-state-filler,#F43F5E)] border border-[var(--color-state-filler,#F43F5E)]/30' : 'bg-[var(--color-state-canon,#10B981)]/20 text-[var(--color-state-canon,#10B981)] border border-[var(--color-state-canon,#10B981)]/30' }}">
+                                            {{ strtoupper($arc->classification ?? 'CANON') }}
+                                        </span>
+                                        <span class="text-xs text-theme-muted group-hover:text-theme-accent">❯</span>
+                                    </div>
+                                    <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors line-clamp-2 leading-snug">
+                                        {{ $arc->title }}
+                                    </h3>
+                                </div>
+                                <div class="mt-2 pt-2 border-t border-theme-default/40">
+                                    <p class="text-[10px] font-mono text-theme-accent truncate">
+                                        {{ $isManga ? 'Capítulos' : 'Episódios' }} {{ $arc->start_number ?? 1 }} ao {{ $arc->end_number ?? '?' }}
+                                    </p>
                                 </div>
                             </div>
                         @endforeach
@@ -354,122 +365,104 @@
                 </div>
                 @endif
 
-                <!-- ABA 3: SLOT MODULAR DE EXTENSÕES (ARQUITETURA ABERTA DE ADD-ONS + ANIRIUM+ PLAYER PRO) -->
-                @if(!$isManga)
-                <div id="entity-tab-panel-player" class="flex-1 min-h-0 {{ $defaultTab === 'player' ? 'flex' : 'hidden' }} flex-col p-4 rounded-3xl bg-theme-card border border-theme-default overflow-y-auto no-scrollbar gap-3">
-                    <!-- Cabeçalho de Arquitetura Modular -->
-                    <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-theme-default">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-theme-accent animate-pulse"></span>
-                            <h3 class="text-xs font-mono font-bold uppercase tracking-wider text-theme-primary">
-                                Slot Modular de Extensões • {{ $title }} (Ep. <span id="addon-stage-ep-label">{{ $epNum }}</span>)
-                            </h3>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span id="addon-service-badge" class="px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-theme-pill text-theme-muted border-theme-default">
-                                Verificando Extensões...
-                            </span>
-                            <button type="button"
-                                    onclick="window.openProfileModal(); window.switchProfileTab('addons');"
-                                    class="px-2.5 py-1 rounded-lg bg-theme-pill hover:bg-white/10 border border-theme-default text-[10px] font-mono font-bold text-theme-accent cursor-pointer transition-all">
-                                ⚙️ Gerenciar Add-ons
-                            </button>
-                        </div>
+                <!-- ABA 3: GENEALOGIA & RELAÇÕES DA OBRA (LINHA DO TEMPO SEQUENCIAL HORIZONTAL) -->
+                @if($totalRelations > 0)
+                <div id="work-tab-pane-relations" class="work-tab-pane {{ $defaultTab === 'relations' ? 'flex' : 'hidden' }} flex-col justify-between h-full gap-2">
+                    <div class="flex items-center justify-between flex-none">
+                        <span class="text-xs font-mono text-theme-muted">Continuidade cronológica, adaptações e derivações diretas desta obra</span>
+                        <span class="text-xs font-mono text-theme-accent font-bold">{{ $totalRelations }} conexões</span>
                     </div>
 
-                    <!-- Área Dinâmica do Player / Provedor Modular -->
-                    <div id="addon-player-stage-viewport" class="flex-1 min-h-[220px] rounded-2xl bg-black/75 border border-theme-default relative overflow-hidden flex flex-col items-center justify-center p-4">
-                        <video id="anirium-modular-video" class="hidden w-full h-full max-h-[340px] object-contain bg-black rounded-xl" controls playsinline></video>
-
-                        <div id="addon-stage-placeholder" class="max-w-lg text-center space-y-3">
-                            <div class="w-12 h-12 rounded-2xl bg-theme-accent/15 border border-theme-accent/30 flex items-center justify-center text-xl mx-auto text-theme-accent">
-                                🧩
+                    <div class="flex-1 p-5 rounded-3xl bg-theme-raised/60 border border-theme-default flex items-center gap-4 overflow-x-auto no-scrollbar">
+                        @foreach($relations as $rel)
+                            @php
+                                $relKind = strtolower($rel->media ?? 'anime') === 'manga' ? 'manga' : 'work';
+                                $relLabel = match($rel->relation_type ?? '') {
+                                    'prequel' => 'Prequel',
+                                    'sequel' => 'Sequência',
+                                    'adaptation' => 'Adaptação',
+                                    'side_story' => 'Side-Story',
+                                    'parent_story' => 'Obra-Mãe',
+                                    'spin_off' => 'Spin-Off',
+                                    default => strtoupper(str_replace('_', ' ', $rel->relation_type ?? 'Relação')),
+                                };
+                            @endphp
+                            <div class="flex items-center gap-4 shrink-0">
+                                <div class="flex items-center gap-3 p-3 pr-4 rounded-2xl bg-theme-card border border-theme-default hover:border-theme-accent cursor-pointer transition-all hover:scale-105 shadow-md"
+                                     onclick="window.pushNavigation('{{ $relKind }}', '{{ $rel->id }}', '{{ addslashes($rel->title) }}')">
+                                    <div class="w-12 h-14 rounded-xl overflow-hidden bg-black shrink-0 border border-theme-default">
+                                        <img src="{{ $rel->image_url ?? $image }}" class="w-full h-full object-cover" onerror="this.src='/assets/icons/actions/search.png'">
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="text-xs font-bold text-theme-primary truncate max-w-[150px]">{{ $rel->title }}</h4>
+                                            <span class="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold uppercase bg-theme-accent/20 text-theme-accent border border-theme-accent/30">
+                                                {{ $relLabel }}
+                                            </span>
+                                        </div>
+                                        <p class="text-[10px] font-mono text-theme-muted mt-0.5">
+                                            {{ strtoupper($rel->format ?? 'TV') }} {{ ($rel->episode_count ?? null) ? '• ' . $rel->episode_count . ' un.' : '' }}
+                                        </p>
+                                    </div>
+                                </div>
+                                @if(!$loop->last)
+                                    <span class="text-theme-accent text-base font-mono font-bold opacity-60">➔</span>
+                                @endif
                             </div>
-                            <h4 class="text-sm font-bold text-white font-serif">Catálogo Ontológico & Arquitetura Aberta de Add-ons</h4>
-                            <p class="text-[11px] font-mono text-theme-muted leading-relaxed">
-                                O Anirium é um catálogo ontológico e não hospeda nem transmite mídia nativamente. A reprodução funciona de forma modular através de <strong>Add-ons da Comunidade</strong> (abertos para qualquer usuário) ou do add-on oficial <strong>Anirium Player Pro + Anirium+ Service</strong> (exclusivo para assinantes Anirium+).
-                            </p>
-                            <div id="addon-stage-actions" class="flex flex-wrap items-center justify-center gap-2 pt-1">
-                                <button type="button"
-                                        onclick="window.probeAndRunAddons()"
-                                        class="px-4 py-2 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer">
-                                    ⚡ Conectar Add-ons Ativos
-                                </button>
-                                <label class="px-3.5 py-2 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-xs font-mono font-bold text-theme-primary cursor-pointer transition-all">
-                                    📂 Abrir Arquivo Local (.mp4/.mkv)
-                                    <input type="file" accept="video/*,.mkv" class="hidden" onchange="window.loadLocalVideoFileInStage(this)">
-                                </label>
-                                <button type="button"
-                                        onclick="window.promptDirectStreamUrl()"
-                                        class="px-3.5 py-2 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-xs font-mono font-bold text-theme-muted hover:text-white cursor-pointer transition-all">
-                                    🔗 Link Direto HTTP
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Lista de Streams Resolvidos pelos Add-ons (Comunidade / Anirium+ Service / Canais Oficiais) -->
-                    <div id="addon-resolved-streams-bar" class="grid grid-cols-1 md:grid-cols-3 gap-2.5 shrink-0">
-                        <div class="p-3 rounded-2xl bg-theme-raised/70 border border-theme-default flex items-center justify-between">
-                            <div>
-                                <span class="text-[9px] font-mono uppercase text-theme-accent font-bold block">Add-on Oficial Anirium+</span>
-                                <strong class="text-xs text-theme-primary">Anirium Player Pro (4004)</strong>
-                            </div>
-                            <button type="button"
-                                    onclick="window.connectAniriumPlusService()"
-                                    class="px-2.5 py-1 rounded-lg bg-theme-accent/20 border border-theme-accent/40 text-theme-accent text-[10px] font-mono font-bold hover:bg-theme-accent hover:text-theme-inverse transition-all cursor-pointer">
-                                Conectar
-                            </button>
-                        </div>
-
-                        <div class="p-3 rounded-2xl bg-theme-raised/70 border border-theme-default flex items-center justify-between">
-                            <div>
-                                <span class="text-[9px] font-mono uppercase text-emerald-400 font-bold block">Arquitetura Aberta</span>
-                                <strong class="text-xs text-theme-primary" id="community-addons-count-label">Add-ons da Comunidade</strong>
-                            </div>
-                            <button type="button"
-                                    onclick="window.queryCommunityAddonStreams()"
-                                    class="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold hover:bg-emerald-500 hover:text-black transition-all cursor-pointer">
-                                Buscar Fontes
-                            </button>
-                        </div>
-
-                        <div class="p-3 rounded-2xl bg-theme-raised/70 border border-theme-default flex items-center justify-between">
-                            <div>
-                                <span class="text-[9px] font-mono uppercase text-theme-muted font-bold block">Distribuição Oficial</span>
-                                <strong class="text-xs text-theme-primary">Crunchyroll / Netflix</strong>
-                            </div>
-                            <a href="https://www.crunchyroll.com/search?q={{ urlencode($title) }}"
-                               target="_blank" rel="noopener noreferrer"
-                               class="px-2.5 py-1 rounded-lg bg-theme-pill border border-theme-default text-theme-primary text-[10px] font-mono font-bold hover:border-theme-accent transition-all">
-                                Oficial ↗
-                            </a>
-                        </div>
+                        @endforeach
                     </div>
                 </div>
                 @endif
 
-                <!-- ABA 4: TRILHAS SONORAS DA OBRA -->
-                @if($totalTracks > 0)
-                <div id="entity-tab-panel-tracks" class="flex-1 min-h-0 hidden flex-col p-4 rounded-3xl bg-theme-card border border-theme-default overflow-hidden">
-                    <div class="flex items-center justify-between mb-3 flex-none">
-                        <h3 class="text-xs font-mono uppercase tracking-wider text-theme-accent font-bold">Trilhas Sonoras & Temas (OP / ED / OST)</h3>
-                        <span class="text-[11px] font-mono text-theme-muted">{{ $totalTracks }} faixas</span>
+                <!-- ABA 4: ABERTURAS & ENDINGS (OFICIAL: PLATAFORMAS DE ÁUDIO SPOTIFY / YOUTUBE MUSIC) -->
+                @if(!$isManga && $totalTracks > 0)
+                <div id="work-tab-pane-tracks" class="work-tab-pane hidden flex-col justify-between h-full gap-2">
+                    <div class="flex items-center justify-between flex-none">
+                        <span class="text-xs font-mono text-theme-muted">
+                            {{ $isEpisodeMode ? ('Temas musicais (OP / ED) vinculados à faixa do ' . $episodeTitle) : 'Aberturas (OP), Encerramentos (ED) e OSTs oficiais desta obra' }}
+                        </span>
+                        <span class="text-xs font-mono text-theme-accent font-bold">{{ count($episodeTracks) }} faixas</span>
                     </div>
-                    <div class="flex-1 overflow-y-auto no-scrollbar grid grid-cols-1 md:grid-cols-2 gap-2 pr-1">
-                        @foreach($tracks as $tr)
-                            <div class="p-3 rounded-2xl border border-theme-default bg-theme-raised/60 hover:bg-theme-raised hover:border-theme-accent transition-all flex items-center justify-between cursor-pointer group"
-                                 onclick="window.pushNavigation('track', '{{ $tr->id }}', '{{ addslashes($tr->title) }}')">
-                                <div class="flex items-center gap-3 min-w-0">
-                                    <span class="px-2 py-1 rounded-lg bg-pink-500/20 text-pink-300 border border-pink-500/30 text-[10px] font-mono font-bold uppercase shrink-0">
-                                        {{ strtoupper($tr->track_type ?? 'OST') }}
-                                    </span>
-                                    <div class="min-w-0">
-                                        <h4 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors truncate">{{ $tr->title }}</h4>
-                                        <p class="text-[10px] font-mono text-theme-muted truncate">{{ $tr->composer_name ?? 'Trilha Oficial Catalogada' }}</p>
+
+                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
+                        @foreach($episodeTracks as $tr)
+                            @php
+                                $rawTr = $tr->title ?? 'Faixa Musical';
+                                $cleanSong = $rawTr;
+                                if (preg_match('/"([^"]+)"/', $rawTr, $m)) {
+                                    $cleanSong = $m[1];
+                                }
+                                $searchAudioQuery = urlencode($cleanSong . ' ' . $title);
+                            @endphp
+                            <div class="flex-none w-72 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 hover:bg-theme-raised hover:border-pink-400/50 transition-all cursor-pointer shadow-md group flex flex-col justify-between"
+                                 onclick="window.pushNavigation('track', '{{ $tr->id }}', '{{ addslashes($cleanSong) }}')">
+                                <div>
+                                    <div class="flex items-center justify-between gap-2 mb-2">
+                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-pink-500/20 text-pink-300 border border-pink-500/30">
+                                            🎵 {{ strtoupper($tr->track_type ?? 'THEME') }}
+                                        </span>
+                                        <span class="text-xs text-theme-muted group-hover:text-pink-300">Ficha ❯</span>
                                     </div>
+                                    <h3 class="text-xs font-bold text-theme-primary group-hover:text-pink-300 transition-colors line-clamp-2 leading-snug">
+                                        {{ $rawTr }}
+                                    </h3>
                                 </div>
-                                <span class="text-xs text-theme-muted group-hover:text-theme-accent shrink-0">🎵 ❯</span>
+
+                                <!-- Plataformas Oficiais de Streaming de Áudio (100% Legal / Sempre Visíveis) -->
+                                <div class="pt-2 border-t border-theme-default/40 flex items-center justify-between gap-2">
+                                    <a href="https://open.spotify.com/search/{{ $searchAudioQuery }}"
+                                       target="_blank" rel="noopener noreferrer"
+                                       onclick="event.stopPropagation()"
+                                       class="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-[9px] font-mono font-bold text-center transition-all">
+                                        🟢 Spotify
+                                    </a>
+                                    <a href="https://music.youtube.com/search?q={{ $searchAudioQuery }}"
+                                       target="_blank" rel="noopener noreferrer"
+                                       onclick="event.stopPropagation()"
+                                       class="flex-1 py-1.5 px-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-[9px] font-mono font-bold text-center transition-all">
+                                        🔴 YT Music
+                                    </a>
+                                </div>
                             </div>
                         @endforeach
                     </div>
@@ -477,9 +470,9 @@
                 @endif
 
                 <!-- ABA 5: DISCUSSÃO COMUNITÁRIA -->
-                <div id="entity-tab-panel-discussion" class="flex-1 min-h-0 hidden flex-col overflow-hidden">
+                <div id="work-tab-pane-discussion" class="work-tab-pane hidden flex-col h-full overflow-y-auto no-scrollbar">
                     <x-shell.entity-discussion
-                        :targetType="$isEpisodeMode ? 'episode' : 'work'"
+                        :targetType="$isEpisodeMode ? 'episode' : ($isManga ? 'manga' : 'work')"
                         :targetId="$isEpisodeMode ? ($currentEpisode->id ?? '') : ($work->id ?? '')" />
                 </div>
 
@@ -487,37 +480,52 @@
 
         </main>
 
-        <!-- COLUNA LATERAL FIXA: DOCKS ONTOLÓGICOS (UNIVERSO, CRIADORES, ESTÚDIOS, TRILHAS) -->
+        <!-- COLUNA LATERAL FIXA: SIDEBAR ONTOLÓGICA (3 DOCKS NO PADRÃO DO UNIVERSO) -->
         <aside class="w-full lg:w-80 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
 
-            <!-- DOCK 1: UNIVERSO CANÔNICO & MÉTRICAS DA OBRA -->
+            <!-- DOCK 1: HIERARQUIA & MÉTRICAS CONSOLIDADAS -->
             <div class="p-4 rounded-3xl bg-theme-card border border-theme-default space-y-3 shadow-xl">
                 @if($universe)
-                    <div class="p-3 rounded-2xl bg-theme-raised/80 border border-[var(--color-state-universe,#6366F1)]/40 hover:border-[var(--color-state-universe,#6366F1)] cursor-pointer transition-all group"
+                    <div class="p-3 rounded-2xl bg-theme-raised/70 border border-theme-default/50 hover:border-[var(--color-state-universe,#6366F1)] cursor-pointer transition-all group"
                          onclick="window.pushNavigation('universe', '{{ $universe->id }}', '{{ addslashes($universe->name) }}')">
                         <div class="flex items-center justify-between">
                             <span class="text-[9px] font-mono uppercase tracking-wider text-[var(--color-state-universe,#6366F1)] font-bold">🌌 Universo Canônico</span>
                             <span class="text-xs text-theme-muted group-hover:text-white">❯</span>
                         </div>
-                        <h4 class="text-xs font-bold text-white group-hover:text-theme-accent transition-colors truncate mt-1">
+                        <p class="text-xs font-bold text-white truncate mt-1 group-hover:text-theme-accent transition-colors">
                             {{ $universe->name }}
-                        </h4>
+                        </p>
                     </div>
                 @endif
 
-                <div class="grid grid-cols-3 gap-2">
-                    <div class="p-2.5 rounded-xl bg-theme-raised/70 border border-theme-default/50 text-center">
-                        <span class="block text-sm font-black font-mono text-theme-accent">{{ $format }}</span>
-                        <span class="text-[9px] font-mono text-theme-muted uppercase">Formato</span>
+                @if($isEpisodeMode)
+                    <div class="p-3 rounded-2xl bg-theme-raised/70 border border-theme-default/50 hover:border-theme-accent cursor-pointer transition-all group"
+                         onclick="window.pushNavigation('{{ $isManga ? 'manga' : 'work' }}', '{{ $work->id }}', '{{ addslashes($title) }}')">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[9px] font-mono uppercase tracking-wider text-theme-accent font-bold">🎬 Obra / Temporada</span>
+                            <span class="text-xs text-theme-muted group-hover:text-white">❯</span>
+                        </div>
+                        <p class="text-xs font-bold text-white truncate mt-1">{{ $title }} ({{ $format }})</p>
                     </div>
-                    <div class="p-2.5 rounded-xl bg-theme-raised/70 border border-theme-default/50 text-center">
-                        <span class="block text-sm font-black font-mono text-white">{{ $totalEpisodes ?: '?' }}</span>
-                        <span class="text-[9px] font-mono text-theme-muted uppercase">{{ $isManga ? 'Capítulos' : 'Episódios' }}</span>
-                    </div>
+                @endif
+
+                <div class="grid {{ $totalTracks > 0 ? 'grid-cols-3' : 'grid-cols-2' }} gap-2">
                     <div class="p-2.5 rounded-xl bg-theme-raised/70 border border-theme-default/50 text-center">
                         <span class="block text-sm font-black font-mono text-[var(--color-state-canon,#10B981)]">{{ $totalArcs }}</span>
                         <span class="text-[9px] font-mono text-theme-muted uppercase">Arcos</span>
                     </div>
+
+                    <div class="p-2.5 rounded-xl bg-theme-raised/70 border border-theme-default/50 text-center">
+                        <span class="block text-sm font-black font-mono text-white">{{ $totalEpisodes ?: '?' }}</span>
+                        <span class="text-[9px] font-mono text-theme-muted uppercase">{{ $isManga ? 'Capítulos' : 'Episódios' }}</span>
+                    </div>
+
+                    @if($totalTracks > 0)
+                        <div class="p-2.5 rounded-xl bg-theme-raised/70 border border-theme-default/50 text-center">
+                            <span class="block text-sm font-black font-mono text-pink-400">{{ $totalTracks }}</span>
+                            <span class="text-[9px] font-mono text-theme-muted uppercase">Músicas</span>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -527,20 +535,22 @@
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-theme-accent">✍️</span>
-                            <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold">Autores & Direção</h3>
+                            <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold">
+                                Autores & Direção
+                            </h3>
                         </div>
-                        <span class="text-[9px] font-mono text-theme-muted">{{ count($creators) }}</span>
+                        <span class="text-[9px] font-mono text-theme-muted">Criação</span>
                     </div>
 
                     <div class="space-y-2">
                         @foreach(collect($creators)->take(4) as $cr)
                             @php
                                 $roleLabel = match($cr->role ?? '') {
-                                    'author' => 'Autor Original',
+                                    'author' => 'Autor do Original',
                                     'director' => 'Diretor',
-                                    'writer' => 'Roteiro / Composição',
+                                    'writer' => 'Roteirista',
                                     'composer' => 'Compositor Musical',
-                                    default => strtoupper($cr->role ?? 'Staff'),
+                                    default => 'Staff Principal',
                                 };
                             @endphp
                             <div class="flex items-center justify-between p-2 rounded-2xl bg-theme-raised/60 border border-theme-default hover:border-theme-accent cursor-pointer transition-all hover:scale-[1.02]"
@@ -550,7 +560,7 @@
                                         <img src="{{ $cr->image_url ?? '/assets/icons/actions/search.png' }}" class="w-full h-full object-cover" onerror="this.src='/assets/icons/actions/search.png'">
                                     </div>
                                     <div class="min-w-0">
-                                        <h4 class="text-xs font-bold text-theme-primary truncate max-w-[155px]">{{ $cr->name }}</h4>
+                                        <h4 class="text-xs font-bold text-theme-primary truncate max-w-[145px]">{{ $cr->name }}</h4>
                                         <p class="text-[9px] font-mono {{ ($cr->role ?? '') === 'author' ? 'text-theme-accent font-bold' : 'text-theme-muted' }}">
                                             {{ $roleLabel }}
                                         </p>
@@ -563,13 +573,15 @@
                 </div>
             @endif
 
-            <!-- DOCK 3: ESTÚDIOS DE PRODUÇÃO -->
+            <!-- DOCK 3: ESTÚDIOS -->
             @if(count($studios) > 0)
                 <div class="p-4 rounded-3xl bg-theme-card border border-theme-default space-y-2.5 shadow-xl">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-theme-accent">🏢</span>
-                            <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold">Estúdios</h3>
+                            <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold">
+                                Estúdios
+                            </h3>
                         </div>
                     </div>
 
@@ -582,7 +594,7 @@
                                         🏢
                                     </div>
                                     <div class="min-w-0">
-                                        <h4 class="text-xs font-bold text-theme-primary truncate max-w-[160px]">{{ $st->name }}</h4>
+                                        <h4 class="text-xs font-bold text-theme-primary truncate max-w-[150px]">{{ $st->name }}</h4>
                                         <p class="text-[9px] font-mono text-theme-muted">Produção & Animação</p>
                                     </div>
                                 </div>
@@ -593,42 +605,40 @@
                 </div>
             @endif
 
-            <!-- DOCK 4: TRILHAS SONORAS EM DESTAQUE -->
-            @if(count($tracks) > 0)
-                <div class="p-4 rounded-3xl bg-theme-card border border-theme-default space-y-2.5 shadow-xl">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="text-theme-accent">🎵</span>
-                            <h3 class="text-xs font-mono uppercase tracking-wider text-theme-primary font-bold">Temas (OP/ED)</h3>
-                        </div>
-                        <span class="text-[9px] font-mono text-theme-muted">{{ count($tracks) }}</span>
-                    </div>
-
-                    <div class="space-y-1.5">
-                        @foreach(collect($tracks)->take(3) as $tr)
-                            <div class="flex items-center justify-between p-2 rounded-2xl bg-theme-raised/60 border border-theme-default hover:border-theme-accent cursor-pointer transition-all"
-                                 onclick="window.pushNavigation('track', '{{ $tr->id }}', '{{ addslashes($tr->title) }}')">
-                                <div class="flex items-center gap-2 min-w-0">
-                                    <span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase bg-pink-500/20 text-pink-300 border border-pink-500/30 shrink-0">
-                                        {{ strtoupper($tr->track_type ?? 'OST') }}
-                                    </span>
-                                    <span class="text-[11px] font-bold text-theme-primary truncate max-w-[155px]">{{ $tr->title }}</span>
-                                </div>
-                                <span class="text-xs text-theme-muted shrink-0">❯</span>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
         </aside>
 
     </div>
 </div>
-@if($defaultTab === 'player')
+
 <script>
-    if (typeof window.mountAddonStage === 'function') {
-        setTimeout(() => window.mountAddonStage(), 50);
-    }
+window.switchWorkEntityTab = function(tabName) {
+    const tabs = ['episodes', 'arcs', 'relations', 'tracks', 'discussion'];
+    tabs.forEach(t => {
+        const btn = document.getElementById('work-tab-btn-' + t);
+        const pane = document.getElementById('work-tab-pane-' + t);
+        if (btn) {
+            if (t === tabName) {
+                btn.className = 'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer shrink-0';
+            } else {
+                btn.className = 'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all text-theme-muted hover:text-theme-primary cursor-pointer shrink-0';
+            }
+        }
+        if (pane) {
+            if (t === tabName) {
+                pane.classList.remove('hidden');
+                pane.classList.add('flex');
+                if (t === 'discussion') {
+                    window.refreshEntityComments?.();
+                }
+            } else {
+                pane.classList.add('hidden');
+                pane.classList.remove('flex');
+            }
+        }
+    });
+};
+
+if (window.syncAddonCapabilityButtons) {
+    window.syncAddonCapabilityButtons();
+}
 </script>
-@endif

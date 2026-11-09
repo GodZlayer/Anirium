@@ -387,6 +387,51 @@
     <!-- 5. MODAL DE PERFIL CANÔNICO DE 5 ABAS -->
     <x-modals.user-profile-modal :user="$user" :userPreferences="$userPreferences ?? []" />
 
+    <!-- 6. MODAL EXTERNO DE TRAILER OFICIAL (100% LEGAL / YOUTUBE) -->
+    <div id="modal-official-trailer" class="fixed inset-0 z-[70] bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-200">
+        <div class="w-full max-w-3xl rounded-3xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col">
+            <div class="px-5 py-3.5 border-b border-theme-default flex items-center justify-between bg-theme-header">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-red-400">🎬</span>
+                    <h4 id="official-trailer-title" class="text-xs font-mono font-bold uppercase tracking-wider text-white truncate">Trailer Oficial</h4>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a id="official-trailer-yt-link" href="#" target="_blank" rel="noopener noreferrer"
+                       class="px-3 py-1 rounded-xl bg-red-500/20 hover:bg-red-500 border border-red-500/40 text-red-200 hover:text-white text-[10px] font-mono font-bold transition-all">
+                        Abrir no YouTube ↗
+                    </a>
+                    <button type="button" onclick="window.closeOfficialTrailerModal()" class="p-1.5 rounded-xl bg-theme-pill text-theme-muted hover:text-white cursor-pointer">✕</button>
+                </div>
+            </div>
+            <div id="official-trailer-body" class="w-full aspect-video bg-black flex items-center justify-center">
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. MODAL EXTERNO DE EXECUÇÃO DE ADD-ON (VÍDEO PLAYER PRO / MANGA READER PRO / COMUNIDADE) -->
+    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-200">
+        <div class="w-full max-w-4xl rounded-3xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-5 py-3.5 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span id="external-addon-icon" class="text-theme-accent">⚡</span>
+                    <div class="min-w-0">
+                        <h4 id="external-addon-title" class="text-xs font-mono font-bold uppercase tracking-wider text-white truncate">Execução via Add-on Externo</h4>
+                        <p id="external-addon-subtitle" class="text-[10px] font-mono text-theme-muted truncate">Anirium+ Service / Community Addon</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" onclick="window.closeExternalAddonModal(); window.openProfileModal(); window.switchProfileTab('addons');"
+                            class="px-2.5 py-1 rounded-xl bg-theme-pill border border-theme-default text-[10px] font-mono font-bold text-theme-accent hover:text-white cursor-pointer">
+                        ⚙️ Add-ons
+                    </button>
+                    <button type="button" onclick="window.closeExternalAddonModal()" class="p-1.5 rounded-xl bg-theme-pill text-theme-muted hover:text-white cursor-pointer">✕</button>
+                </div>
+            </div>
+            <div id="external-addon-viewport" class="flex-1 min-h-[340px] bg-black flex flex-col items-center justify-center p-6 overflow-y-auto no-scrollbar">
+            </div>
+        </div>
+    </div>
+
     @push('scripts')
     <script>
         // PROCESSAMENTO DE AUTENTICACAO GOOGLE OAUTH (#id_token=...)
@@ -1272,8 +1317,17 @@
             // LOCAL-FIRST: Renderização instantânea se já estiver no cache local da sessão
             if (window.entityHtmlCache.has(cacheKey)) {
                 container.innerHTML = window.entityHtmlCache.get(cacheKey);
+                container.querySelectorAll('script').forEach(s => {
+                    try {
+                        const newScript = document.createElement('script');
+                        Array.from(s.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+                        newScript.appendChild(document.createTextNode(s.innerHTML));
+                        s.parentNode.replaceChild(newScript, s);
+                    } catch (err) {}
+                });
                 window.renderDynamicBreadcrumb();
-if (window.i18n) window.i18n.applyToDOM();
+                window.syncAddonCapabilityButtons?.();
+                if (window.i18n) window.i18n.applyToDOM();
                 return;
             }
 
@@ -1599,14 +1653,60 @@ if (window.i18n) window.i18n.applyToDOM();
                         if (toggleEl && playerPro) {
                             toggleEl.checked = Boolean(playerPro.enabled);
                         }
-                        window.userAddonsList = data.addons.filter(a => a.id !== 'player-pro');
+                        const mangaReaderPro = data.addons.find(a => a.id === 'manga-reader-pro');
+                        const mangaToggleEl = document.getElementById('addon-toggle-manga-reader-pro');
+                        if (mangaToggleEl && mangaReaderPro) {
+                            mangaToggleEl.checked = Boolean(mangaReaderPro.enabled);
+                        }
+                        window.userAddonsList = data.addons.filter(a => !['player-pro', 'manga-reader-pro'].includes(a.id));
                         if (listContainer) window.renderAddonsList();
+                        window.syncAddonCapabilityButtons();
                     }
                 }
             } catch (err) {
                 console.warn('[Anirium Addons] Falha ao carregar lista de addons:', err);
             }
             window.checkAniriumServiceHealth();
+        };
+
+        window.hasActiveAddonCapability = function(capabilityType) {
+            const addons = window.allUserAddons || [];
+            return addons.some(a => {
+                if (!a.enabled) return false;
+                const caps = Array.isArray(a.capabilities) ? a.capabilities : [];
+                if (capabilityType === 'video') {
+                    return a.id === 'player-pro' || caps.includes('video.stream') || caps.includes('ui.player.render') || caps.includes('playback.client');
+                }
+                if (capabilityType === 'manga') {
+                    return a.id === 'manga-reader-pro' || caps.includes('manga.reader') || caps.includes('ui.reader.render') || caps.includes('document.pdf') || caps.includes('document.images');
+                }
+                return false;
+            });
+        };
+
+        window.syncAddonCapabilityButtons = function() {
+            const hasVideo = window.hasActiveAddonCapability('video');
+            const hasManga = window.hasActiveAddonCapability('manga');
+
+            document.querySelectorAll('[data-requires-addon-capability="video"]').forEach(el => {
+                if (hasVideo) {
+                    el.classList.remove('hidden');
+                    el.classList.add('inline-flex');
+                } else {
+                    el.classList.add('hidden');
+                    el.classList.remove('inline-flex');
+                }
+            });
+
+            document.querySelectorAll('[data-requires-addon-capability="manga"]').forEach(el => {
+                if (hasManga) {
+                    el.classList.remove('hidden');
+                    el.classList.add('inline-flex');
+                } else {
+                    el.classList.add('hidden');
+                    el.classList.remove('inline-flex');
+                }
+            });
         };
 
         window.aniriumServiceOnline = false;
@@ -1748,6 +1848,11 @@ if (window.i18n) window.i18n.applyToDOM();
                     },
                     body: JSON.stringify({ addon_id: addonId, enabled: enabled })
                 });
+                if (Array.isArray(window.allUserAddons)) {
+                    const target = window.allUserAddons.find(a => a.id === addonId);
+                    if (target) target.enabled = Boolean(enabled);
+                }
+                window.syncAddonCapabilityButtons();
             } catch (err) {
                 console.warn('[Anirium Addons] Falha ao alternar addon:', err);
             }
@@ -1813,257 +1918,201 @@ if (window.i18n) window.i18n.applyToDOM();
             }
         };
 
-        // 11. MOTOR DE EXTENSÕES MODULARES (ADD-ONS COMUNITÁRIOS + ANIRIUM+ PLAYER PRO / SERVICE 4004)
-        window.openAddonStageForEpisode = function(workId, epId, epNum) {
-            const stage = document.getElementById('work-context-stage');
-            if (stage) {
-                if (epId) stage.setAttribute('data-episode-id', epId);
-                if (epNum) stage.setAttribute('data-episode-number', epNum);
-            }
-            const epLabel = document.getElementById('addon-stage-ep-label');
-            if (epLabel && epNum) epLabel.innerText = epNum;
-            window.switchEntityTab('player');
-            window.mountAddonStage();
+        // 11. TRAILER OFICIAL (LEGAL / SEMPRE VISÍVEL) & ADD-ONS EXTERNOS CONDICIONAIS POR CAPACIDADE (VÍDEO vs MANGÁ)
+        window.openOfficialTrailerModal = function(queryTitle) {
+            const modal = document.getElementById('modal-official-trailer');
+            const titleEl = document.getElementById('official-trailer-title');
+            const ytLink = document.getElementById('official-trailer-yt-link');
+            const body = document.getElementById('official-trailer-body');
+            if (!modal || !body) return;
+
+            const q = encodeURIComponent((queryTitle || '') + ' official trailer');
+            if (titleEl) titleEl.innerText = `Trailer Oficial • ${queryTitle}`;
+            if (ytLink) ytLink.href = `https://www.youtube.com/results?search_query=${q}`;
+
+            body.innerHTML = `
+                <div class="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+                    <div class="w-14 h-14 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-2xl text-red-400">🎬</div>
+                    <h4 class="text-base font-bold font-serif text-white">${queryTitle} — Trailer Oficial</h4>
+                    <p class="text-xs font-mono text-theme-muted max-w-md">
+                        Acesso oficial aos trailers promocionais (PV) publicados pelos canais oficiais dos estúdios e distribuidoras no YouTube.
+                    </p>
+                    <div class="flex items-center gap-3 pt-1">
+                        <a href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener noreferrer"
+                           class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-mono font-bold shadow-lg transition-all">
+                            ▶ Assistir Trailer Oficial no YouTube ↗
+                        </a>
+                        <button type="button" onclick="window.closeOfficialTrailerModal()"
+                                class="px-4 py-2.5 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono text-theme-muted hover:text-white cursor-pointer">
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            `;
+            modal.classList.remove('opacity-0', 'pointer-events-none');
         };
 
-        window.openPlayerPro = function(workId, epId, epNum) {
-            window.openAddonStageForEpisode(workId, epId, epNum);
+        window.closeOfficialTrailerModal = function() {
+            const modal = document.getElementById('modal-official-trailer');
+            const body = document.getElementById('official-trailer-body');
+            if (modal) modal.classList.add('opacity-0', 'pointer-events-none');
+            if (body) body.innerHTML = '';
         };
 
-        window.mountAddonStage = async function() {
-            if (!window.allUserAddons) {
-                await window.loadAccountAddons();
-            } else {
-                await window.checkAniriumServiceHealth();
-            }
-            const commLabel = document.getElementById('community-addons-count-label');
-            const commAddons = (window.userAddonsList || []).filter(a => a.enabled);
-            if (commLabel) {
-                commLabel.innerText = commAddons.length > 0
-                    ? `${commAddons.length} Add-on(s) Comunitário(s)`
-                    : 'Nenhum Add-on Comunitário';
-            }
+        window.closeExternalAddonModal = function() {
+            const modal = document.getElementById('modal-external-addon');
+            const viewport = document.getElementById('external-addon-viewport');
+            if (modal) modal.classList.add('opacity-0', 'pointer-events-none');
+            if (viewport) viewport.innerHTML = '';
         };
 
-        window.playStreamInModularStage = function(url, label) {
-            const video = document.getElementById('anirium-modular-video');
-            const placeholder = document.getElementById('addon-stage-placeholder');
-            const badge = document.getElementById('addon-service-badge');
-            if (!video) return;
-            if (placeholder) placeholder.classList.add('hidden');
-            video.classList.remove('hidden');
-            video.src = url;
-            video.play().catch(() => {});
-            if (badge && label) {
-                badge.className = "px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
-                badge.innerText = `▶ ${label}`;
-            }
-        };
-
-        window.loadLocalVideoFileInStage = function(input) {
-            const file = input?.files?.[0];
-            if (!file) return;
-            const objectUrl = URL.createObjectURL(file);
-            window.playStreamInModularStage(objectUrl, `Arquivo Local: ${file.name}`);
-        };
-
-        window.promptDirectStreamUrl = function() {
-            const url = prompt('Cole a URL direta do fluxo de mídia (.mp4 / .webm / .m3u8):');
-            if (url && /^https?:\/\//i.test(url.trim())) {
-                window.playStreamInModularStage(url.trim(), 'Fluxo HTTP Direto');
-            }
-        };
-
-        window.connectAniriumPlusService = async function() {
-            const stage = document.getElementById('work-context-stage');
-            const workId = stage?.getAttribute('data-work-id') || '';
-            const epId = stage?.getAttribute('data-episode-id') || '';
-            const placeholder = document.getElementById('addon-stage-placeholder');
-
-            // 1. Verifica assinatura Anirium+ e sessão
-            if (!window.currentUser) {
-                window.openProfileModal();
-                return;
-            }
-            const isPlusOrAdmin = Number(window.currentUser.tier || 1) >= 2 || (window.currentUser.email || '').toLowerCase() === 'santoss.cog@gmail.com';
-            if (!isPlusOrAdmin) {
-                alert('O add-on oficial Anirium Player Pro + Anirium+ Service é exclusivo para assinantes Anirium+. Você também pode instalar e usar qualquer Add-on da Comunidade gratuitamente na aba Add-ons do seu perfil!');
-                window.openProfileModal();
-                window.switchProfileTab('addons');
+        window.launchExternalVideoAddon = async function(workId, epId, epNum, workTitle) {
+            if (!window.hasActiveAddonCapability('video')) {
+                alert('Nenhum Add-on de Vídeo ativo. Ative o Anirium Player Pro (Anirium+) ou um Add-on de Vídeo da Comunidade no seu perfil.');
                 return;
             }
 
-            // 2. Verifica se o daemon local 127.0.0.1:4004 está online
-            const online = await window.checkAniriumServiceHealth();
-            if (!online) {
-                if (placeholder) {
-                    placeholder.innerHTML = `
-                        <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl mx-auto text-amber-300">⚡</div>
-                        <h4 class="text-sm font-bold text-white font-serif">Anirium+ Service Offline (127.0.0.1:4004)</h4>
-                        <p class="text-[11px] font-mono text-theme-muted leading-relaxed">
-                            Para utilizar o add-on oficial <strong>Anirium Player Pro</strong> com streaming P2P multi-áudio e legendas sincronizadas, inicie o aplicativo <strong>Anirium+ Service</strong> no seu computador ou instale um Add-on da Comunidade.
-                        </p>
-                        <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
-                            <a href="ms-windows-store://pdp/?productid=9MV35DDQ6SBD" class="px-4 py-2 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold shadow-lg">
-                                🪟 Obter na Microsoft Store
-                            </a>
-                            <a href="/download/service" class="px-3.5 py-2 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono font-bold text-theme-primary">
-                                ⬇ Baixar Instalador (.exe)
-                            </a>
-                            <button type="button" onclick="window.connectAniriumPlusService()" class="px-3.5 py-2 rounded-xl bg-theme-pill border border-theme-accent/40 text-xs font-mono font-bold text-theme-accent cursor-pointer">
-                                🔄 Tentar Novamente
-                            </button>
-                        </div>
-                    `;
-                }
-                return;
-            }
+            const modal = document.getElementById('modal-external-addon');
+            const iconEl = document.getElementById('external-addon-icon');
+            const titleEl = document.getElementById('external-addon-title');
+            const subEl = document.getElementById('external-addon-subtitle');
+            const viewport = document.getElementById('external-addon-viewport');
+            if (!modal || !viewport) return;
 
-            // 3. Solicita token efêmero de sessão ao Core e aciona /playback/prepare no Service 4004
-            try {
-                let deviceId = localStorage.getItem('anirium_device_id');
-                if (!deviceId) {
-                    deviceId = 'dev-' + Math.random().toString(36).substring(2, 12);
-                    localStorage.setItem('anirium_device_id', deviceId);
-                }
-                let playerSessionId = sessionStorage.getItem('anirium_player_session_id');
-                if (!playerSessionId) {
-                    playerSessionId = 'ps-' + Math.random().toString(36).substring(2, 12);
-                    sessionStorage.setItem('anirium_player_session_id', playerSessionId);
-                }
+            if (iconEl) iconEl.innerText = '▶';
+            if (titleEl) titleEl.innerText = `${workTitle || 'Obra'} • Episódio ${epNum || 1}`;
+            if (subEl) subEl.innerText = 'Player Externo via Add-on de Vídeo (Anirium Player Pro / Comunidade)';
 
-                const tokenRes = await fetch('/api/service/session', {
-                    headers: {
-                        'Accept': 'application/json',
-                        'x-anirium-device': deviceId,
-                        'x-anirium-player-session': playerSessionId
-                    }
-                });
-                const tokenData = await tokenRes.json();
-                if (!tokenRes.ok || !tokenData.token) {
-                    alert(tokenData.message || 'Não foi possível emitir a chave de sessão do Anirium+ Service.');
-                    return;
-                }
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            viewport.innerHTML = `<div class="text-xs font-mono text-theme-accent animate-pulse">Inicializando Add-on Externo de Vídeo...</div>`;
 
-                const prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        workId: workId,
-                        episodeId: epId || `${workId}:ep:1`,
-                        token: tokenData.token,
-                        deviceId: deviceId,
-                        coreOrigin: window.location.origin
-                    })
-                });
-                const prepData = await prepRes.json();
-                if (prepRes.ok && prepData.streamUrl) {
-                    const streamUrl = prepData.streamUrl.startsWith('http')
-                        ? prepData.streamUrl
-                        : `http://127.0.0.1:4004${prepData.streamUrl}`;
-                    window.playStreamInModularStage(streamUrl, 'Anirium Player Pro • Service 4004');
-                }
-            } catch (err) {
-                console.warn('[Anirium+ Service] Erro ao preparar playback:', err);
-            }
-        };
+            const playerProActive = (window.allUserAddons || []).some(a => a.id === 'player-pro' && a.enabled);
+            const serviceOnline = await window.checkAniriumServiceHealth();
 
-        window.queryCommunityAddonStreams = async function() {
-            const stage = document.getElementById('work-context-stage');
-            const imdbId = stage?.getAttribute('data-imdb-id') || '';
-            const malId = stage?.getAttribute('data-mal-id') || '';
-            const epNum = stage?.getAttribute('data-episode-number') || '1';
-            const placeholder = document.getElementById('addon-stage-placeholder');
-
-            if (!window.allUserAddons) await window.loadAccountAddons();
-            const commAddons = (window.userAddonsList || []).filter(a => a.enabled && a.manifest_url);
-
-            if (commAddons.length === 0) {
-                window.openProfileModal();
-                window.switchProfileTab('addons');
-                return;
-            }
-
-            if (placeholder) {
-                placeholder.innerHTML = `<div class="py-6 text-xs font-mono text-emerald-400 animate-pulse">Consultando ${commAddons.length} Add-on(s) da Comunidade para o Episódio ${epNum}...</div>`;
-            }
-
-            const foundStreams = [];
-            for (const addon of commAddons) {
+            if (playerProActive && serviceOnline) {
                 try {
-                    const baseUrl = addon.manifest_url.replace(/\/manifest\.json$/i, '').replace(/^stremio:\/\//i, 'https://');
-                    const candidates = [];
-                    if (imdbId) candidates.push(`${baseUrl}/stream/series/${imdbId}:1:${epNum}.json`);
-                    if (malId) {
-                        candidates.push(`${baseUrl}/stream/anime/mal:${malId}:${epNum}.json`);
-                        candidates.push(`${baseUrl}/stream/series/mal:${malId}:${epNum}.json`);
-                    }
-                    for (const endpoint of candidates) {
-                        const res = await fetch(endpoint);
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data && Array.isArray(data.streams)) {
-                                data.streams.forEach(s => {
-                                    foundStreams.push({
-                                        addonName: addon.name || 'Community Addon',
-                                        title: s.title || s.name || 'Stream Comunitário',
-                                        url: s.url || (s.infoHash ? `magnet:?xt=urn:btih:${s.infoHash}` : null)
-                                    });
-                                });
-                            }
+                    let deviceId = localStorage.getItem('anirium_device_id') || ('dev-' + Math.random().toString(36).substring(2, 12));
+                    localStorage.setItem('anirium_device_id', deviceId);
+                    let playerSessionId = sessionStorage.getItem('anirium_player_session_id') || ('ps-' + Math.random().toString(36).substring(2, 12));
+                    sessionStorage.setItem('anirium_player_session_id', playerSessionId);
+
+                    const tokenRes = await fetch('/api/service/session', {
+                        headers: {
+                            'Accept': 'application/json',
+                            'x-anirium-device': deviceId,
+                            'x-anirium-player-session': playerSessionId
+                        }
+                    });
+                    const tokenData = await tokenRes.json();
+                    if (tokenRes.ok && tokenData.token) {
+                        const prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                workId: workId,
+                                episodeId: epId || `${workId}:ep:${epNum || 1}`,
+                                token: tokenData.token,
+                                deviceId: deviceId,
+                                coreOrigin: window.location.origin
+                            })
+                        });
+                        const prepData = await prepRes.json();
+                        if (prepRes.ok && prepData.streamUrl) {
+                            const streamUrl = prepData.streamUrl.startsWith('http')
+                                ? prepData.streamUrl
+                                : `http://127.0.0.1:4004${prepData.streamUrl}`;
+                            viewport.innerHTML = `
+                                <video src="${streamUrl}" controls autoplay playsinline class="w-full max-h-[65vh] rounded-2xl bg-black"></video>
+                            `;
+                            return;
                         }
                     }
                 } catch (e) {
-                    // Continua para o próximo addon comunitário
+                    console.warn('[Anirium Player Pro] Fallback para seletor de fluxo externo:', e);
                 }
             }
 
-            if (placeholder) {
-                if (foundStreams.length === 0) {
-                    placeholder.innerHTML = `
-                        <div class="space-y-2 text-center">
-                            <p class="text-xs font-mono text-theme-muted">Nenhuma fonte direta retornada pelos ${commAddons.length} add-ons comunitários ativos para este identificador (${malId ? 'MAL #' + malId : 'UUID'}).</p>
-                            <div class="flex items-center justify-center gap-2 pt-2">
-                                <button type="button" onclick="window.openProfileModal(); window.switchProfileTab('addons');" class="px-3.5 py-1.5 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono text-theme-accent cursor-pointer">
-                                    Gerenciar Add-ons
-                                </button>
-                                <button type="button" onclick="window.promptDirectStreamUrl()" class="px-3.5 py-1.5 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono text-theme-primary cursor-pointer">
-                                    Inserir Link Direto
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    placeholder.innerHTML = `
-                        <div class="w-full max-w-xl space-y-2 text-left">
-                            <h5 class="text-xs font-mono uppercase text-emerald-400 font-bold">Fontes Encontradas pelos Add-ons da Comunidade (${foundStreams.length})</h5>
-                            <div class="max-h-40 overflow-y-auto space-y-1.5 pr-1">
-                                ${foundStreams.slice(0, 8).map(fs => `
-                                    <div class="p-2.5 rounded-xl bg-theme-raised border border-theme-default flex items-center justify-between gap-2">
-                                        <div class="min-w-0">
-                                            <span class="text-[9px] font-mono text-emerald-400 block">${fs.addonName}</span>
-                                            <p class="text-[11px] font-bold text-white truncate">${fs.title.replace(/\n/g, ' • ')}</p>
-                                        </div>
-                                        ${fs.url && fs.url.startsWith('http')
-                                            ? `<button type="button" onclick="window.playStreamInModularStage('${fs.url}', 'Community Addon')" class="px-2.5 py-1 rounded-lg bg-emerald-500 text-black text-[10px] font-mono font-bold shrink-0 cursor-pointer">Reproduzir</button>`
-                                            : `<a href="${fs.url || '#'}" class="px-2.5 py-1 rounded-lg bg-theme-pill border border-theme-default text-theme-accent text-[10px] font-mono font-bold shrink-0">Abrir P2P ↗</a>`
-                                        }
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-            }
+            viewport.innerHTML = `
+                <div class="max-w-lg text-center space-y-4">
+                    <div class="w-12 h-12 rounded-2xl bg-theme-accent/15 border border-theme-accent/30 flex items-center justify-center text-xl mx-auto text-theme-accent">⚡</div>
+                    <h4 class="text-sm font-bold font-serif text-white">Anirium Player Pro & Add-ons de Vídeo</h4>
+                    <p class="text-xs font-mono text-theme-muted leading-relaxed">
+                        ${serviceOnline
+                            ? 'Anirium+ Service conectado na porta 4004. Selecione a fonte de reprodução para este episódio:'
+                            : 'O daemon local Anirium+ Service (127.0.0.1:4004) está offline. Inicie o serviço local ou abra um arquivo/fluxo externo no Player Add-on:'}
+                    </p>
+                    <div class="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                        <a href="ms-windows-store://pdp/?productid=9MV35DDQ6SBD" class="px-4 py-2 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold shadow-lg">
+                            🪟 Abrir Anirium+ Service
+                        </a>
+                        <label class="px-3.5 py-2 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-xs font-mono font-bold text-theme-primary cursor-pointer">
+                            📂 Arquivo de Vídeo (.mp4/.mkv)
+                            <input type="file" accept="video/*,.mkv" class="hidden" onchange="window.loadExternalVideoFile(this)">
+                        </label>
+                    </div>
+                </div>
+            `;
         };
 
-        window.probeAndRunAddons = async function() {
-            const online = await window.checkAniriumServiceHealth();
-            if (online) {
-                await window.connectAniriumPlusService();
-            } else {
-                await window.queryCommunityAddonStreams();
+        window.loadExternalVideoFile = function(input) {
+            const file = input?.files?.[0];
+            const viewport = document.getElementById('external-addon-viewport');
+            if (!file || !viewport) return;
+            const url = URL.createObjectURL(file);
+            viewport.innerHTML = `<video src="${url}" controls autoplay playsinline class="w-full max-h-[65vh] rounded-2xl bg-black"></video>`;
+        };
+
+        window.launchExternalMangaAddon = function(workId, chapterNum, workTitle) {
+            if (!window.hasActiveAddonCapability('manga')) {
+                alert('Nenhum Add-on de Leitura de Mangá ativo. Ative o Anirium Manga Reader Pro (Anirium+) ou um Add-on de Leitura da Comunidade na aba Add-ons do seu perfil.');
+                return;
             }
+
+            const modal = document.getElementById('modal-external-addon');
+            const iconEl = document.getElementById('external-addon-icon');
+            const titleEl = document.getElementById('external-addon-title');
+            const subEl = document.getElementById('external-addon-subtitle');
+            const viewport = document.getElementById('external-addon-viewport');
+            if (!modal || !viewport) return;
+
+            if (iconEl) iconEl.innerText = '📖';
+            if (titleEl) titleEl.innerText = `${workTitle || 'Mangá'} • Capítulo ${chapterNum || 1}`;
+            if (subEl) subEl.innerText = 'Leitor Externo via Add-on de Mangá (Imagens / CBZ / PDF)';
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            viewport.innerHTML = `
+                <div class="max-w-lg text-center space-y-4">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl mx-auto text-amber-400">📖</div>
+                    <h4 class="text-sm font-bold font-serif text-white">Anirium Manga Reader Pro (PDF / Imagens)</h4>
+                    <p class="text-xs font-mono text-theme-muted leading-relaxed">
+                        Carregue um capítulo em PDF ou páginas de imagem no tocador do Add-on de Leitura para <strong>${workTitle} (Cap. ${chapterNum || 1})</strong>.
+                    </p>
+                    <div class="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                        <label class="px-4 py-2 rounded-xl bg-amber-400 text-black text-xs font-mono font-bold shadow-lg cursor-pointer">
+                            📄 Abrir PDF / Imagens do Capítulo
+                            <input type="file" accept=".pdf,image/*" multiple class="hidden" onchange="window.loadExternalMangaFiles(this)">
+                        </label>
+                    </div>
+                </div>
+            `;
+        };
+
+        window.loadExternalMangaFiles = function(input) {
+            const files = Array.from(input?.files || []);
+            const viewport = document.getElementById('external-addon-viewport');
+            if (files.length === 0 || !viewport) return;
+
+            if (files[0].type === 'application/pdf' || files[0].name.toLowerCase().endsWith('.pdf')) {
+                const pdfUrl = URL.createObjectURL(files[0]);
+                viewport.innerHTML = `<iframe src="${pdfUrl}" class="w-full h-[70vh] rounded-2xl border border-theme-default bg-white"></iframe>`;
+                return;
+            }
+
+            const imgsHtml = files.map(f => {
+                const u = URL.createObjectURL(f);
+                return `<img src="${u}" class="max-w-full rounded-xl shadow-lg mx-auto mb-3">`;
+            }).join('');
+            viewport.innerHTML = `<div class="w-full max-h-[70vh] overflow-y-auto space-y-3 p-2">${imgsHtml}</div>`;
         };
 
         window.refreshEntityComments = async function(type, id) {
@@ -2286,12 +2335,17 @@ window.toggleEntityBookmark = async function(type, id) {
                 window.initRollingDaysBar();
             }
             window.deriveHeroRollFromCalendar();
+            if (window.currentUser) {
+                window.loadAccountAddons();
+            }
             if (window.currentTab === 'explore') window.runClientSideCatalogFilter();
             if (window.currentTab === 'calendar') window.renderCalendarPage();
         });
 
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
+                window.closeOfficialTrailerModal?.();
+                window.closeExternalAddonModal?.();
                 if (window.navStack.length > 0) window.popNavigation();
                 window.closeProfileModal();
             }

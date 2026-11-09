@@ -519,7 +519,7 @@ class TelemetryDeviceController extends Controller
         return response()->json([
             'comments' => $comments,
             'cursor' => $latestTimestamp,
-            'is_delta' => !empty($since),
+            'is_delta' => ! empty($since),
         ]);
     }
 
@@ -558,23 +558,47 @@ class TelemetryDeviceController extends Controller
                 'id' => 'player-pro',
                 'name' => 'Anirium Player Pro',
                 'version' => '1.0.0',
-                'description' => 'Cliente de reprodução oficial Anirium+: conexões P2P diretas via Anirium Service, áudio multi-dub e legendas sincronizadas.',
+                'description' => 'Cliente de reprodução oficial de vídeo (episódios e filmes) Anirium+: conexões via Anirium+ Service, multi-áudio e legendas.',
                 'author' => 'Anirium Core & TGCode',
                 'type' => 'official-plus',
                 'origin' => 'official',
-                'capabilities' => ['ui.player.render', 'playback.client', 'subtitles.manage', 'audio.manage'],
+                'capabilities' => ['ui.player.render', 'playback.client', 'video.stream', 'subtitles.manage', 'audio.manage'],
                 'enabled' => $playerProRecord ? (bool) $playerProRecord->enabled : true,
+                'is_official' => true,
+            ];
+
+            $mangaReaderRecord = $addonsMap['manga-reader-pro'] ?? null;
+            $responseAddons[] = [
+                'id' => 'manga-reader-pro',
+                'name' => 'Anirium Manga Reader Pro',
+                'version' => '1.0.0',
+                'description' => 'Tocador oficial de capítulos de mangás e novels Anirium+ (suporte a imagens, páginas duplas, CBZ e PDF).',
+                'author' => 'Anirium Core & TGCode',
+                'type' => 'official-plus',
+                'origin' => 'official',
+                'capabilities' => ['ui.reader.render', 'manga.reader', 'document.pdf', 'document.images'],
+                'enabled' => $mangaReaderRecord ? (bool) $mangaReaderRecord->enabled : false,
                 'is_official' => true,
             ];
         }
 
         // 2. Addons Comunitários instalados na conta (Tier 1, 2 e 3)
         foreach ($dbAddons as $a) {
-            if ($a->addon_id === 'player-pro') {
+            if (in_array($a->addon_id, ['player-pro', 'manga-reader-pro'], true)) {
                 continue;
             }
 
             $manifest = ! empty($a->manifest_json) ? json_decode($a->manifest_json, true) : null;
+            $caps = $manifest['capabilities'] ?? [];
+            if (empty($caps)) {
+                $types = $manifest['types'] ?? [];
+                $urlLower = strtolower(($a->manifest_url ?? '').' '.($a->name ?? ''));
+                if (in_array('manga', $types, true) || in_array('comic', $types, true) || in_array('book', $types, true) || str_contains($urlLower, 'manga') || str_contains($urlLower, 'reader') || str_contains($urlLower, 'pdf')) {
+                    $caps = ['manga.reader'];
+                } else {
+                    $caps = ['video.stream'];
+                }
+            }
             $responseAddons[] = [
                 'id' => $a->addon_id,
                 'name' => $a->name ?: ($manifest['name'] ?? $a->addon_id),
@@ -583,6 +607,7 @@ class TelemetryDeviceController extends Controller
                 'author' => $manifest['author'] ?? 'Comunidade',
                 'type' => 'community',
                 'origin' => 'community',
+                'capabilities' => $caps,
                 'manifest_url' => $a->manifest_url,
                 'enabled' => (bool) $a->enabled,
                 'is_official' => false,
@@ -620,11 +645,11 @@ class TelemetryDeviceController extends Controller
         }
 
         // Addons Anirium+ não podem ser ativados por contas de Tier inferior a 2
-        if ($addonId === 'player-pro' && $tier < 2) {
+        if (in_array($addonId, ['player-pro', 'manga-reader-pro'], true) && $tier < 2) {
             return response()->json(['error' => 'tier_unauthorized'], 403);
         }
 
-        if ($addonId !== 'player-pro' && ! DB::table('user_addons')->where('user_id', $user->id)->where('addon_id', $addonId)->exists()) {
+        if (! in_array($addonId, ['player-pro', 'manga-reader-pro'], true) && ! DB::table('user_addons')->where('user_id', $user->id)->where('addon_id', $addonId)->exists()) {
             return response()->json(['error' => 'addon_not_installed'], 404);
         }
 

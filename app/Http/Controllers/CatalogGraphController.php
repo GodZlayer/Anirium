@@ -281,7 +281,7 @@ class CatalogGraphController extends Controller
         $realId = $this->resolveUuid($id, 'universe');
         $allowAdult = (bool) ($request->user()?->adult_content_enabled || $request->query('adult') === '1');
 
-        $cacheKey = "catalog:universe:graph:payload:v6:{$realId}:".($allowAdult ? '1' : '0');
+        $cacheKey = "catalog:universe:graph:payload:v7:{$realId}:".($allowAdult ? '1' : '0');
         $data = Cache::remember($cacheKey, 3600, function () use ($realId, $allowAdult) {
             $universe = DB::table('catalog_universes')->where('id', $realId)->first();
             if (! $universe) {
@@ -291,6 +291,7 @@ class CatalogGraphController extends Controller
             $allWorkIds = DB::table('catalog_universe_works')->where('universe_id', $realId)->pluck('work_id')->all();
             $visibility = app(CatalogGraphVisibility::class);
             $visibleWorkIds = $visibility->works($allWorkIds, $allowAdult);
+            $safeWorkIds = $allWorkIds ?: ['00000000-0000-0000-0000-000000000000'];
 
             // Buscar todas as obras vinculadas a este universo
             $works = DB::table('catalog_universe_works as uw')
@@ -306,7 +307,7 @@ class CatalogGraphController extends Controller
             $authors = DB::table('catalog_work_creators as wc')
                 ->join('catalog_creators as c', 'wc.creator_id', '=', 'c.id')
                 ->leftJoin('catalog_roles as r', 'wc.role_id', '=', 'r.id')
-                ->whereIn('wc.work_id', $allWorkIds)
+                ->whereIn('wc.work_id', $safeWorkIds)
                 ->whereIn('r.token', ['author', 'writer'])
                 ->select(
                     'c.id',
@@ -323,7 +324,7 @@ class CatalogGraphController extends Controller
             // Buscar estúdios de animação da franquia com contagem de produções
             $studios = DB::table('catalog_work_studios as ws')
                 ->join('catalog_studios as s', 'ws.studio_id', '=', 's.id')
-                ->whereIn('ws.work_id', $allWorkIds)
+                ->whereIn('ws.work_id', $safeWorkIds)
                 ->select(
                     's.id',
                     's.name',
@@ -337,7 +338,7 @@ class CatalogGraphController extends Controller
 
             // Formatos presentes no universo
             $formats = DB::table('catalog_works')
-                ->whereIn('id', $allWorkIds)
+                ->whereIn('id', $safeWorkIds)
                 ->select('format', DB::raw('COUNT(*) as total'))
                 ->groupBy('format')
                 ->orderByDesc('total')
@@ -347,7 +348,7 @@ class CatalogGraphController extends Controller
             $tracks = DB::table('catalog_work_tracks as wt')
                 ->join('catalog_tracks as t', 'wt.track_id', '=', 't.id')
                 ->leftJoin('catalog_works as w', 'wt.work_id', '=', 'w.id')
-                ->whereIn('wt.work_id', $allWorkIds)
+                ->whereIn('wt.work_id', $safeWorkIds)
                 ->select('t.id', 't.title', 't.track_type', 'w.title as work_title')
                 ->distinct()
                 ->take(5)
@@ -355,7 +356,7 @@ class CatalogGraphController extends Controller
 
             // Métricas agregadas de unidades (episódios de animes, capítulos de mangás e volumes)
             $unitMetrics = DB::table('catalog_works')
-                ->whereIn('id', $allWorkIds)
+                ->whereIn('id', $safeWorkIds)
                 ->select(
                     DB::raw("SUM(CASE WHEN media = 'anime' THEN coalesce(episode_count, 0) ELSE 0 END) as anime_episodes"),
                     DB::raw("SUM(CASE WHEN media = 'manga' THEN coalesce(episode_count, 0) ELSE 0 END) as manga_chapters"),
@@ -365,7 +366,7 @@ class CatalogGraphController extends Controller
 
             $totalEpisodes = (int) ($unitMetrics->anime_episodes ?? 0);
             if ($totalEpisodes === 0) {
-                $totalEpisodes = DB::table('catalog_episodes')->whereIn('work_id', $allWorkIds)->count();
+                $totalEpisodes = DB::table('catalog_episodes')->whereIn('work_id', $safeWorkIds)->count();
             }
             $totalChapters = (int) ($unitMetrics->manga_chapters ?? 0);
             $totalVolumes = (int) ($unitMetrics->novel_volumes ?? 0);
@@ -391,57 +392,63 @@ class CatalogGraphController extends Controller
             }
             $mangas = $mangasQuery->get(['w.id', 'w.title', 'w.format', 'w.status', 'wa.image_url']);
 
-            // Sagas & Arcos com mapeamento exato de cobertura (Obra, Temporada, Episódio Inicial e Final)
-            $arcsRaw = DB::table('catalog_arcs as a')
+            // Sagas & Arcos com mapeamento exato de cobertura sem subquery em catalog_seasons
+            $seasonMap = DB::table('catalog_seasons')
+                ->whereIn('work_id', $safeWorkIds)
+                ->select('work_id', DB::raw('MIN(number) as number'))
+                ->groupBy('work_id')
+                ->pluck('number', 'work_id')
+                ->all();
+
+            $arcRows = DB::table('catalog_arcs as a')
                 ->join('catalog_arc_works as aw', 'a.id', '=', 'aw.arc_id')
                 ->join('catalog_works as w', 'aw.work_id', '=', 'w.id')
-                ->leftJoin(DB::raw('(SELECT work_id, min(number) as number FROM catalog_seasons GROUP BY work_id) as s'), 'w.id', '=', 's.work_id')
                 ->where('a.universe_id', $realId)
-                ->select(
-                    'a.id',
-                    'a.title',
-                    'a.classification',
-                    DB::raw("json_group_array(json_object('work_id', aw.work_id, 'work_title', w.title, 'start_ep', aw.start_number, 'end_ep', aw.end_number, 'season', coalesce(s.number, 1))) as coverage")
-                )
-                ->groupBy('a.id')
-                ->get();
+                ->orderBy('aw.position')
+                ->orderBy('aw.start_number')
+                ->get(['a.id', 'a.title', 'a.classification', 'aw.work_id', 'w.title as work_title', 'aw.start_number', 'aw.end_number']);
 
-            $arcs = $arcsRaw->map(function ($arc) {
-                $cov = json_decode($arc->coverage ?? '[]', true) ?: [];
-                $first = $cov[0] ?? null;
-                $last = end($cov) ?: $first;
+            $arcs = $arcRows->groupBy('id')->map(function ($rows) use ($seasonMap) {
+                $firstRow = $rows->first();
+                $lastRow = $rows->last();
+                $startSeason = (int) ($seasonMap[$firstRow->work_id] ?? 1);
+                $endSeason = (int) ($seasonMap[$lastRow->work_id] ?? 1);
+                $startEp = $firstRow->start_number ?? 1;
+                $endEp = $lastRow->end_number ?? $startEp;
 
-                $arc->coverage_list = $cov;
-                $arc->work_title = $first['work_title'] ?? 'Obra da Franquia';
-                $arc->start_season = $first['season'] ?? 1;
-                $arc->start_episode = $first['start_ep'] ?? 1;
-                $arc->end_work_title = $last['work_title'] ?? $arc->work_title;
-                $arc->end_season = $last['season'] ?? 1;
-                $arc->end_episode = $last['end_ep'] ?? $arc->start_episode;
-
-                if (($first['work_id'] ?? '') === ($last['work_id'] ?? '') && $arc->start_season === $arc->end_season) {
-                    $arc->span_description = "{$arc->work_title} • T{$arc->start_season} (Ep. {$arc->start_episode} a {$arc->end_episode})";
-                } elseif (($first['work_id'] ?? '') === ($last['work_id'] ?? '')) {
-                    $arc->span_description = "{$arc->work_title} • T{$arc->start_season} Ep. {$arc->start_episode} ➔ T{$arc->end_season} Ep. {$arc->end_episode}";
+                if ($firstRow->work_id === $lastRow->work_id && $startSeason === $endSeason) {
+                    $spanDesc = "{$firstRow->work_title} • T{$startSeason} (Ep. {$startEp} a {$endEp})";
+                } elseif ($firstRow->work_id === $lastRow->work_id) {
+                    $spanDesc = "{$firstRow->work_title} • T{$startSeason} Ep. {$startEp} ➔ T{$endSeason} Ep. {$endEp}";
                 } else {
-                    $arc->span_description = "{$arc->work_title} (T{$arc->start_season} Ep. {$arc->start_episode}) ➔ {$arc->end_work_title} (T{$arc->end_season} Ep. {$arc->end_episode})";
+                    $spanDesc = "{$firstRow->work_title} (T{$startSeason} Ep. {$startEp}) ➔ {$lastRow->work_title} (T{$endSeason} Ep. {$endEp})";
                 }
 
-                return (array) $arc;
-            })->toArray();
+                return [
+                    'id' => $firstRow->id,
+                    'title' => $firstRow->title,
+                    'classification' => $firstRow->classification,
+                    'work_title' => $firstRow->work_title,
+                    'start_season' => $startSeason,
+                    'start_episode' => $startEp,
+                    'end_work_title' => $lastRow->work_title,
+                    'end_season' => $endSeason,
+                    'end_episode' => $endEp,
+                    'span_description' => $spanDesc,
+                ];
+            })->values()->toArray();
 
-            // Genealogia ontológica: Cronologia, Prequels, Sequels e Side-Stories baseadas nas relações
-            $genealogyRaw = collect(DB::select("
-                SELECT w2.id, r.relation_type, w2.title, w2.format, wa.image_url, w2.episode_count 
-                FROM catalog_work_relations r 
-                JOIN catalog_works w2 ON r.to_work_id = w2.id 
-                LEFT JOIN catalog_work_assets wa ON w2.id = wa.work_id 
-                WHERE r.from_work_id IN (SELECT work_id FROM catalog_universe_works WHERE universe_id = ?) 
-                  AND r.to_work_id IN (SELECT work_id FROM catalog_universe_works WHERE universe_id = ?) 
-                  AND w2.media = 'anime' 
-                  AND r.relation_type IN ('prequel', 'sequel', 'side_story', 'spin_off', 'parent_story') 
-                GROUP BY w2.id, r.relation_type
-            ", [$realId, $realId]))
+            // Genealogia ontológica rápida usando os IDs em memória
+            $genealogyRaw = DB::table('catalog_work_relations as r')
+                ->join('catalog_works as w2', 'r.to_work_id', '=', 'w2.id')
+                ->leftJoin('catalog_work_assets as wa', 'w2.id', '=', 'wa.work_id')
+                ->whereIn('r.from_work_id', $safeWorkIds)
+                ->whereIn('r.to_work_id', $safeWorkIds)
+                ->where('w2.media', 'anime')
+                ->whereIn('r.relation_type', ['prequel', 'sequel', 'side_story', 'spin_off', 'parent_story'])
+                ->select('w2.id', 'r.relation_type', 'w2.title', 'w2.format', 'wa.image_url', 'w2.episode_count')
+                ->groupBy('w2.id', 'r.relation_type')
+                ->get()
                 ->map(fn ($item) => (array) $item)
                 ->toArray();
 
@@ -902,7 +909,7 @@ class CatalogGraphController extends Controller
     {
         $realId = $this->resolveUuid($id, 'arc');
 
-        $data = Cache::remember("catalog:arc:graph:payload:v3:{$realId}", 3600, function () use ($realId) {
+        $data = Cache::remember("catalog:arc:graph:payload:v4:{$realId}", 3600, function () use ($realId) {
             $arc = DB::table('catalog_arcs')->where('id', $realId)->first();
             if (! $arc) {
                 return null;
@@ -919,7 +926,7 @@ class CatalogGraphController extends Controller
                 $work = DB::table('catalog_works as w')
                     ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
                     ->where('w.id', $arcWork->work_id)
-                    ->first(['w.id', 'w.title', 'w.format', 'w.status', 'w.episode_count', 'wa.image_url']);
+                    ->first(['w.id', 'w.title', 'w.media', 'w.format', 'w.status', 'w.episode_count', 'wa.image_url']);
             }
 
             $universeId = $arc->universe_id ?? null;
@@ -953,28 +960,31 @@ class CatalogGraphController extends Controller
                 $episodes = $epQuery->orderBy('number')->limit(200)->get(['id', 'number', 'air_date_utc']);
             }
 
-            // Outros arcos da mesma obra ou universo
+            // Outros arcos da mesma obra ou universo (incluindo o próprio para linha cronológica anterior -> atual -> próximo)
+            $allWorkArcs = [];
             $otherArcs = [];
             if ($work) {
-                $otherArcs = DB::table('catalog_arc_works as aw')
+                $allWorkArcs = DB::table('catalog_arc_works as aw')
                     ->join('catalog_arcs as a', 'aw.arc_id', '=', 'a.id')
                     ->where('aw.work_id', $work->id)
-                    ->where('a.id', '!=', $realId)
                     ->orderBy('aw.position')
                     ->orderBy('aw.start_number')
                     ->get(['a.id', 'a.title', 'a.classification', 'aw.start_number', 'aw.end_number'])
                     ->toArray();
+
+                $otherArcs = array_values(array_filter($allWorkArcs, fn ($a) => $a->id !== $realId));
             }
 
-            // Criadores e Estúdios da obra pai
+            // Criadores, Estúdios e Trilhas (OP/ED) da obra pai
             $creators = [];
             $studios = [];
+            $tracks = [];
             if ($work) {
                 $creators = DB::table('catalog_work_creators as wc')
                     ->join('catalog_creators as c', 'wc.creator_id', '=', 'c.id')
                     ->join('catalog_roles as r', 'wc.role_id', '=', 'r.id')
                     ->where('wc.work_id', $work->id)
-                    ->limit(4)
+                    ->limit(6)
                     ->get(['c.id', 'c.name', 'c.image_url', 'r.token as role'])
                     ->toArray();
 
@@ -984,6 +994,13 @@ class CatalogGraphController extends Controller
                     ->limit(3)
                     ->get(['s.id', 's.name', 's.image_url'])
                     ->toArray();
+
+                $tracks = DB::table('catalog_work_tracks as wt')
+                    ->join('catalog_tracks as t', 'wt.track_id', '=', 't.id')
+                    ->where('wt.work_id', $work->id)
+                    ->limit(16)
+                    ->get(['t.id', 't.title', 't.track_type'])
+                    ->toArray();
             }
 
             return json_decode(json_encode([
@@ -991,9 +1008,11 @@ class CatalogGraphController extends Controller
                 'work' => $work,
                 'universe' => $universe,
                 'episodes' => $episodes,
+                'allWorkArcs' => $allWorkArcs,
                 'otherArcs' => $otherArcs,
                 'creators' => $creators,
                 'studios' => $studios,
+                'tracks' => $tracks,
             ]), true);
         });
 
@@ -1005,9 +1024,11 @@ class CatalogGraphController extends Controller
         $work = ! empty($data['work']) ? (object) $data['work'] : null;
         $universe = ! empty($data['universe']) ? (object) $data['universe'] : null;
         $episodes = collect($data['episodes'] ?? [])->map(fn ($e) => (object) $e);
+        $allWorkArcs = collect($data['allWorkArcs'] ?? [])->map(fn ($wa) => (object) $wa);
         $otherArcs = collect($data['otherArcs'] ?? [])->map(fn ($oa) => (object) $oa);
         $creators = collect($data['creators'] ?? [])->map(fn ($c) => (object) $c);
         $studios = collect($data['studios'] ?? [])->map(fn ($s) => (object) $s);
+        $tracks = collect($data['tracks'] ?? [])->map(fn ($t) => (object) $t);
 
         if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
             $user = $request->user();
@@ -1024,9 +1045,11 @@ class CatalogGraphController extends Controller
                 'work' => $work,
                 'universe' => $universe,
                 'episodes' => $episodes,
+                'allWorkArcs' => $allWorkArcs,
                 'otherArcs' => $otherArcs,
                 'creators' => $creators,
                 'studios' => $studios,
+                'tracks' => $tracks,
                 'isLiked' => (bool) ($pref->liked ?? false),
                 'isBookmarked' => (bool) ($pref->bookmarked ?? false),
                 'userScore' => $pref->user_score ?? null,

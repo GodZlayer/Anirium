@@ -222,6 +222,33 @@
                             </div>
                         </div>
 
+                        <!-- Add-on Oficial 2: Anirium Manga Reader Pro -->
+                        <div class="pt-3 border-t border-theme-default/60 flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                                    📖
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h5 class="text-xs font-bold text-theme-primary truncate">Anirium Manga Reader Pro (v1.0.0)</h5>
+                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ANIRIUM+</span>
+                                    </div>
+                                    <p class="text-[10px] text-theme-muted truncate mt-0.5">Leitor oficial para capítulos de mangás e novels (imagens, CBZ e PDF).</p>
+                                </div>
+                            </div>
+
+                            <div class="shrink-0">
+                                @if($isAdmin || $isPlus)
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="addon-toggle-manga-reader-pro" onchange="window.toggleAddon('manga-reader-pro', this.checked)" class="sr-only peer">
+                                        <div class="w-9 h-5 bg-theme-pill border border-theme-default peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-400"></div>
+                                    </label>
+                                @else
+                                    <span class="px-2.5 py-1 rounded-lg bg-theme-pill border border-theme-default text-[10px] font-mono text-theme-muted">Requer Anirium+</span>
+                                @endif
+                            </div>
+                        </div>
+
                         <!-- Controle e Download do Daemon Local Anirium+ Service -->
                         <div class="pt-2.5 border-t border-theme-default/60 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
                             <span class="text-theme-muted">Daemon Local: <code class="text-theme-accent">http://127.0.0.1:4004</code></span>
