@@ -97,12 +97,26 @@ class CatalogGraphController extends Controller
             return $canonicalTitle;
         }
 
-        $uName = DB::table('catalog_universes')->where('id', $universeId)->value('name');
-        if ($uName) {
-            return $uName;
+        $translatedTitle = DB::table('catalog_translations')
+            ->where('entity_id', $universeId)
+            ->where('field', 'title')
+            ->whereIn('locale', ['pt-BR', 'romaji', 'en', 'und'])
+            ->value('value');
+
+        if ($translatedTitle) {
+            return $translatedTitle;
         }
 
-        return $fallbackWorkTitle ? "{$fallbackWorkTitle}" : 'Universo Canônico';
+        if ($fallbackWorkTitle) {
+            return $fallbackWorkTitle;
+        }
+
+        $firstWorkTitle = DB::table('catalog_universe_works as uw')
+            ->join('catalog_works as w', 'uw.work_id', '=', 'w.id')
+            ->where('uw.universe_id', $universeId)
+            ->value('w.title');
+
+        return $firstWorkTitle ?: 'Universo Canônico';
     }
 
     public function context(Request $request, string $kind, string $id, CatalogContextLookup $lookup): JsonResponse
@@ -129,33 +143,20 @@ class CatalogGraphController extends Controller
             );
 
             // Cache atômico em memória para o grafo estático da obra (reduz de 6s para 0ms)
-            $cacheKey = "catalog:work:graph:payload:v4:{$realId}:".($allowAdult ? '1' : '0');
-            $result = Cache::remember($cacheKey, 3600, function () use ($graph, $realId, $allowAdult) {
-                $res = $graph->read($realId, $allowAdult);
-                if (! $res) {
-                    return null;
-                }
+            $res = $graph->read($realId, $allowAdult);
+            if (! $res) {
+                return response()->json(['error' => 'entity_not_found'], 404);
+            }
 
+            $metaKey = "catalog:work:graph:meta:v5:{$realId}";
+            $meta = Cache::remember($metaKey, 3600, function () use ($realId, $res) {
                 $workRow = DB::table('catalog_works')->where('id', $realId)->first();
-                if ($workRow) {
-                    $res['entity']['media'] = $workRow->media ?? ($res['entity']['media'] ?? 'anime');
-                    $res['entity']['format'] = $workRow->format ?? ($res['entity']['format'] ?? 'TV');
-                    $res['entity']['status'] = $workRow->status ?? ($res['entity']['status'] ?? 'COMPLETED');
-                    $res['entity']['episode_count'] = $workRow->episode_count ?? ($res['entity']['episode_count'] ?? null);
-                }
-
-                // Sinopse localizada se ausente
-                if (empty($res['entity']['synopsis'])) {
-                    $synopsis = DB::table('catalog_translations')
-                        ->where('entity_id', $realId)
-                        ->where('field', 'synopsis')
-                        ->whereIn('locale', ['pt-BR', 'en', 'und'])
-                        ->orderByRaw("CASE WHEN locale = 'pt-BR' THEN 1 WHEN locale = 'en' THEN 2 ELSE 3 END")
-                        ->value('value');
-                    if ($synopsis) {
-                        $res['entity']['synopsis'] = $synopsis;
-                    }
-                }
+                $synopsis = DB::table('catalog_translations')
+                    ->where('entity_id', $realId)
+                    ->where('field', 'synopsis')
+                    ->whereIn('locale', ['pt-BR', 'en', 'und'])
+                    ->orderByRaw("CASE WHEN locale = 'pt-BR' THEN 1 WHEN locale = 'en' THEN 2 ELSE 3 END")
+                    ->value('value');
 
                 // Injetar relações de Universo Canônico
                 $universeWork = DB::table('catalog_universe_works')
@@ -193,16 +194,6 @@ class CatalogGraphController extends Controller
                     ->get(['t.id', 't.title', 't.track_type', 'c.name as composer_name', 'c.id as composer_id'])
                     ->toArray();
 
-                // Relações diretas (Prequel, Sequel, Adaptação, Side-Story)
-                $relations = DB::table('catalog_work_relations as wr')
-                    ->join('catalog_works as w2', 'wr.to_work_id', '=', 'w2.id')
-                    ->leftJoin('catalog_work_assets as wa', 'w2.id', '=', 'wa.work_id')
-                    ->where('wr.from_work_id', $realId)
-                    ->select('w2.id', 'w2.title', 'w2.media', 'w2.format', 'w2.status', 'w2.episode_count', 'wa.image_url', 'wr.relation_type')
-                    ->limit(16)
-                    ->get()
-                    ->toArray();
-
                 // Identidades externas para resolução aberta de Addons (MAL, AniList, Shikimori, IMDb)
                 $externalIds = DB::table('catalog_external_identities')
                     ->where('entity_id', $realId)
@@ -211,24 +202,40 @@ class CatalogGraphController extends Controller
                     ->toArray();
 
                 $image = DB::table('catalog_work_assets')->where('work_id', $realId)->value('image_url');
-                if ($image) {
-                    $res['entity']['image_url'] = $image;
-                }
 
-                $res['creators'] = $creators;
-                $res['studios'] = $studios;
-                $res['tracks'] = $tracks;
-                $res['universe'] = $universeData;
-                $res['relations'] = $relations;
-                $res['external_ids'] = $externalIds;
-
-                // Converter todos os stdClass para arrays antes de salvar em cache
-                return json_decode(json_encode($res), true);
+                return json_decode(json_encode([
+                    'workRow' => $workRow,
+                    'synopsis' => $synopsis,
+                    'universe' => $universeData,
+                    'creators' => $creators,
+                    'studios' => $studios,
+                    'tracks' => $tracks,
+                    'external_ids' => $externalIds,
+                    'image_url' => $image,
+                ]), true);
             });
 
-            if (! $result) {
-                return response()->json(['error' => 'entity_not_found'], 404);
+            if (! empty($meta['workRow'])) {
+                $workRow = $meta['workRow'];
+                $res['entity']['media'] = $workRow['media'] ?? ($res['entity']['media'] ?? 'anime');
+                $res['entity']['format'] = $workRow['format'] ?? ($res['entity']['format'] ?? 'TV');
+                $res['entity']['status'] = $workRow['status'] ?? ($res['entity']['status'] ?? 'COMPLETED');
+                $res['entity']['episode_count'] = $workRow['episode_count'] ?? ($res['entity']['episode_count'] ?? null);
             }
+            if (empty($res['entity']['synopsis']) && ! empty($meta['synopsis'])) {
+                $res['entity']['synopsis'] = $meta['synopsis'];
+            }
+            if (! empty($meta['image_url'])) {
+                $res['entity']['image_url'] = $meta['image_url'];
+            }
+
+            $res['creators'] = $meta['creators'] ?? [];
+            $res['studios'] = $meta['studios'] ?? [];
+            $res['tracks'] = $meta['tracks'] ?? [];
+            $res['universe'] = $meta['universe'] ?? null;
+            $res['external_ids'] = $meta['external_ids'] ?? [];
+
+            $result = json_decode(json_encode($res), true);
 
             $creators = collect($result['creators'] ?? [])->map(fn ($c) => (object) $c);
             $studios = collect($result['studios'] ?? [])->map(fn ($s) => (object) $s);
@@ -238,7 +245,7 @@ class CatalogGraphController extends Controller
             $universe = ! empty($result['universe']) ? (object) $result['universe'] : null;
 
             // Se for requisição pedindo HTML/Blade ou HTMX, retorna a view compilada diretamente pelo PHP
-            if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
+            if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
                 $user = $request->user();
                 $pref = null;
                 if ($user) {
@@ -281,16 +288,19 @@ class CatalogGraphController extends Controller
         $realId = $this->resolveUuid($id, 'universe');
         $allowAdult = (bool) ($request->user()?->adult_content_enabled || $request->query('adult') === '1');
 
-        $cacheKey = "catalog:universe:graph:payload:v7:{$realId}:".($allowAdult ? '1' : '0');
-        $data = Cache::remember($cacheKey, 3600, function () use ($realId, $allowAdult) {
-            $universe = DB::table('catalog_universes')->where('id', $realId)->first();
-            if (! $universe) {
-                return null;
-            }
+        $universeRow = DB::table('catalog_universes')->where('id', $realId)->first();
+        if (! $universeRow) {
+            return response()->json(['error' => 'entity_not_found'], 404);
+        }
 
-            $allWorkIds = DB::table('catalog_universe_works')->where('universe_id', $realId)->pluck('work_id')->all();
-            $visibility = app(CatalogGraphVisibility::class);
-            $visibleWorkIds = $visibility->works($allWorkIds, $allowAdult);
+        $allWorkIds = DB::table('catalog_universe_works')->where('universe_id', $realId)->pluck('work_id')->all();
+        $visibility = app(CatalogGraphVisibility::class);
+        $visibleWorkIds = $visibility->works($allWorkIds, $allowAdult);
+        sort($visibleWorkIds, SORT_STRING);
+
+        $cacheKey = "catalog:universe:graph:payload:v9:{$realId}:".($allowAdult ? '1' : '0');
+        $data = Cache::remember($cacheKey, 3600, function () use ($realId, $universeRow, $allWorkIds, $visibleWorkIds) {
+            $universe = clone $universeRow;
             $safeWorkIds = $allWorkIds ?: ['00000000-0000-0000-0000-000000000000'];
 
             // Buscar todas as obras vinculadas a este universo
@@ -404,8 +414,8 @@ class CatalogGraphController extends Controller
                 ->join('catalog_arc_works as aw', 'a.id', '=', 'aw.arc_id')
                 ->join('catalog_works as w', 'aw.work_id', '=', 'w.id')
                 ->where('a.universe_id', $realId)
-                ->orderBy('aw.position')
                 ->orderBy('aw.start_number')
+                ->orderBy('a.title')
                 ->get(['a.id', 'a.title', 'a.classification', 'aw.work_id', 'w.title as work_title', 'aw.start_number', 'aw.end_number']);
 
             $arcs = $arcRows->groupBy('id')->map(function ($rows) use ($seasonMap) {
@@ -484,9 +494,8 @@ class CatalogGraphController extends Controller
         $totalEpisodes = $data['totalEpisodes'] ?? 0;
         $totalChapters = $data['totalChapters'] ?? 0;
         $totalVolumes = $data['totalVolumes'] ?? 0;
-        $visibleWorkIds = $data['visibleWorkIds'];
 
-        if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
+        if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             $user = $request->user();
             $pref = null;
             if ($user) {
@@ -627,7 +636,7 @@ class CatalogGraphController extends Controller
         $tracks = collect($data['tracks'] ?? [])->map(fn ($t) => (object) $t);
         $universe = $universes->first();
 
-        if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
+        if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             $user = $request->user();
             $pref = null;
             if ($user) {
@@ -737,7 +746,7 @@ class CatalogGraphController extends Controller
         $universes = collect($data['universes'] ?? [])->map(fn ($u) => (object) $u);
         $creators = collect($data['creators'] ?? [])->map(fn ($c) => (object) $c);
 
-        if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
+        if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             $user = $request->user();
             $pref = null;
             if ($user) {
@@ -875,7 +884,7 @@ class CatalogGraphController extends Controller
         $studios = collect($data['studios'] ?? [])->map(fn ($s) => (object) $s);
         $otherTracks = collect($data['otherTracks'] ?? [])->map(fn ($ot) => (object) $ot);
 
-        if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
+        if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             $user = $request->user();
             $pref = null;
             if ($user) {
@@ -909,7 +918,7 @@ class CatalogGraphController extends Controller
     {
         $realId = $this->resolveUuid($id, 'arc');
 
-        $data = Cache::remember("catalog:arc:graph:payload:v4:{$realId}", 3600, function () use ($realId) {
+        $data = Cache::remember("catalog:arc:graph:payload:v5:{$realId}", 3600, function () use ($realId) {
             $arc = DB::table('catalog_arcs')->where('id', $realId)->first();
             if (! $arc) {
                 return null;
@@ -967,8 +976,8 @@ class CatalogGraphController extends Controller
                 $allWorkArcs = DB::table('catalog_arc_works as aw')
                     ->join('catalog_arcs as a', 'aw.arc_id', '=', 'a.id')
                     ->where('aw.work_id', $work->id)
-                    ->orderBy('aw.position')
                     ->orderBy('aw.start_number')
+                    ->orderBy('a.title')
                     ->get(['a.id', 'a.title', 'a.classification', 'aw.start_number', 'aw.end_number'])
                     ->toArray();
 
@@ -1030,7 +1039,7 @@ class CatalogGraphController extends Controller
         $studios = collect($data['studios'] ?? [])->map(fn ($s) => (object) $s);
         $tracks = collect($data['tracks'] ?? [])->map(fn ($t) => (object) $t);
 
-        if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
+        if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             $user = $request->user();
             $pref = null;
             if ($user) {
@@ -1097,7 +1106,7 @@ class CatalogGraphController extends Controller
         // Delegar para work() renderizando o contexto com o episódio ativo selecionado
         $workResponse = $this->work($request, $episode->work_id, $graph);
 
-        if ($request->wantsJson() === false || $request->header('HX-Request') || $request->query('render') === 'blade') {
+        if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             if ($workResponse instanceof Response) {
                 $viewData = $workResponse->getOriginalContent()->getData();
                 $viewData['currentEpisode'] = $episode;

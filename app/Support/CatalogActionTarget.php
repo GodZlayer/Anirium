@@ -11,9 +11,21 @@ class CatalogActionTarget
 
     public function canonical(string $kind, string $reference): ?string
     {
+        if ($kind === 'manga') {
+            $kind = 'work';
+        }
         $id = $this->legacy($kind, $reference);
+        if ($id && DB::table('catalog_entities')->where('id', $id)->where('kind', $kind)->where('resolution_status', 'verified')->exists()) {
+            return $id;
+        }
+        if (in_array($kind, ['creator', 'studio', 'track'], true) && Str::isUuid($reference)) {
+            $clean = strtolower($reference);
+            $table = 'catalog_'.$kind.'s';
 
-        return $id && DB::table('catalog_entities')->where('id', $id)->where('kind', $kind)->where('resolution_status', 'verified')->exists() ? $id : null;
+            return DB::table($table)->where('id', $clean)->exists() ? $clean : null;
+        }
+
+        return null;
     }
 
     public function legacy(string $kind, string $reference): ?string

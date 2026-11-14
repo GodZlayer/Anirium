@@ -43,6 +43,7 @@ return new class extends Migration
             $table->string('format', 32)->nullable();
             $table->string('status', 32)->nullable()->index();
             $table->unsignedInteger('episode_count')->nullable();
+            $table->boolean('is_adult')->default(false)->index();
         });
         Schema::create('catalog_universe_works', function (Blueprint $table) {
             $table->foreignUuid('universe_id')->constrained('catalog_universes')->restrictOnDelete();

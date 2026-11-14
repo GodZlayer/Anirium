@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class CatalogIdentityStore
 {
-    public const KINDS = ['universe', 'work', 'season', 'episode', 'arc'];
+    public const KINDS = ['universe', 'work', 'manga', 'season', 'episode', 'arc', 'creator', 'studio', 'track'];
 
     public function create(string $kind, array $aliases = [], ?string $id = null, string $status = 'verified'): string
     {

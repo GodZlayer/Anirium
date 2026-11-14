@@ -113,6 +113,20 @@ return new class extends Migration
                 $table->string('default_dark', 32);
             });
         }
+
+        // 10. Tabela de Traduções Relacionais (Títulos e Sinopses Localizadas)
+        if (!Schema::hasTable('catalog_translations')) {
+            Schema::create('catalog_translations', function (Blueprint $table) {
+                $table->string('entity_id', 36);
+                $table->string('entity_kind', 32)->default('work');
+                $table->string('field', 32)->default('title');
+                $table->string('locale', 16);
+                $table->text('value');
+                $table->primary(['entity_id', 'field', 'locale']);
+                $table->index(['entity_id', 'locale'], 'idx_trans_lookup');
+                $table->index(['field', 'locale'], 'idx_trans_field');
+            });
+        }
     }
 
     /**
@@ -120,6 +134,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('catalog_translations');
         Schema::dropIfExists('system_themes');
         Schema::dropIfExists('system_strings');
         Schema::dropIfExists('catalog_work_tracks');
