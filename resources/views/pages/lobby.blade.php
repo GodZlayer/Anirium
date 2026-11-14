@@ -2749,6 +2749,48 @@
                         }
                     }
                 } catch (e) {}
+            } else if (msg.type === 'anirium:player:p2p-metrics' && msg.payload) {
+                // Encaminha a telemetria do player / Anirium Service para o pipeline de gamificação do Core
+                if (window.currentUser) {
+                    try {
+                        const p = msg.payload;
+                        const p2pEvent = {
+                            target_type: 'global',
+                            target_id: 'p2p_swarm',
+                            event_type: 'p2p_seeding_heartbeat',
+                            payload: {
+                                delta_uploaded_bytes: p.delta_uploaded_bytes || 0,
+                                delta_downloaded_bytes: p.delta_downloaded_bytes || 0,
+                                seeding_seconds: 30,
+                                upload_rate: p.upload_rate,
+                                download_rate: p.download_rate,
+                                peers: p.peers
+                            }
+                        };
+                        const payloadBody = JSON.stringify({
+                            machine_fingerprint: window.getValidDeviceId(),
+                            events: [p2pEvent]
+                        });
+                        const tRes = await fetch('/api/telemetry/events', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: payloadBody
+                        });
+                        if (tRes.ok) {
+                            const tData = await tRes.json().catch(() => ({}));
+                            if (tData.seeding_xp !== undefined && window.currentUser) {
+                                window.currentUser.seeding_xp = tData.seeding_xp;
+                                window.currentUser.bytes_uploaded = tData.bytes_uploaded;
+                                window.currentUser.bytes_downloaded = tData.bytes_downloaded;
+                                window.currentUser.active_minutes = tData.active_minutes;
+                            }
+                        }
+                    } catch (err) {}
+                }
             }
         });
 

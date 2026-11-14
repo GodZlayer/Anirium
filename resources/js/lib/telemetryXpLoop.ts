@@ -36,6 +36,10 @@ export interface TelemetryState {
   currentStreak: number; // Dias seguidos de presença
   longestStreak: number; // Maior sequência de dias
   streakXp: number; // XP acumulado de presença diária + bônus semanais/mensais/anuais
+  bytesUploaded: number; // Bytes de seed entregues para a rede P2P
+  bytesDownloaded: number; // Bytes consumidos da rede P2P
+  seedingSeconds: number; // Segundos de seeding ativo
+  seedingXp: number; // XP gerado por contribuição e seed no enxame
   totalSecondsWatched: number;
   episodesCompleted: number;
   arcsCompleted: number;
@@ -61,6 +65,7 @@ export interface TelemetryEvent {
     | "dwell_time"
     | "playback_heartbeat"
     | "episode_completed"
+    | "p2p_seeding_heartbeat"
     | "like"
     | "favorite"
     | "rate"
@@ -132,6 +137,10 @@ export function defaultTelemetryState(): TelemetryState {
     currentStreak: 0,
     longestStreak: 0,
     streakXp: 0,
+    bytesUploaded: 0,
+    bytesDownloaded: 0,
+    seedingSeconds: 0,
+    seedingXp: 0,
     totalSecondsWatched: 0,
     episodesCompleted: 0,
     arcsCompleted: 0,
@@ -200,6 +209,10 @@ export function recalculateUserGamification(
     tier?: number;
     isAuthenticated?: boolean;
     customTitle?: string | null;
+    bytesUploaded?: number;
+    bytesDownloaded?: number;
+    seedingSeconds?: number;
+    seedingXp?: number;
   }
 ): TelemetryState {
   if (preferencesInput) cachedPreferences = preferencesInput;
@@ -224,6 +237,10 @@ export function recalculateUserGamification(
   const currentStreak = metaInput?.currentStreak ?? current.currentStreak ?? 1;
   const longestStreak = metaInput?.longestStreak ?? current.longestStreak ?? 1;
   const streakXp = metaInput?.streakXp ?? current.streakXp ?? 10;
+  const bytesUploaded = metaInput?.bytesUploaded ?? current.bytesUploaded ?? 0;
+  const bytesDownloaded = metaInput?.bytesDownloaded ?? current.bytesDownloaded ?? 0;
+  const seedingSeconds = metaInput?.seedingSeconds ?? current.seedingSeconds ?? 0;
+  const seedingXp = metaInput?.seedingXp ?? current.seedingXp ?? 0;
 
   const counts = cachedCompletion.counts;
   const totalCompletedEpisodesCount = counts.episodes;
@@ -250,7 +267,7 @@ export function recalculateUserGamification(
     worksCompleted * experienceRules.catalog.works +
     universesCompleted * experienceRules.catalog.universes;
 
-  const totalXp = activeXp + streakXp + socialXp + catalogXp;
+  const totalXp = activeXp + streakXp + socialXp + catalogXp + seedingXp;
   const levelCalc = computeLevelFromTotalXp(totalXp);
 
   const uniqueTitleIds = unlockedAchievementIds({ tier, level:levelCalc.levelNumber, episodes:totalCompletedEpisodesCount, universes:universesCompleted });
@@ -268,6 +285,10 @@ export function recalculateUserGamification(
     currentStreak,
     longestStreak,
     streakXp,
+    bytesUploaded,
+    bytesDownloaded,
+    seedingSeconds,
+    seedingXp,
     totalSecondsWatched: current.totalSecondsWatched || 0,
     episodesCompleted: totalCompletedEpisodesCount,
     arcsCompleted,
@@ -474,6 +495,49 @@ export function initTelemetryLoop(isLoggedIn: boolean = false, tier: number = 1)
   return () => {
     flushTelemetryQueue();
   };
+}
+
+let lastTrackedServiceBytesWritten = 0;
+let lastTrackedServiceBytesRead = 0;
+let serviceTelemetryInterval: any = null;
+
+export function recordP2pSeedingHeartbeat(
+  deltaUploaded: number,
+  deltaDownloaded: number,
+  seedingSeconds: number = 30,
+  isAuthenticated: boolean = currentAuthFlag
+): TelemetryState {
+  if (deltaUploaded <= 0 && deltaDownloaded <= 0 && seedingSeconds <= 0) {
+    return loadTelemetryState();
+  }
+
+  const current = loadTelemetryState();
+  const nextUploaded = (current.bytesUploaded || 0) + deltaUploaded;
+  const nextDownloaded = (current.bytesDownloaded || 0) + deltaDownloaded;
+  const nextSeedingSec = (current.seedingSeconds || 0) + seedingSeconds;
+  
+  // 1 MB = 1 XP | 30s seed = 1 XP
+  const addedXp = Math.floor(deltaUploaded / (1024 * 1024)) + Math.floor(seedingSeconds / 30);
+  const nextSeedingXp = (current.seedingXp || 0) + addedXp;
+
+  queueTelemetryEvent({
+    target_type: "global",
+    target_id: "p2p_swarm",
+    event_type: "p2p_seeding_heartbeat",
+    payload: {
+      delta_uploaded_bytes: deltaUploaded,
+      delta_downloaded_bytes: deltaDownloaded,
+      seeding_seconds: seedingSeconds,
+    },
+  });
+
+  return recalculateUserGamification(undefined, undefined, undefined, {
+    bytesUploaded: nextUploaded,
+    bytesDownloaded: nextDownloaded,
+    seedingSeconds: nextSeedingSec,
+    seedingXp: nextSeedingXp,
+    isAuthenticated,
+  });
 }
 
 export function recordWatchProgress(

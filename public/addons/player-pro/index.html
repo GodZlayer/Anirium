@@ -1606,6 +1606,69 @@
                     if (document.visibilityState === 'visible') void renewSession();
                 });
 
+                // ==========================================
+                //  TELEMETRIA P2P, SEEDING & CONTRIBUIÇÃO DE REDE
+                // ==========================================
+                let lastRawBytesUploaded = 0;
+                let lastRawBytesDownloaded = 0;
+                const parseFormattedBytes = (str) => {
+                    if (!str || typeof str !== 'string') return 0;
+                    const parts = str.trim().split(/\s+/);
+                    const val = parseFloat(parts[0]) || 0;
+                    const unit = (parts[1] || 'MB').toUpperCase();
+                    if (unit.startsWith('GB')) return Math.floor(val * 1024 * 1024 * 1024);
+                    if (unit.startsWith('MB')) return Math.floor(val * 1024 * 1024);
+                    if (unit.startsWith('KB')) return Math.floor(val * 1024);
+                    return Math.floor(val);
+                };
+
+                const reportP2pNetworkActivity = async () => {
+                    if (!state.token || !state.deviceId) return;
+                    try {
+                        const stRes = await fetch('http://127.0.0.1:4004/stats', {
+                            cache: 'no-store',
+                            headers: {
+                                'Authorization': `Bearer ${state.token}`,
+                                'X-Anirium-Device': state.deviceId
+                            }
+                        });
+                        if (stRes.ok) {
+                            const stData = await stRes.json().catch(() => ({}));
+                            const currentUp = parseFormattedBytes(stData.totalUploaded);
+                            const currentDown = parseFormattedBytes(stData.totalDownloaded);
+
+                            let deltaUp = 0;
+                            let deltaDown = 0;
+                            if (lastRawBytesUploaded > 0 && currentUp >= lastRawBytesUploaded) {
+                                deltaUp = currentUp - lastRawBytesUploaded;
+                            }
+                            if (lastRawBytesDownloaded > 0 && currentDown >= lastRawBytesDownloaded) {
+                                deltaDown = currentDown - lastRawBytesDownloaded;
+                            }
+                            lastRawBytesUploaded = currentUp;
+                            lastRawBytesDownloaded = currentDown;
+
+                            // Emite para o Core (Lobby) contabilizar XP e métricas absolutas via heartbeat
+                            window.parent.postMessage({
+                                type: 'anirium:player:p2p-metrics',
+                                payload: {
+                                    delta_uploaded_bytes: deltaUp,
+                                    delta_downloaded_bytes: deltaDown,
+                                    upload_rate: stData.uploadRate || '0.0 KB/s',
+                                    download_rate: stData.downloadRate || '0.0 KB/s',
+                                    peers: Number(stData.peers || 0),
+                                    is_playing: dom.video ? !dom.video.paused : false,
+                                    current_time: dom.video ? dom.video.currentTime || 0 : 0
+                                }
+                            }, '*');
+                        }
+                    } catch (e) {}
+                };
+
+                // Reporta telemetria P2P a cada 30 segundos
+                setInterval(reportP2pNetworkActivity, 30000);
+                setTimeout(reportP2pNetworkActivity, 5000);
+
             } catch (e) {
                 dom.badgeStatus.innerText = '● ERRO DE CONEXÃO 4004';
                 dom.badgeStatus.className = 'badge-status warn mono';

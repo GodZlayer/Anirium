@@ -174,6 +174,9 @@ class TelemetryDeviceController extends Controller
         $rows = [];
         $now = now();
         $activeMinuteIncrements = 0;
+        $uploadedBytesIncrement = 0;
+        $downloadedBytesIncrement = 0;
+        $seedingSecondsIncrement = 0;
 
         foreach ($events as $ev) {
             if (! is_array($ev) || (isset($ev['target_id']) && ! is_string($ev['target_id']))) {
@@ -182,6 +185,16 @@ class TelemetryDeviceController extends Controller
             $eventType = substr($ev['event_type'] ?? 'presence_ping', 0, 32);
             if ($eventType === 'active_minute') {
                 $activeMinuteIncrements += 1;
+            } elseif ($eventType === 'p2p_seeding_heartbeat') {
+                // Validação e contabilização antifraude de tráfego P2P
+                $payload = is_array($ev['payload'] ?? null) ? $ev['payload'] : [];
+                $upBytes = max(0, min((int) ($payload['delta_uploaded_bytes'] ?? 0), 200 * 1024 * 1024)); // teto máx 200MB/min
+                $downBytes = max(0, min((int) ($payload['delta_downloaded_bytes'] ?? 0), 500 * 1024 * 1024));
+                $seedSec = max(0, min((int) ($payload['seeding_seconds'] ?? 60), 300));
+                
+                $uploadedBytesIncrement += $upBytes;
+                $downloadedBytesIncrement += $downBytes;
+                $seedingSecondsIncrement += $seedSec;
             }
             $eventTargetType = $ev['target_type'] ?? 'global';
             if (! is_string($eventTargetType) || ! in_array($eventTargetType, ['global', ...CatalogIdentityStore::KINDS], true)) {
@@ -219,14 +232,34 @@ class TelemetryDeviceController extends Controller
 
             if ($activeMinuteIncrements > 0) {
                 $user->active_minutes = (int) ($user->active_minutes ?? 0) + $activeMinuteIncrements;
-                $user->saveQuietly();
             }
+
+            if ($uploadedBytesIncrement > 0 || $downloadedBytesIncrement > 0 || $seedingSecondsIncrement > 0) {
+                $user->bytes_uploaded = (int) ($user->bytes_uploaded ?? 0) + $uploadedBytesIncrement;
+                $user->bytes_downloaded = (int) ($user->bytes_downloaded ?? 0) + $downloadedBytesIncrement;
+                $user->seeding_seconds = (int) ($user->seeding_seconds ?? 0) + $seedingSecondsIncrement;
+                
+                // 1 MB seeded = 1 XP | cada 60s seeding ativo = 2 XP
+                $mbSeededXp = (int) floor($uploadedBytesIncrement / (1024 * 1024));
+                $timeSeededXp = (int) floor($seedingSecondsIncrement / 30);
+                $newSeedingXp = $mbSeededXp + $timeSeededXp;
+                
+                if ($newSeedingXp > 0) {
+                    $user->seeding_xp = (int) ($user->seeding_xp ?? 0) + $newSeedingXp;
+                }
+            }
+
+            $user->saveQuietly();
         }
 
         return response()->json([
             'status' => 'recorded',
             'count' => count($rows),
             'active_minutes' => $user ? (int) $user->active_minutes : 0,
+            'bytes_uploaded' => $user ? (int) $user->bytes_uploaded : 0,
+            'bytes_downloaded' => $user ? (int) $user->bytes_downloaded : 0,
+            'seeding_seconds' => $user ? (int) $user->seeding_seconds : 0,
+            'seeding_xp' => $user ? (int) $user->seeding_xp : 0,
             'current_streak' => $user ? (int) $user->current_streak : 0,
             'streak_xp' => $user ? (int) $user->streak_xp : 0,
         ]);
