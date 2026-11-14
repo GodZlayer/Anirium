@@ -187,6 +187,15 @@
             transition: opacity 0.3s ease;
         }
 
+        .spin-slow {
+            animation: spin 1.2s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
         .orb-pulse {
             width: 58px;
             height: 58px;
@@ -572,7 +581,12 @@
 
         <!-- Overlay Central de Inicialização / Arquivo Local -->
         <div id="central-overlay">
-            <div class="orb-pulse">▶</div>
+            <div class="orb-pulse">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="spin-slow">
+                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="#FFC766"></path>
+                </svg>
+            </div>
             <div style="max-width: 520px; display: flex; flex-direction: column; gap: 8px;">
                 <h3 id="overlay-heading" style="font-size: 17px; font-weight: 800; color: #FFF9F0;">
                     Carregando Episódio...
@@ -581,7 +595,7 @@
                     Inicializando mixer multi-magnet e autenticando sessão de vídeo local...
                 </p>
             </div>
-            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin-top: 6px;">
+            <div id="overlay-manual-actions" style="display: none; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin-top: 6px;">
                 <label class="btn-action btn-primary mono">
                     📂 Abrir Arquivo Local (.mp4/.mkv)
                     <input type="file" accept="video/*,.mkv" style="display:none;" onchange="openLocalFile(this)">
@@ -661,7 +675,7 @@
                 <div class="controls-right">
                     <!-- Menu de Qualidades -->
                     <div class="popover-menu">
-                        <button type="button" class="ctrl-btn mono" id="btn-quality" onclick="togglePopover('card-quality')" title="Qualidade de Vídeo" style="font-size: 11px; font-weight: 800;">
+                        <button type="button" class="ctrl-btn mono" id="btn-quality" onclick="toggleDropdown('card-quality')" title="Qualidade de Vídeo" style="font-size: 11px; font-weight: 800;">
                             HD
                         </button>
                         <div class="popover-card mono" id="card-quality"></div>
@@ -669,7 +683,7 @@
 
                     <!-- Menu de Áudio -->
                     <div class="popover-menu">
-                        <button type="button" class="ctrl-btn" id="btn-audio" onclick="togglePopover('card-audio')" title="Faixas de Áudio">
+                        <button type="button" class="ctrl-btn" id="btn-audio" onclick="toggleDropdown('card-audio')" title="Faixas de Áudio">
                             <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                         </button>
                         <div class="popover-card mono" id="card-audio"></div>
@@ -677,7 +691,7 @@
 
                     <!-- Menu de Legendas -->
                     <div class="popover-menu">
-                        <button type="button" class="ctrl-btn" id="btn-sub" onclick="togglePopover('card-sub')" title="Legendas (C)">
+                        <button type="button" class="ctrl-btn" id="btn-sub" onclick="toggleDropdown('card-sub')" title="Legendas (C)">
                             <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" ry="2"/><path d="M7 15h3"/><path d="M14 15h3"/><path d="M7 11h10"/></svg>
                         </button>
                         <div class="popover-card mono" id="card-sub"></div>
@@ -727,6 +741,7 @@
             centralOverlay: document.getElementById('central-overlay'),
             overlayHeading: document.getElementById('overlay-heading'),
             overlayStatus: document.getElementById('overlay-status'),
+            overlayManualActions: document.getElementById('overlay-manual-actions'),
             badgeEp: document.getElementById('badge-ep'),
             badgeStatus: document.getElementById('badge-status'),
             videoTitle: document.getElementById('video-title'),
@@ -805,13 +820,14 @@
             document.querySelectorAll('.popover-card').forEach(c => c.classList.remove('open'));
         }
 
-        function togglePopover(cardId) {
+        function toggleDropdown(cardId) {
             const card = document.getElementById(cardId);
             if (!card) return;
             const isOpen = card.classList.contains('open');
             closeAllPopovers();
             if (!isOpen) card.classList.add('open');
         }
+        window.toggleDropdown = toggleDropdown;
 
         // ==========================================
         //  REPRODUÇÃO, SEEK E VOLUME
@@ -991,6 +1007,8 @@
             return cues;
         }
 
+        let subtitleAbortController = null;
+
         async function fetchSubtitleTrack(trackId) {
             state.selectedSubtitleTrackId = trackId;
             state.parsedSubtitleCues = [];
@@ -1000,25 +1018,43 @@
 
             if (!trackId || trackId === 'off' || !state.playbackTicket) return;
 
+            // Cancela requisições anteriores de legenda para evitar concorrência e 404s
+            if (subtitleAbortController) {
+                try { subtitleAbortController.abort(); } catch (e) {}
+            }
+            subtitleAbortController = new AbortController();
+            const signal = subtitleAbortController.signal;
+
             const url = `http://127.0.0.1:4004/subtitles?trackId=${encodeURIComponent(trackId)}&playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
             
-            // Loop de Retry para 202 Accepted (mesma estratégia soberana do Animeflix)
-            for (let attempt = 0; attempt < 15; attempt++) {
+            // Loop de Retry para 202 Accepted (estratégia oficial do anirium-service)
+            for (let attempt = 0; attempt < 20; attempt++) {
+                if (signal.aborted) return;
                 try {
-                    const res = await fetch(url);
+                    const res = await fetch(url, { signal });
                     if (res.status === 202) {
                         const waitSec = parseInt(res.headers.get('Retry-After') || '2', 10) || 2;
-                        await new Promise(r => setTimeout(r, waitSec * 1000));
+                        await new Promise((resolve, reject) => {
+                            const timer = setTimeout(resolve, waitSec * 1000);
+                            signal.addEventListener('abort', () => { clearTimeout(timer); reject(); }, { once: true });
+                        });
                         continue;
+                    }
+                    if (res.status === 404) {
+                        // Faixa de geração anterior ou inexistente
+                        console.warn('[PlayerPro] Faixa de legenda não encontrada (404):', trackId);
+                        break;
                     }
                     if (res.ok) {
                         const vttContent = await res.text();
                         if (state.selectedSubtitleTrackId === trackId) {
                             state.parsedSubtitleCues = parseVtt(vttContent);
+                            updateSubtitleCue(dom.video.currentTime || 0);
                         }
                         break;
                     }
                 } catch (e) {
+                    if (signal.aborted) return;
                     break;
                 }
             }
@@ -1169,7 +1205,7 @@
                 dom.badgeStatus.className = 'badge-status mono';
             }
 
-            if (state.selectedSubtitleTrackId && state.playbackTicket) {
+            if (state.selectedSubtitleTrackId && state.selectedSubtitleTrackId !== 'off' && state.playbackTicket && state.parsedSubtitleCues.length === 0) {
                 fetchSubtitleTrack(state.selectedSubtitleTrackId);
             }
         }
@@ -1220,7 +1256,8 @@
             }
 
             state.subtitleTracks = Array.isArray(m.subtitleTracks) ? m.subtitleTracks : [];
-            if (!state.selectedSubtitleTrackId && state.subtitleTracks.length > 0) {
+            const activeTrackExists = state.subtitleTracks.some(t => t.id === state.selectedSubtitleTrackId);
+            if (!activeTrackExists && state.subtitleTracks.length > 0) {
                 const ptTrack = state.subtitleTracks.find(t => /por|pt/i.test(t.language || ''));
                 state.selectedSubtitleTrackId = (ptTrack || state.subtitleTracks[0]).id;
                 fetchSubtitleTrack(state.selectedSubtitleTrackId);
@@ -1317,6 +1354,7 @@
                 dom.badgeStatus.innerText = '● SERVICE 4004 OFFLINE';
                 dom.badgeStatus.className = 'badge-status warn mono';
                 dom.overlayStatus.innerHTML = 'O aplicativo <strong>Anirium Service (porta 4004)</strong> não foi detectado em execução no seu computador. Inicie o Anirium Service no Windows ou utilize um arquivo/link abaixo.';
+                if (dom.overlayManualActions) dom.overlayManualActions.style.display = 'flex';
                 return;
             }
 
@@ -1324,9 +1362,11 @@
                 dom.badgeStatus.innerText = '● AGUARDANDO SESSÃO';
                 dom.badgeStatus.className = 'badge-status warn mono';
                 dom.overlayStatus.innerText = 'Aguardando autorização de sessão do Anirium...';
+                if (dom.overlayManualActions) dom.overlayManualActions.style.display = 'flex';
                 return;
             }
 
+            if (dom.overlayManualActions) dom.overlayManualActions.style.display = 'none';
             dom.badgeStatus.innerText = '● AUTENTICADO NO SERVICE 4004';
             dom.overlayStatus.innerText = 'Sondando provedores P2P e preparando mixer de streaming...';
 
@@ -1424,7 +1464,7 @@
                     break;
                 case 'KeyC':
                     e.preventDefault();
-                    togglePopover('card-sub');
+                    toggleDropdown('card-sub');
                     break;
             }
         });
