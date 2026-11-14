@@ -447,11 +447,11 @@
     </div>
 
     <!-- 7. MODAL EXTERNO DE EXECUÇÃO DE ADD-ON (VÍDEO PLAYER PRO / MANGA READER PRO / COMUNIDADE) -->
-    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 opacity-0 pointer-events-none transition-all duration-200">
-        <div class="w-full max-w-6xl h-[92vh] max-h-[92vh] rounded-3xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col">
-            <div class="px-5 py-3 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0">
+    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-1 sm:p-2.5 md:p-3 opacity-0 pointer-events-none transition-all duration-200">
+        <div class="w-full max-w-[98vw] h-[97vh] max-h-[97vh] rounded-2xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col">
+            <div class="px-4 py-2 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0">
                 <div class="flex items-center gap-2.5 min-w-0">
-                    <span id="external-addon-icon" class="text-theme-accent">⚡</span>
+                    <span id="external-addon-icon" class="text-theme-accent text-sm">⚡</span>
                     <div class="min-w-0">
                         <h4 id="external-addon-title" class="text-xs font-mono font-bold uppercase tracking-wider text-white truncate">Execução via Add-on Externo</h4>
                         <p id="external-addon-subtitle" class="text-[10px] font-mono text-theme-muted truncate">Anirium+ Service / Community Addon</p>
@@ -462,7 +462,7 @@
                             class="px-2.5 py-1 rounded-xl bg-theme-pill border border-theme-default text-[10px] font-mono font-bold text-theme-accent hover:text-white cursor-pointer">
                         ⚙️ Add-ons
                     </button>
-                    <button type="button" onclick="window.closeExternalAddonModal()" class="p-1.5 rounded-xl bg-theme-pill text-theme-muted hover:text-white cursor-pointer">✕</button>
+                    <button type="button" onclick="window.closeExternalAddonModal()" class="px-2.5 py-1 rounded-xl bg-theme-pill text-theme-muted hover:text-white hover:bg-rose-500/20 text-xs font-bold cursor-pointer transition-colors" title="Fechar / Sair do Modo Player">✕ Sair</button>
                 </div>
             </div>
             <div id="external-addon-viewport" class="flex-1 w-full h-full bg-black flex flex-col p-0 overflow-hidden">
