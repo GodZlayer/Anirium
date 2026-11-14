@@ -1053,10 +1053,24 @@
             subtitleAbortController = new AbortController();
             const signal = subtitleAbortController.signal;
 
-            const url = `http://127.0.0.1:4004/subtitles?trackId=${encodeURIComponent(trackId)}&playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
+            // Resolve o ID atual da faixa diretamente do manifesto ativo
+            // Caso o ID tenha mudado de geração (ex: subtitle-6 -> subtitle-7), pega pelo idioma ou match
+            let resolvedTrackId = trackId;
+            if (state.manifest && Array.isArray(state.manifest.subtitleTracks)) {
+                const exact = state.manifest.subtitleTracks.find(t => t.id === trackId);
+                if (!exact) {
+                    const fallback = state.manifest.subtitleTracks[0];
+                    if (fallback) {
+                        resolvedTrackId = fallback.id;
+                        state.selectedSubtitleTrackId = resolvedTrackId;
+                    }
+                }
+            }
+
+            const url = `http://127.0.0.1:4004/subtitles?trackId=${encodeURIComponent(resolvedTrackId)}&playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
             
             // Loop de Retry para 202 Accepted (estratégia oficial do anirium-service)
-            for (let attempt = 0; attempt < 20; attempt++) {
+            for (let attempt = 0; attempt < 25; attempt++) {
                 if (signal.aborted) return;
                 try {
                     const res = await fetch(url, { signal });
@@ -1069,13 +1083,12 @@
                         continue;
                     }
                     if (res.status === 404) {
-                        // Faixa de geração anterior ou inexistente
-                        console.warn('[PlayerPro] Faixa de legenda não encontrada (404):', trackId);
+                        console.warn('[PlayerPro] Faixa de legenda não encontrada (404):', resolvedTrackId);
                         break;
                     }
                     if (res.ok) {
                         const vttContent = await res.text();
-                        if (state.selectedSubtitleTrackId === trackId) {
+                        if (state.selectedSubtitleTrackId === resolvedTrackId || state.selectedSubtitleTrackId === trackId) {
                             state.parsedSubtitleCues = parseVtt(vttContent);
                             updateSubtitleCue(getEpisodeTime());
                         }
@@ -1313,6 +1326,12 @@
             if (readyVariant && readyVariant.playlistUrl) {
                 const streamUrl = `http://127.0.0.1:4004${readyVariant.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
                 playStream(streamUrl, `Anirium+ Unificado (${state.selectedQuality})`);
+                return;
+            }
+
+            // Se o stream já estiver reproduzindo e não houver solicitação forçada (ex: troca manual de qualidade/áudio),
+            // não dispara nova preparação de trecho para não reiniciar o buffer
+            if (!forceRequest && state.currentStreamUrl) {
                 return;
             }
 
