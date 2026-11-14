@@ -542,7 +542,7 @@
 
         // Renderiza deterministicamente a barra de dias para o fuso local do navegador do usuário
         window.initRollingDaysBar = function() {
-            const bar = document.getElementById('calendar-days-bar');
+            const bar = document.getElementById('calendar-days-container') || document.getElementById('calendar-days-bar');
             if (!bar) return;
             const clientToday = new Date().getDay();
             let html = '';
