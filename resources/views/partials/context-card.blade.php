@@ -23,6 +23,7 @@
     $format = strtoupper($work->format ?? ($media === 'manga' ? 'MANGA' : 'TV'));
     $isManga = $media === 'manga' || in_array($format, ['MANGA', 'MANHWA', 'MANHUA', 'ONE_SHOT', 'DOUJINSHI', 'NOVEL', 'LIGHT_NOVEL', 'OEL'], true);
     $status = strtoupper($work->status ?? 'COMPLETED');
+    $isUnreleased = in_array($status, ['NOT_YET_RELEASED', 'NOT_YET_AIRED', 'UPCOMING', 'UNRELEASED'], true);
     $image = $work->image_url ?? '/assets/icons/actions/search.png';
     $synopsis = strip_tags($work->synopsis ?? 'Sinopse oficial catalogada na malha ontológica relacional.');
     $isEpisodeMode = !empty($currentEpisode);
@@ -34,7 +35,7 @@
         $maxArcStart = collect($arcs)->max('start_number');
         $totalEpisodes = max((int) $maxArcEnd, (int) $maxArcStart);
     }
-    if ($totalEpisodes <= 0) {
+    if ($totalEpisodes <= 0 && ! $isUnreleased) {
         $totalEpisodes = 1;
     }
     $totalArcs = count($arcs);
@@ -43,8 +44,9 @@
 
     // Se a obra possui episode_count (ex: 12 eps) ou fallback canônico, mas a tabela catalog_episodes ainda não populou as linhas individuais,
     // gera as unidades episódicas virtuais canônicas (1..N) para que o trilho de Episódios/Capítulos sempre exiba os cards clicáveis!
+    // Para obras ainda não lançadas (ex: Demons' Crest), não gera episódios falsos vazios!
     $displayEpisodes = collect($episodes);
-    if ($displayEpisodes->isEmpty() && $totalEpisodes > 0) {
+    if ($displayEpisodes->isEmpty() && $totalEpisodes > 0 && ! $isUnreleased) {
         $maxVirtual = min((int) $totalEpisodes, 200);
         $virtualList = [];
         for ($i = 1; $i <= $maxVirtual; $i++) {
@@ -187,13 +189,19 @@
                                 </button>
 
                                 <!-- CONDICIONAL POR ADD-ON DE VÍDEO (Anirium Player Pro / Addon de Stream da Comunidade) -->
-                                <button type="button"
-                                        data-requires-addon-capability="video"
-                                        onclick="window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $currentEpisode->id ?? ($episodes[0]->id ?? '') }}', '{{ $epNum }}', '{{ addslashes($title) }}')"
-                                        class="hidden px-3.5 py-1.5 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold transition-all hover:scale-105 active:scale-95 shadow-lg items-center gap-1.5 cursor-pointer">
-                                    <span>▶</span>
-                                    <span>{{ $isEpisodeMode ? ('Tocar Episódio ' . $epNum) : ($format === 'MOVIE' ? 'Reproduzir Filme' : ('Tocar Ep. ' . $epNum)) }}</span>
-                                </button>
+                                @if($isUnreleased)
+                                    <span class="px-3.5 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold flex items-center gap-1.5 shadow-sm">
+                                        <span>⏳</span> <span>Em Breve (Não Lançado)</span>
+                                    </span>
+                                @else
+                                    <button type="button"
+                                            data-requires-addon-capability="video"
+                                            onclick="window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $currentEpisode->id ?? ($episodes[0]->id ?? '') }}', '{{ $epNum }}', '{{ addslashes($title) }}')"
+                                            class="hidden px-3.5 py-1.5 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold transition-all hover:scale-105 active:scale-95 shadow-lg items-center gap-1.5 cursor-pointer">
+                                        <span>▶</span>
+                                        <span>{{ $isEpisodeMode ? ('Tocar Episódio ' . $epNum) : ($format === 'MOVIE' ? 'Reproduzir Filme' : ('Tocar Ep. ' . $epNum)) }}</span>
+                                    </button>
+                                @endif
                             @else
                                 <!-- CONDICIONAL POR ADD-ON DE LEITURA / MANGÁ (Manga Reader Pro / Addon Reader da Comunidade) -->
                                 <button type="button"
@@ -348,7 +356,11 @@
                                         <p class="text-xs text-theme-muted line-clamp-3 leading-relaxed">{{ $synopsis }}</p>
                                     </div>
                                     <div class="flex flex-col gap-2 shrink-0">
-                                        @if(!$isManga)
+                                        @if($isUnreleased)
+                                            <span class="px-3.5 py-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold text-center">
+                                                ⏳ Produção Não Transmitida
+                                            </span>
+                                        @elseif(!$isManga)
                                             <button type="button"
                                                     data-requires-addon-capability="video"
                                                     onclick="window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '', '1', '{{ addslashes($title) }}')"

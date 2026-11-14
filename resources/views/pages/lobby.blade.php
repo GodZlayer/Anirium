@@ -568,7 +568,7 @@
 
         // Local-First Catalog Engine via IndexedDB (Zero bloqueio de thread, Zero JSON de 34MB)
         const DB_NAME = 'anirium_local_catalog';
-        const DB_VERSION = 5;
+        const DB_VERSION = 6;
         const STORE_NAME = 'works';
 
         function openCatalogDB() {
@@ -982,7 +982,12 @@
 
                 // Busca Unificada no Campo da Navbar (Atua no título, formato e em todas as CORRELAÇÕES)
                 if (query) {
-                    const titleMatch = (item.title || item.name || '').toLowerCase().includes(query);
+                    const normQ = query.toLowerCase().replace(/['"`´’]/g, '');
+                    const qTokens = normQ.split(/\s+/).filter(Boolean);
+                    const rawTitle = (item.title || item.name || '').toLowerCase();
+                    const cleanTitle = rawTitle.replace(/['"`´’]/g, '');
+                    
+                    const titleMatch = cleanTitle.includes(normQ) || (qTokens.length > 0 && qTokens.every(t => cleanTitle.includes(t)));
                     const formatMatch = item.format && item.format.toLowerCase().includes(query);
                     
                     // Checa correlação direta de obras vinculadas (ex: Bleach -> Tite Kubo, Pierrot, Noriyuki Abe)
@@ -1000,11 +1005,24 @@
                 return true;
             });
 
-            // Ordenação Sempre Alfabética (A-Z)
+            // Ordenação: Se houver busca ativa, prioriza relevância do título; caso contrário, Alfabética (A-Z)
             const normalizeSortKey = (t) => (t || '').toLowerCase().replace(/^[\s"'«»"''""_\-\.\[\]()!?~*#@]+/g, '');
             filtered.sort((a, b) => {
-                const keyA = normalizeSortKey(a.title || a.name);
-                const keyB = normalizeSortKey(b.title || b.name);
+                const titleA = (a.title || a.name || '').toLowerCase();
+                const titleB = (b.title || b.name || '').toLowerCase();
+                if (query) {
+                    const normQ = query.toLowerCase().replace(/['"`´’]/g, '');
+                    const cleanA = titleA.replace(/['"`´’]/g, '');
+                    const cleanB = titleB.replace(/['"`´’]/g, '');
+                    const exactA = cleanA === normQ ? 1 : 0;
+                    const exactB = cleanB === normQ ? 1 : 0;
+                    if (exactA !== exactB) return exactB - exactA;
+                    const startA = cleanA.startsWith(normQ) ? 1 : 0;
+                    const startB = cleanB.startsWith(normQ) ? 1 : 0;
+                    if (startA !== startB) return startB - startA;
+                }
+                const keyA = normalizeSortKey(titleA);
+                const keyB = normalizeSortKey(titleB);
                 return keyA.localeCompare(keyB);
             });
 
@@ -1041,7 +1059,8 @@
             // Renderiza Cards Oficiais de Entidades Ontológicas (Determinístico e Específico por Entidade)
             container.innerHTML = paged.map(item => {
                 const navType = item.kind || (item.universe_id ? 'universe' : (item.format === 'ARC' ? 'arc' : 'work'));
-                const badgeLabel = (item.kind || item.format || 'OBRA').toUpperCase();
+                const rawFormat = (item.format || (item.kind !== 'work' ? item.kind : '') || 'OBRA').toUpperCase();
+                const badgeLabel = rawFormat === 'WORK' ? 'OBRA' : rawFormat;
                 const subMeta = item.subMeta !== undefined ? item.subMeta : (item.role || (item.episode_count ? item.episode_count + ' eps' : (item.format || '')));
                 const isArc = (item.kind === 'arc' || item.format === 'ARC');
                 let statusMeta = '';
@@ -1060,12 +1079,16 @@
                     }
                 } else if (item.status === 'RELEASING') {
                     statusMeta = 'Em exibição';
-                } else if (item.status === 'COMPLETED') {
+                } else if (item.status === 'COMPLETED' || item.status === 'FINISHED') {
                     statusMeta = 'Completo';
+                } else if (item.status === 'NOT_YET_RELEASED' || item.status === 'NOT_YET_AIRED') {
+                    statusMeta = 'Em breve';
+                    statusColorClass = 'text-amber-400 font-bold';
                 } else if (item.track_type) {
                     statusMeta = item.track_type.toUpperCase();
                 } else {
-                    statusMeta = (item.kind || item.format || '').toUpperCase();
+                    const fallbackStatus = (item.kind || item.format || '').toUpperCase();
+                    statusMeta = fallbackStatus === 'WORK' ? 'OBRA' : fallbackStatus;
                 }
 
                 const safeTitle = encodeURIComponent(item.title || item.name || '');
@@ -2595,7 +2618,7 @@
                     statusText.innerText = 'Consultando provedores autorizados e agregando múltiplos magnets no Anirium+ Service...';
                 }
 
-                // Monta estritamente os 7 campos aceitos pelo anirium-service 2.2.1.0 (decoder.DisallowUnknownFields)
+                // Monta o payload conforme aceito pelo anirium-service (decoder.DisallowUnknownFields)
                 const preparePayload = {
                     token: tokenData.token,
                     deviceId: deviceId,
@@ -2605,6 +2628,9 @@
                     season: 1,
                     episode: cleanEpNum
                 };
+                if (malId > 0) preparePayload.malId = malId;
+                if (episodeCount > 0) preparePayload.episodeCount = episodeCount;
+                if (workFormat) preparePayload.format = String(workFormat).toUpperCase();
 
                 const prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
                     method: 'POST',
