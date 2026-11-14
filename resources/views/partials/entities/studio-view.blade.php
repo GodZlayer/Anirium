@@ -128,35 +128,51 @@
 
                 <!-- ABA 1: PRODUÇÕES ANIMADAS (TRILHO HORIZONTAL w-44 h-[210px] IGUAL AO UNIVERSO) -->
                 <div id="studio-tab-pane-works" class="studio-tab-pane flex flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">Séries de TV, filmes, OVAs e especiais animados por {{ $name }}</span>
-                        <span class="text-xs font-mono text-theme-accent font-bold">{{ $totalWorks }} produções</span>
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">Séries de TV, filmes, OVAs e especiais animados por {{ $name }}</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-theme-accent font-bold">{{ $totalWorks }} produções</span>
+                            @if($worksCollection->count() > 1)
+                                <div class="flex items-center gap-1">
+                                    <button type="button" onclick="window.scrollEntityRail('studio-works-rail', -1)" class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">❮</button>
+                                    <button type="button" onclick="window.scrollEntityRail('studio-works-rail', 1)" class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">❯</button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
-                        @forelse($worksCollection as $w)
-                            <div class="flex-none w-44 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
-                                 onclick="window.pushNavigation('work', '{{ $w->id }}', '{{ addslashes($w->title) }}')">
-                                <div class="relative w-full h-32 overflow-hidden bg-black shrink-0">
-                                    <img src="{{ $w->image_url ?? $leadImage }}" class="w-full h-full object-cover group-hover:scale-105 transition-all" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
-                                    <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-black/80 text-theme-accent border border-white/10 uppercase">
-                                        {{ $w->format ?? 'TV' }}
-                                    </span>
+                    <div class="relative flex-1 flex items-center min-h-0">
+                        @if($worksCollection->count() > 3)
+                            <button type="button" onclick="window.scrollEntityRail('studio-works-rail', -1)" class="absolute left-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer">❮</button>
+                        @endif
+                        <div id="studio-works-rail" data-draggable-rail="true" class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing">
+                            @forelse($worksCollection as $w)
+                                <div class="flex-none w-44 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
+                                     onclick="window.pushNavigation('work', '{{ $w->id }}', '{{ addslashes($w->title) }}')">
+                                    <div class="relative w-full h-32 overflow-hidden bg-black shrink-0">
+                                        <img src="{{ $w->image_url ?? $leadImage }}" class="w-full h-full object-cover group-hover:scale-105 transition-all pointer-events-none" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
+                                        <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-black/80 text-theme-accent border border-white/10 uppercase">
+                                            {{ $w->format ?? 'TV' }}
+                                        </span>
+                                    </div>
+                                    <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
+                                        <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors line-clamp-2 leading-tight">
+                                            {{ $w->title }}
+                                        </h3>
+                                        <p class="text-[10px] font-mono text-theme-muted mt-1">
+                                            {{ $w->status ?? 'Lançado' }} • {{ ($w->episode_count ?? null) ? $w->episode_count . ' eps' : 'Catalogado' }}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
-                                    <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors line-clamp-2 leading-tight">
-                                        {{ $w->title }}
-                                    </h3>
-                                    <p class="text-[10px] font-mono text-theme-muted mt-1">
-                                        {{ $w->status ?? 'Lançado' }} • {{ ($w->episode_count ?? null) ? $w->episode_count . ' eps' : 'Catalogado' }}
-                                    </p>
+                            @empty
+                                <div class="w-full py-12 text-center text-xs font-mono text-theme-muted">
+                                    Nenhuma obra associada a este estúdio.
                                 </div>
-                            </div>
-                        @empty
-                            <div class="w-full py-12 text-center text-xs font-mono text-theme-muted">
-                                Nenhuma obra associada a este estúdio.
-                            </div>
-                        @endforelse
+                            @endforelse
+                        </div>
+                        @if($worksCollection->count() > 3)
+                            <button type="button" onclick="window.scrollEntityRail('studio-works-rail', 1)" class="absolute right-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer">❯</button>
+                        @endif
                     </div>
                 </div>
 

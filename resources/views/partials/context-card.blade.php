@@ -251,105 +251,160 @@
             <!-- 3. CONTAINER DE CONTEÚDO DAS ABAS (TRILHOS HORIZONTAIS FLUIDOS SEM SCROLL VERTICAL NA PÁGINA) -->
             <div class="min-h-[245px] lg:min-h-0 lg:flex-1 overflow-hidden flex flex-col justify-center">
 
-                <!-- ABA 1: EPISÓDIOS / CAPÍTULOS (TRILHO HORIZONTAL DE CARDS h-[210px]) -->
+                <!-- ABA 1: EPISÓDIOS / CAPÍTULOS (TRILHO HORIZONTAL DE CARDS h-[210px] COM BOTÕES DE ARRASTO) -->
                 <div id="work-tab-pane-episodes" class="work-tab-pane {{ $defaultTab === 'episodes' ? 'flex' : 'hidden' }} flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">
                             {{ $isEpisodeMode ? ('Navegação contínua da temporada • Selecionado: ' . $episodeTitle) : ($isManga ? 'Volumes e capítulos catalogados desta publicação' : 'Episódios catalogados nesta produção audiovisual') }}
                         </span>
-                        <span class="text-xs font-mono text-theme-accent font-bold">
-                            {{ $totalEpisodes }} {{ $isManga ? 'capítulos/un.' : 'episódios' }}
-                        </span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-theme-accent font-bold">
+                                {{ $totalEpisodes }} {{ $isManga ? 'capítulos/un.' : 'episódios' }}
+                            </span>
+                            @if(count($displayEpisodes) > 1)
+                                <div class="flex items-center gap-1">
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('work-episodes-rail', -1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow"
+                                            title="Rolar para a esquerda">
+                                        ❮
+                                    </button>
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('work-episodes-rail', 1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow"
+                                            title="Rolar para a direita">
+                                        ❯
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
-                        @forelse($displayEpisodes as $ep)
-                            @php
-                                $isCurrentEp = $isEpisodeMode && (($currentEpisode->id ?? '') === $ep->id || ($currentEpisode->number ?? 0) == $ep->number);
-                                $isVirtualEp = !empty($ep->is_virtual);
-                            @endphp
-                            <div class="flex-none w-52 h-[210px] rounded-2xl border {{ $isCurrentEp ? 'border-theme-accent ring-2 ring-theme-accent/30 bg-theme-raised' : 'border-theme-default bg-theme-raised/80 hover:border-theme-highlight' }} overflow-hidden cursor-pointer hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
-                                 onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($title) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')">
-                                <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
-                                    <img src="{{ $image }}" class="w-full h-full object-cover group-hover:scale-105 transition-all filter brightness-90" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
-                                    <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded {{ $isCurrentEp ? 'bg-theme-accent text-theme-inverse' : 'bg-black/80 text-theme-accent border border-white/10' }} uppercase">
-                                        {{ $isManga ? 'CAP. ' : 'EP. ' }}{{ $ep->number }}
-                                    </span>
-                                    @if($isCurrentEp)
-                                        <span class="absolute top-2 right-2 text-[8px] font-bold font-mono px-1.5 py-0.5 rounded bg-emerald-500/90 text-black uppercase">
-                                            ATUAL
+                    <div class="relative flex-1 flex items-center min-h-0 group/rail">
+                        @if(count($displayEpisodes) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('work-episodes-rail', -1)"
+                                    class="absolute left-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                                    title="Episódios anteriores">
+                                ❮
+                            </button>
+                        @endif
+
+                        <div id="work-episodes-rail" data-draggable-rail="true" class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing">
+                            @forelse($displayEpisodes as $ep)
+                                @php
+                                    $isCurrentEp = $isEpisodeMode && (($currentEpisode->id ?? '') === $ep->id || ($currentEpisode->number ?? 0) == $ep->number);
+                                    $isVirtualEp = !empty($ep->is_virtual);
+                                @endphp
+                                <div class="flex-none w-52 h-[210px] rounded-2xl border {{ $isCurrentEp ? 'border-theme-accent ring-2 ring-theme-accent/30 bg-theme-raised' : 'border-theme-default bg-theme-raised/80 hover:border-theme-highlight' }} overflow-hidden cursor-pointer hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
+                                     onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($title) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')">
+                                    <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
+                                        <img src="{{ $image }}" class="w-full h-full object-cover group-hover:scale-105 transition-all filter brightness-90 pointer-events-none" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
+                                        <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded {{ $isCurrentEp ? 'bg-theme-accent text-theme-inverse' : 'bg-black/80 text-theme-accent border border-white/10' }} uppercase">
+                                            {{ $isManga ? 'CAP. ' : 'EP. ' }}{{ $ep->number }}
                                         </span>
-                                    @endif
-                                </div>
-                                <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
-                                    <div>
-                                        <h3 class="text-xs font-bold {{ $isCurrentEp ? 'text-theme-accent' : 'text-theme-primary group-hover:text-theme-accent' }} transition-colors truncate">
-                                            {{ $isManga ? 'Capítulo ' : 'Episódio ' }}{{ $ep->number }}
-                                        </h3>
-                                        <p class="text-[10px] font-mono text-theme-muted mt-0.5 truncate">
-                                            {{ $ep->air_date_utc ?? ($status === 'RELEASING' ? 'Em lançamento' : 'Catalogado') }}
-                                        </p>
+                                        @if($isCurrentEp)
+                                            <span class="absolute top-2 right-2 text-[8px] font-bold font-mono px-1.5 py-0.5 rounded bg-emerald-500/90 text-black uppercase">
+                                                ATUAL
+                                            </span>
+                                        @endif
                                     </div>
-                                    <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
-                                        <span class="text-[9px] font-mono text-theme-muted group-hover:text-theme-accent transition-colors">{{ $isManga ? 'Abrir Capítulo ❯' : 'Abrir Episódio ❯' }}</span>
+                                    <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
+                                        <div>
+                                            <h3 class="text-xs font-bold {{ $isCurrentEp ? 'text-theme-accent' : 'text-theme-primary group-hover:text-theme-accent' }} transition-colors truncate">
+                                                {{ $isManga ? 'Capítulo ' : 'Episódio ' }}{{ $ep->number }}
+                                            </h3>
+                                            <p class="text-[10px] font-mono text-theme-muted mt-0.5 truncate">
+                                                {{ $ep->air_date_utc ?? ($status === 'RELEASING' ? 'Em lançamento' : 'Catalogado') }}
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
+                                            <span class="text-[9px] font-mono text-theme-muted group-hover:text-theme-accent transition-colors">{{ $isManga ? 'Abrir Capítulo ❯' : 'Abrir Episódio ❯' }}</span>
+                                            @if(!$isManga)
+                                                <button type="button"
+                                                        data-requires-addon-capability="video"
+                                                        onclick="event.stopPropagation(); window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $ep->id }}', '{{ $ep->number }}', '{{ addslashes($title) }}')"
+                                                        class="hidden px-2 py-0.5 rounded bg-theme-accent text-theme-inverse text-[9px] font-mono font-bold hover:scale-105 transition-transform cursor-pointer">
+                                                    ▶ Play
+                                                </button>
+                                            @else
+                                                <button type="button"
+                                                        data-requires-addon-capability="manga"
+                                                        onclick="event.stopPropagation(); window.launchExternalMangaAddon('{{ $work->id ?? '' }}', '{{ $ep->number }}', '{{ addslashes($title) }}')"
+                                                        class="hidden px-2 py-0.5 rounded bg-amber-400 text-black text-[9px] font-mono font-bold hover:scale-105 transition-transform cursor-pointer">
+                                                    📖 Ler
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="w-full h-[210px] rounded-3xl bg-theme-raised/50 border border-theme-default p-5 flex items-center justify-between gap-6">
+                                    <div class="space-y-2 max-w-xl">
+                                        <span class="text-[10px] font-mono uppercase text-theme-accent font-bold">Catálogo Editorial & Estrutural</span>
+                                        <h3 class="text-sm font-bold text-white">{{ $title }} ({{ $format }})</h3>
+                                        <p class="text-xs text-theme-muted line-clamp-3 leading-relaxed">{{ $synopsis }}</p>
+                                    </div>
+                                    <div class="flex flex-col gap-2 shrink-0">
                                         @if(!$isManga)
                                             <button type="button"
                                                     data-requires-addon-capability="video"
-                                                    onclick="event.stopPropagation(); window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $ep->id }}', '{{ $ep->number }}', '{{ addslashes($title) }}')"
-                                                    class="hidden px-2 py-0.5 rounded bg-theme-accent text-theme-inverse text-[9px] font-mono font-bold hover:scale-105 transition-transform">
-                                                ▶ Play
+                                                    onclick="window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '', '1', '{{ addslashes($title) }}')"
+                                                    class="hidden px-4 py-2 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold cursor-pointer">
+                                                ▶ Reproduzir via Add-on
                                             </button>
                                         @else
                                             <button type="button"
                                                     data-requires-addon-capability="manga"
-                                                    onclick="event.stopPropagation(); window.launchExternalMangaAddon('{{ $work->id ?? '' }}', '{{ $ep->number }}', '{{ addslashes($title) }}')"
-                                                    class="hidden px-2 py-0.5 rounded bg-amber-400 text-black text-[9px] font-mono font-bold hover:scale-105 transition-transform">
-                                                📖 Ler
+                                                    onclick="window.launchExternalMangaAddon('{{ $work->id ?? '' }}', '1', '{{ addslashes($title) }}')"
+                                                    class="hidden px-4 py-2 rounded-xl bg-amber-400 text-black text-xs font-mono font-bold cursor-pointer">
+                                                📖 Abrir no Manga Reader Add-on
                                             </button>
                                         @endif
                                     </div>
                                 </div>
-                            </div>
-                        @empty
-                            <div class="w-full h-[210px] rounded-3xl bg-theme-raised/50 border border-theme-default p-5 flex items-center justify-between gap-6">
-                                <div class="space-y-2 max-w-xl">
-                                    <span class="text-[10px] font-mono uppercase text-theme-accent font-bold">Catálogo Editorial & Estrutural</span>
-                                    <h3 class="text-sm font-bold text-white">{{ $title }} ({{ $format }})</h3>
-                                    <p class="text-xs text-theme-muted line-clamp-3 leading-relaxed">{{ $synopsis }}</p>
-                                </div>
-                                <div class="flex flex-col gap-2 shrink-0">
-                                    @if(!$isManga)
-                                        <button type="button"
-                                                data-requires-addon-capability="video"
-                                                onclick="window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '', '1', '{{ addslashes($title) }}')"
-                                                class="hidden px-4 py-2 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold cursor-pointer">
-                                            ▶ Reproduzir via Add-on
-                                        </button>
-                                    @else
-                                        <button type="button"
-                                                data-requires-addon-capability="manga"
-                                                onclick="window.launchExternalMangaAddon('{{ $work->id ?? '' }}', '1', '{{ addslashes($title) }}')"
-                                                class="hidden px-4 py-2 rounded-xl bg-amber-400 text-black text-xs font-mono font-bold cursor-pointer">
-                                            📖 Abrir no Manga Reader Add-on
-                                        </button>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforelse
+                            @endforelse
+                        </div>
+
+                        @if(count($displayEpisodes) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('work-episodes-rail', 1)"
+                                    class="absolute right-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                                    title="Próximos episódios">
+                                ❯
+                            </button>
+                        @endif
                     </div>
                 </div>
 
                 <!-- ABA 2: ABERTURAS & ENDINGS (OFICIAL: PLATAFORMAS DE ÁUDIO SPOTIFY / YOUTUBE MUSIC) -->
                 @if(!$isManga && $totalTracks > 0)
                 <div id="work-tab-pane-tracks" class="work-tab-pane hidden flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">
                             {{ $isEpisodeMode ? ('Temas musicais (OP / ED) vinculados à faixa do ' . $episodeTitle) : 'Aberturas (OP), Encerramentos (ED) e OSTs oficiais desta obra' }}
                         </span>
-                        <span class="text-xs font-mono text-theme-accent font-bold">{{ count($episodeTracks) }} faixas</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-theme-accent font-bold">{{ count($episodeTracks) }} faixas</span>
+                            @if(count($episodeTracks) > 2)
+                                <div class="flex items-center gap-1">
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('work-tracks-rail', -1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">
+                                        ❮
+                                    </button>
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('work-tracks-rail', 1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">
+                                        ❯
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
+                    <div class="relative flex-1 flex items-center min-h-0">
+                        <div id="work-tracks-rail" data-draggable-rail="true" class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing">
                         @foreach($episodeTracks as $tr)
                             @php
                                 $rawTr = $tr->title ?? 'Faixa Musical';
@@ -390,6 +445,7 @@
                                 </div>
                             </div>
                         @endforeach
+                        </div>
                     </div>
                 </div>
                 @endif

@@ -191,50 +191,88 @@
             <!-- 3. CONTAINER DE CONTEÚDO DAS ABAS (TRILHOS HORIZONTAIS FLUIDOS) -->
             <div class="min-h-[245px] lg:min-h-0 lg:flex-1 overflow-hidden flex flex-col justify-center">
 
-                <!-- ABA 1: EPISÓDIOS DO ARCO (TRILHO HORIZONTAL DE CARDS h-[210px]) -->
+                <!-- ABA 1: EPISÓDIOS DO ARCO (TRILHO HORIZONTAL DE CARDS h-[210px] COM BOTÕES DE ARRASTO) -->
                 <div id="arc-tab-pane-episodes" class="arc-tab-pane flex flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">Sequência exata de episódios pertencentes a {{ $title }}</span>
-                        <span class="text-xs font-mono text-theme-accent font-bold">Ep. {{ $startNum }}{{ $endNum ? ' — ' . $endNum : '+' }}</span>
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">Sequência exata de episódios pertencentes a {{ $title }}</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-theme-accent font-bold">Ep. {{ $startNum }}{{ $endNum ? ' — ' . $endNum : '+' }}</span>
+                            @if(count($displayArcEpisodes) > 1)
+                                <div class="flex items-center gap-1">
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('arc-episodes-rail', -1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow"
+                                            title="Rolar para a esquerda">
+                                        ❮
+                                    </button>
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('arc-episodes-rail', 1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow"
+                                            title="Rolar para a direita">
+                                        ❯
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
-                        @forelse($displayArcEpisodes as $ep)
-                            <div class="flex-none w-48 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
-                                 onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($workTitle) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')">
-                                <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
-                                    <img src="{{ $leadImage }}" class="w-full h-full object-cover group-hover:scale-105 transition-all" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
-                                    <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-black/80 text-theme-accent border border-white/10 uppercase">
-                                        {{ $isManga ? 'CAP. ' : 'EP. ' }}{{ $ep->number }}
-                                    </span>
-                                </div>
-                                <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
-                                    <div>
-                                        <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors truncate">
-                                            {{ $isManga ? 'Capítulo ' : 'Episódio ' }}{{ $ep->number }}
-                                        </h3>
-                                        <p class="text-[10px] font-mono text-theme-muted mt-0.5">
-                                            {{ $ep->air_date_utc ?? 'Catalogado' }}
-                                        </p>
+                    <div class="relative flex-1 flex items-center min-h-0">
+                        @if(count($displayArcEpisodes) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('arc-episodes-rail', -1)"
+                                    class="absolute left-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                                    title="Episódios anteriores">
+                                ❮
+                            </button>
+                        @endif
+
+                        <div id="arc-episodes-rail" data-draggable-rail="true" class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing">
+                            @forelse($displayArcEpisodes as $ep)
+                                <div class="flex-none w-48 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
+                                     onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($workTitle) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')">
+                                    <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
+                                        <img src="{{ $leadImage }}" class="w-full h-full object-cover group-hover:scale-105 transition-all pointer-events-none" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
+                                        <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-black/80 text-theme-accent border border-white/10 uppercase">
+                                            {{ $isManga ? 'CAP. ' : 'EP. ' }}{{ $ep->number }}
+                                        </span>
                                     </div>
-                                    <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
-                                        <span class="text-[9px] font-mono text-theme-muted group-hover:text-theme-accent transition-colors">{{ $isManga ? 'Abrir Capítulo ❯' : 'Abrir Episódio ❯' }}</span>
-                                        @if($work)
-                                            <button type="button"
-                                                    data-requires-addon-capability="video"
-                                                    onclick="event.stopPropagation(); window.launchExternalVideoAddon('{{ $work->id }}', '{{ $ep->id }}', '{{ $ep->number }}', '{{ addslashes($workTitle) }}')"
-                                                    class="hidden px-2 py-0.5 rounded bg-theme-accent text-theme-inverse text-[9px] font-mono font-bold">
-                                                ▶ Play
-                                            </button>
-                                        @endif
+                                    <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
+                                        <div>
+                                            <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors truncate">
+                                                {{ $isManga ? 'Capítulo ' : 'Episódio ' }}{{ $ep->number }}
+                                            </h3>
+                                            <p class="text-[10px] font-mono text-theme-muted mt-0.5">
+                                                {{ $ep->air_date_utc ?? 'Catalogado' }}
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
+                                            <span class="text-[9px] font-mono text-theme-muted group-hover:text-theme-accent transition-colors">{{ $isManga ? 'Abrir Capítulo ❯' : 'Abrir Episódio ❯' }}</span>
+                                            @if($work)
+                                                <button type="button"
+                                                        data-requires-addon-capability="video"
+                                                        onclick="event.stopPropagation(); window.launchExternalVideoAddon('{{ $work->id }}', '{{ $ep->id }}', '{{ $ep->number }}', '{{ addslashes($workTitle) }}')"
+                                                        class="hidden px-2 py-0.5 rounded bg-theme-accent text-theme-inverse text-[9px] font-mono font-bold cursor-pointer">
+                                                    ▶ Play
+                                                </button>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        @empty
-                            <div class="w-full py-12 text-center text-xs font-mono text-theme-muted">
-                                Este arco compreende os episódios {{ $startNum }} a {{ $endNum ?? '?' }} de {{ $workTitle }}.
-                            </div>
-                        @endforelse
+                            @empty
+                                <div class="w-full py-12 text-center text-xs font-mono text-theme-muted">
+                                    Este arco compreende os episódios {{ $startNum }} a {{ $endNum ?? '?' }} de {{ $workTitle }}.
+                                </div>
+                            @endforelse
+                        </div>
+
+                        @if(count($displayArcEpisodes) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('arc-episodes-rail', 1)"
+                                    class="absolute right-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                                    title="Próximos episódios">
+                                ❯
+                            </button>
+                        @endif
                     </div>
                 </div>
 

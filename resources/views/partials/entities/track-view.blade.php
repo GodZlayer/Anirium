@@ -152,35 +152,45 @@
 
                 <!-- ABA 1: OBRAS ONDE TOCA (TRILHO HORIZONTAL w-48 h-[210px]) -->
                 <div id="track-tab-pane-works" class="track-tab-pane flex flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">Produções animadas que utilizam {{ $songTitle }} como tema oficial</span>
-                        <span class="text-xs font-mono text-theme-accent font-bold">{{ count($works) }} produções</span>
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">Produções animadas que utilizam {{ $songTitle }} como tema oficial</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-theme-accent font-bold">{{ count($works) }} produções</span>
+                            @if(count($works) > 1)
+                                <div class="flex items-center gap-1">
+                                    <button type="button" onclick="window.scrollEntityRail('track-works-rail', -1)" class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">❮</button>
+                                    <button type="button" onclick="window.scrollEntityRail('track-works-rail', 1)" class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">❯</button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
-                        @forelse($works as $w)
-                            <div class="flex-none w-48 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
-                                 onclick="window.pushNavigation('work', '{{ $w->id }}', '{{ addslashes($w->title) }}')">
-                                <div class="relative w-full h-32 overflow-hidden bg-black shrink-0">
-                                    <img src="{{ $w->image_url ?? $leadImage }}" class="w-full h-full object-cover group-hover:scale-105 transition-all" onerror="this.src='/assets/icons/actions/search.png'">
-                                    <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-black/80 text-pink-300 border border-pink-500/30 uppercase">
-                                        {{ $trackType }} {{ $episodesUsed ? '• ' . $episodesUsed : '' }}
-                                    </span>
+                    <div class="relative flex-1 flex items-center min-h-0">
+                        <div id="track-works-rail" data-draggable-rail="true" class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing">
+                            @forelse($works as $w)
+                                <div class="flex-none w-48 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
+                                     onclick="window.pushNavigation('work', '{{ $w->id }}', '{{ addslashes($w->title) }}')">
+                                    <div class="relative w-full h-32 overflow-hidden bg-black shrink-0">
+                                        <img src="{{ $w->image_url ?? $leadImage }}" class="w-full h-full object-cover group-hover:scale-105 transition-all pointer-events-none" onerror="this.src='/assets/icons/actions/search.png'">
+                                        <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-black/80 text-pink-300 border border-pink-500/30 uppercase">
+                                            {{ $trackType }} {{ $episodesUsed ? '• ' . $episodesUsed : '' }}
+                                        </span>
+                                    </div>
+                                    <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
+                                        <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors line-clamp-2 leading-tight">
+                                            {{ $w->title }}
+                                        </h3>
+                                        <p class="text-[10px] font-mono text-theme-muted mt-1">
+                                            {{ $w->format ?? 'TV' }} • {{ ($w->episode_count ?? null) ? $w->episode_count . ' eps' : 'Catalogado' }}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
-                                    <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors line-clamp-2 leading-tight">
-                                        {{ $w->title }}
-                                    </h3>
-                                    <p class="text-[10px] font-mono text-theme-muted mt-1">
-                                        {{ $w->format ?? 'TV' }} • {{ ($w->episode_count ?? null) ? $w->episode_count . ' eps' : 'Catalogado' }}
-                                    </p>
+                            @empty
+                                <div class="w-full py-12 text-center text-xs font-mono text-theme-muted">
+                                    Nenhuma obra diretamente vinculada.
                                 </div>
-                            </div>
-                        @empty
-                            <div class="w-full py-12 text-center text-xs font-mono text-theme-muted">
-                                Nenhuma obra diretamente vinculada.
-                            </div>
-                        @endforelse
+                            @endforelse
+                        </div>
                     </div>
                 </div>
 

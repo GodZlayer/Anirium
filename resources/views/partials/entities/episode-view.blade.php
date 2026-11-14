@@ -297,7 +297,7 @@
             <!-- 2. NAVEGAÇÃO EM ABAS EXCLUSIVAS DO EPISÓDIO / CAPÍTULO -->
             <nav class="flex items-center gap-2 p-1.5 rounded-2xl bg-theme-raised border border-theme-default overflow-x-auto no-scrollbar shrink-0">
                 <button type="button"
-                        onclick="window.switchEpisodeEntityTab(' ficha')"
+                        onclick="window.switchEpisodeEntityTab('ficha')"
                         id="ep-tab-btn-ficha"
                         class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all bg-emerald-400 text-black shadow-sm cursor-pointer shrink-0">
                     <span>🎛️</span>
@@ -326,206 +326,268 @@
 
                 <!-- ABA 1 (PADRÃO): RAIO-X ONTOLÓGICO DO EPISÓDIO (4 CARDS ESTRUTURAIS: ARCO, ABERTURA OP, ENDING ED, DIREÇÃO/AUTORIA) -->
                 <div id="ep-tab-pane-ficha" class="ep-tab-pane flex flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">
                             Composição ontológica exata do {{ $episodeTitle }} dentro de {{ $workTitle }}
                         </span>
-                        <span class="text-xs font-mono text-emerald-400 font-bold">
-                            Unidade #{{ $epNum }} • {{ strtoupper($classification) }}
-                        </span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-emerald-400 font-bold">
+                                Unidade #{{ $epNum }} • {{ strtoupper($classification) }}
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <button type="button"
+                                        onclick="window.scrollEntityRail('ep-ficha-rail', -1)"
+                                        class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-emerald-400 hover:text-black border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">
+                                    ❮
+                                </button>
+                                <button type="button"
+                                        onclick="window.scrollEntityRail('ep-ficha-rail', 1)"
+                                        class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-emerald-400 hover:text-black border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">
+                                    ❯
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
+                    <div class="relative flex-1 flex items-center min-h-0">
+                        <div id="ep-ficha-rail" data-draggable-rail="true" class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing">
 
-                        <!-- CARD 1: ARCO NARRATIVO DESTE EPISÓDIO -->
-                        <div class="flex-none w-64 h-[210px] p-4 rounded-2xl border {{ $currentArc ? 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-400 cursor-pointer' : 'border-theme-default bg-theme-raised/60' }} transition-all shadow-lg flex flex-col justify-between group"
-                             @if($currentArc)
-                                 onclick="window.pushNavigation('arc', '{{ $currentArc->id }}', '{{ addslashes($currentArc->title) }}')"
-                             @endif>
-                            <div>
-                                <div class="flex items-center justify-between gap-2 mb-2">
-                                    <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                        📜 ARCO DO {{ strtoupper($unitShort) }} {{ $epNum }}
+                            <!-- CARD 1: ARCO NARRATIVO DESTE EPISÓDIO -->
+                            <div class="flex-none w-64 h-[210px] p-4 rounded-2xl border {{ $currentArc ? 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-400 cursor-pointer' : 'border-theme-default bg-theme-raised/60' }} transition-all shadow-lg flex flex-col justify-between group"
+                                 @if($currentArc)
+                                     onclick="window.pushNavigation('arc', '{{ $currentArc->id }}', '{{ addslashes($currentArc->title) }}')"
+                                 @endif>
+                                <div>
+                                    <div class="flex items-center justify-between gap-2 mb-2">
+                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                            📜 ARCO DO {{ strtoupper($unitShort) }} {{ $epNum }}
+                                        </span>
+                                        @if($currentArc)
+                                            <span class="text-xs text-emerald-400 group-hover:translate-x-0.5 transition-transform">Abrir ❯</span>
+                                        @endif
+                                    </div>
+                                    <h3 class="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors line-clamp-2 leading-snug">
+                                        {{ $currentArc->title ?? (' Narrativa Principal de ' . $workTitle) }}
+                                    </h3>
+                                    <p class="text-[11px] font-mono text-theme-muted mt-1.5">
+                                        @if($currentArc)
+                                            Cobre do {{ $unitShort }} {{ $arcStart }} até {{ $arcEnd ?: '?' }}
+                                        @else
+                                            Progressão direta na temporada ({{ $format }})
+                                        @endif
+                                    </p>
+                                </div>
+                                <div class="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono">
+                                    <span class="text-theme-muted">Classificação</span>
+                                    <span class="text-emerald-400 font-bold uppercase">{{ $classification }}</span>
+                                </div>
+                            </div>
+
+                            <!-- CARD 2: ABERTURA (OPENING) DESTE EPISÓDIO -->
+                            @if(!$isManga)
+                                @php
+                                    $opRaw = $openingTrack->title ?? ($episodeTracks[0]->title ?? null);
+                                    $opId = $openingTrack->id ?? ($episodeTracks[0]->id ?? null);
+                                    $opClean = $opRaw && preg_match('/"([^"]+)"/', $opRaw, $m) ? $m[1] : ($opRaw ?? 'Tema de Abertura');
+                                    $opQuery = urlencode($opClean . ' ' . $workTitle);
+                                @endphp
+                                <div class="flex-none w-68 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 hover:border-pink-400/50 transition-all shadow-lg flex flex-col justify-between group {{ $opId ? 'cursor-pointer' : '' }}"
+                                     @if($opId)
+                                         onclick="window.pushNavigation('track', '{{ $opId }}', '{{ addslashes($opClean) }}')"
+                                     @endif>
+                                    <div>
+                                        <div class="flex items-center justify-between gap-2 mb-2">
+                                            <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-pink-500/20 text-pink-300 border border-pink-500/30">
+                                                🎵 ABERTURA (OP)
+                                            </span>
+                                            @if($opId)
+                                                <span class="text-xs text-theme-muted group-hover:text-pink-300">Ficha ❯</span>
+                                            @endif
+                                        </div>
+                                        <h3 class="text-xs font-bold text-white group-hover:text-pink-300 transition-colors line-clamp-2 leading-snug">
+                                            {{ $opRaw ?? ('Abertura de ' . $workTitle) }}
+                                        </h3>
+                                        <p class="text-[10px] font-mono text-theme-muted mt-1">
+                                            Executada no {{ $episodeTitle }}
+                                        </p>
+                                    </div>
+                                    <div class="pt-2 border-t border-theme-default/40 flex items-center justify-between gap-2">
+                                        <a href="https://open.spotify.com/search/{{ $opQuery }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
+                                           class="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-[9px] font-mono font-bold text-center">
+                                            🟢 Spotify
+                                        </a>
+                                        <a href="https://music.youtube.com/search?q={{ $opQuery }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
+                                           class="flex-1 py-1.5 px-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-[9px] font-mono font-bold text-center">
+                                            🔴 YT Music
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- CARD 3: ENCERRAMENTO (ENDING) DESTE EPISÓDIO -->
+                                @php
+                                    $edRaw = $endingTrack->title ?? ($episodeTracks[1]->title ?? null);
+                                    $edId = $endingTrack->id ?? ($episodeTracks[1]->id ?? null);
+                                    $edClean = $edRaw && preg_match('/"([^"]+)"/', $edRaw, $m2) ? $m2[1] : ($edRaw ?? 'Tema de Encerramento');
+                                    $edQuery = urlencode($edClean . ' ' . $workTitle);
+                                @endphp
+                                <div class="flex-none w-68 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 hover:border-pink-400/50 transition-all shadow-lg flex flex-col justify-between group {{ $edId ? 'cursor-pointer' : '' }}"
+                                     @if($edId)
+                                         onclick="window.pushNavigation('track', '{{ $edId }}', '{{ addslashes($edClean) }}')"
+                                     @endif>
+                                    <div>
+                                        <div class="flex items-center justify-between gap-2 mb-2">
+                                            <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                                🎶 ENDING (ED)
+                                            </span>
+                                            @if($edId)
+                                                <span class="text-xs text-theme-muted group-hover:text-purple-300">Ficha ❯</span>
+                                            @endif
+                                        </div>
+                                        <h3 class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors line-clamp-2 leading-snug">
+                                            {{ $edRaw ?? ('Encerramento de ' . $workTitle) }}
+                                        </h3>
+                                        <p class="text-[10px] font-mono text-theme-muted mt-1">
+                                            Créditos finais do {{ $episodeTitle }}
+                                        </p>
+                                    </div>
+                                    <div class="pt-2 border-t border-theme-default/40 flex items-center justify-between gap-2">
+                                        <a href="https://open.spotify.com/search/{{ $edQuery }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
+                                           class="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-[9px] font-mono font-bold text-center">
+                                            🟢 Spotify
+                                        </a>
+                                        <a href="https://music.youtube.com/search?q={{ $edQuery }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
+                                           class="flex-1 py-1.5 px-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-[9px] font-mono font-bold text-center">
+                                            🔴 YT Music
+                                        </a>
+                                    </div>
+                                </div>
+                            @endif
+
+                            <!-- CARD 4: NAVEGAÇÃO IMEDIATA (ANTERIOR / PRÓXIMO EPISÓDIO) -->
+                            <div class="flex-none w-64 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 flex flex-col justify-between shadow-lg">
+                                <div>
+                                    <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-theme-accent/20 text-theme-accent border border-theme-accent/30">
+                                        ⏭️ CONTINUIDADE IMEDIATA
                                     </span>
-                                    @if($currentArc)
-                                        <span class="text-xs text-emerald-400 group-hover:translate-x-0.5 transition-transform">Abrir ❯</span>
-                                    @endif
-                                </div>
-                                <h3 class="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors line-clamp-2 leading-snug">
-                                    {{ $currentArc->title ?? (' Narrativa Principal de ' . $workTitle) }}
-                                </h3>
-                                <p class="text-[11px] font-mono text-theme-muted mt-1.5">
-                                    @if($currentArc)
-                                        Cobre do {{ $unitShort }} {{ $arcStart }} até {{ $arcEnd ?: '?' }}
-                                    @else
-                                        Progressão direta na temporada ({{ $format }})
-                                    @endif
-                                </p>
-                            </div>
-                            <div class="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono">
-                                <span class="text-theme-muted">Classificação</span>
-                                <span class="text-emerald-400 font-bold uppercase">{{ $classification }}</span>
-                            </div>
-                        </div>
-
-                        <!-- CARD 2: ABERTURA (OPENING) DESTE EPISÓDIO -->
-                        @if(!$isManga)
-                            @php
-                                $opRaw = $openingTrack->title ?? ($episodeTracks[0]->title ?? null);
-                                $opId = $openingTrack->id ?? ($episodeTracks[0]->id ?? null);
-                                $opClean = $opRaw && preg_match('/"([^"]+)"/', $opRaw, $m) ? $m[1] : ($opRaw ?? 'Tema de Abertura');
-                                $opQuery = urlencode($opClean . ' ' . $workTitle);
-                            @endphp
-                            <div class="flex-none w-68 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 hover:border-pink-400/50 transition-all shadow-lg flex flex-col justify-between group {{ $opId ? 'cursor-pointer' : '' }}"
-                                 @if($opId)
-                                     onclick="window.pushNavigation('track', '{{ $opId }}', '{{ addslashes($opClean) }}')"
-                                 @endif>
-                                <div>
-                                    <div class="flex items-center justify-between gap-2 mb-2">
-                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-pink-500/20 text-pink-300 border border-pink-500/30">
-                                            🎵 ABERTURA (OP)
-                                        </span>
-                                        @if($opId)
-                                            <span class="text-xs text-theme-muted group-hover:text-pink-300">Ficha ❯</span>
-                                        @endif
-                                    </div>
-                                    <h3 class="text-xs font-bold text-white group-hover:text-pink-300 transition-colors line-clamp-2 leading-snug">
-                                        {{ $opRaw ?? ('Abertura de ' . $workTitle) }}
+                                    <h3 class="text-xs font-bold text-white mt-2">
+                                        Avançar ou Retroceder na Temporada
                                     </h3>
                                     <p class="text-[10px] font-mono text-theme-muted mt-1">
-                                        Executada no {{ $episodeTitle }}
+                                        Você está no {{ $unitLabel }} {{ $epNum }} de {{ $totalEpisodes }}.
                                     </p>
                                 </div>
-                                <div class="pt-2 border-t border-theme-default/40 flex items-center justify-between gap-2">
-                                    <a href="https://open.spotify.com/search/{{ $opQuery }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
-                                       class="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-[9px] font-mono font-bold text-center">
-                                        🟢 Spotify
-                                    </a>
-                                    <a href="https://music.youtube.com/search?q={{ $opQuery }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
-                                       class="flex-1 py-1.5 px-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-[9px] font-mono font-bold text-center">
-                                        🔴 YT Music
-                                    </a>
+
+                                <div class="space-y-2">
+                                    @if($nextEpObj)
+                                        <button type="button"
+                                                onclick="window.pushNavigation('episode', '{{ $nextEpObj->id }}', '{{ addslashes($workTitle) }} • {{ $unitShort }} {{ $nextEpObj->number }}')"
+                                                class="w-full py-2 px-3 rounded-xl bg-emerald-400 text-black text-xs font-mono font-black hover:scale-[1.02] transition-transform cursor-pointer flex items-center justify-between">
+                                            <span>Próximo: {{ $unitShort }} {{ $nextEpObj->number }}</span>
+                                            <span>❯</span>
+                                        </button>
+                                    @endif
+                                    @if($prevEpObj)
+                                        <button type="button"
+                                                onclick="window.pushNavigation('episode', '{{ $prevEpObj->id }}', '{{ addslashes($workTitle) }} • {{ $unitShort }} {{ $prevEpObj->number }}')"
+                                                class="w-full py-1.5 px-3 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-theme-muted hover:text-white text-[11px] font-mono font-bold transition-colors cursor-pointer flex items-center justify-between">
+                                            <span>❮ Anterior: {{ $unitShort }} {{ $prevEpObj->number }}</span>
+                                        </button>
+                                    @endif
                                 </div>
                             </div>
 
-                            <!-- CARD 3: ENCERRAMENTO (ENDING) DESTE EPISÓDIO -->
-                            @php
-                                $edRaw = $endingTrack->title ?? ($episodeTracks[1]->title ?? null);
-                                $edId = $endingTrack->id ?? ($episodeTracks[1]->id ?? null);
-                                $edClean = $edRaw && preg_match('/"([^"]+)"/', $edRaw, $m2) ? $m2[1] : ($edRaw ?? 'Tema de Encerramento');
-                                $edQuery = urlencode($edClean . ' ' . $workTitle);
-                            @endphp
-                            <div class="flex-none w-68 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 hover:border-pink-400/50 transition-all shadow-lg flex flex-col justify-between group {{ $edId ? 'cursor-pointer' : '' }}"
-                                 @if($edId)
-                                     onclick="window.pushNavigation('track', '{{ $edId }}', '{{ addslashes($edClean) }}')"
-                                 @endif>
-                                <div>
-                                    <div class="flex items-center justify-between gap-2 mb-2">
-                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                                            🎶 ENDING (ED)
-                                        </span>
-                                        @if($edId)
-                                            <span class="text-xs text-theme-muted group-hover:text-purple-300">Ficha ❯</span>
-                                        @endif
-                                    </div>
-                                    <h3 class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors line-clamp-2 leading-snug">
-                                        {{ $edRaw ?? ('Encerramento de ' . $workTitle) }}
-                                    </h3>
-                                    <p class="text-[10px] font-mono text-theme-muted mt-1">
-                                        Créditos finais do {{ $episodeTitle }}
-                                    </p>
-                                </div>
-                                <div class="pt-2 border-t border-theme-default/40 flex items-center justify-between gap-2">
-                                    <a href="https://open.spotify.com/search/{{ $edQuery }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
-                                       class="flex-1 py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-[9px] font-mono font-bold text-center">
-                                        🟢 Spotify
-                                    </a>
-                                    <a href="https://music.youtube.com/search?q={{ $edQuery }}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
-                                       class="flex-1 py-1.5 px-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-[9px] font-mono font-bold text-center">
-                                        🔴 YT Music
-                                    </a>
-                                </div>
-                            </div>
-                        @endif
-
-                        <!-- CARD 4: NAVEGAÇÃO IMEDIATA (ANTERIOR / PRÓXIMO EPISÓDIO) -->
-                        <div class="flex-none w-64 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 flex flex-col justify-between shadow-lg">
-                            <div>
-                                <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-theme-accent/20 text-theme-accent border border-theme-accent/30">
-                                    ⏭️ CONTINUIDADE IMEDIATA
-                                </span>
-                                <h3 class="text-xs font-bold text-white mt-2">
-                                    Avançar ou Retroceder na Temporada
-                                </h3>
-                                <p class="text-[10px] font-mono text-theme-muted mt-1">
-                                    Você está no {{ $unitLabel }} {{ $epNum }} de {{ $totalEpisodes }}.
-                                </p>
-                            </div>
-
-                            <div class="space-y-2">
-                                @if($nextEpObj)
-                                    <button type="button"
-                                            onclick="window.pushNavigation('episode', '{{ $nextEpObj->id }}', '{{ addslashes($workTitle) }} • {{ $unitShort }} {{ $nextEpObj->number }}')"
-                                            class="w-full py-2 px-3 rounded-xl bg-emerald-400 text-black text-xs font-mono font-black hover:scale-[1.02] transition-transform cursor-pointer flex items-center justify-between">
-                                        <span>Próximo: {{ $unitShort }} {{ $nextEpObj->number }}</span>
-                                        <span>❯</span>
-                                    </button>
-                                @endif
-                                @if($prevEpObj)
-                                    <button type="button"
-                                            onclick="window.pushNavigation('episode', '{{ $prevEpObj->id }}', '{{ addslashes($workTitle) }} • {{ $unitShort }} {{ $prevEpObj->number }}')"
-                                            class="w-full py-1.5 px-3 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-theme-muted hover:text-white text-[11px] font-mono font-bold transition-colors cursor-pointer flex items-center justify-between">
-                                        <span>❮ Anterior: {{ $unitShort }} {{ $prevEpObj->number }}</span>
-                                    </button>
-                                @endif
-                            </div>
                         </div>
-
                     </div>
                 </div>
 
                 <!-- ABA 2: SELETOR DE EPISÓDIOS DA TEMPORADA -->
                 <div id="ep-tab-pane-sequence" class="ep-tab-pane hidden flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">Todos os {{ $totalEpisodes }} {{ $isManga ? 'capítulos' : 'episódios' }} de {{ $workTitle }}</span>
-                        <span class="text-xs font-mono text-emerald-400 font-bold">Selecionado: {{ $unitShort }} {{ $epNum }}</span>
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">Todos os {{ $totalEpisodes }} {{ $isManga ? 'capítulos' : 'episódios' }} de {{ $workTitle }}</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-emerald-400 font-bold">Selecionado: {{ $unitShort }} {{ $epNum }}</span>
+                            @if(count($displayEpisodes) > 1)
+                                <div class="flex items-center gap-1">
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('ep-sequence-rail', -1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-emerald-400 hover:text-black border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow"
+                                            title="Rolar para a esquerda">
+                                        ❮
+                                    </button>
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('ep-sequence-rail', 1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-emerald-400 hover:text-black border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow"
+                                            title="Rolar para a direita">
+                                        ❯
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1" id="ep-sequence-rail">
-                        @foreach($displayEpisodes as $ep)
-                            @php
-                                $isCurrent = ($ep->number ?? 0) == $epNum;
-                            @endphp
-                            <div class="flex-none w-48 h-[210px] rounded-2xl border {{ $isCurrent ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-500/10' : 'border-theme-default bg-theme-raised/80 hover:border-theme-highlight' }} overflow-hidden cursor-pointer hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
-                                 onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($workTitle) }} • {{ $unitShort }} {{ $ep->number }}')">
-                                <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
-                                    <img src="{{ $image }}" class="w-full h-full object-cover group-hover:scale-105 transition-all filter brightness-90" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
-                                    <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded {{ $isCurrent ? 'bg-emerald-400 text-black' : 'bg-black/80 text-theme-accent border border-white/10' }} uppercase">
-                                        {{ $unitShort }} {{ $ep->number }}
-                                    </span>
-                                    @if($isCurrent)
-                                        <span class="absolute top-2 right-2 text-[8px] font-bold font-mono px-1.5 py-0.5 rounded bg-emerald-400 text-black uppercase">
-                                            EM TELA
+                    <div class="relative flex-1 flex items-center min-h-0">
+                        @if(count($displayEpisodes) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('ep-sequence-rail', -1)"
+                                    class="absolute left-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-emerald-400 text-white hover:text-black border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                                    title="Episódios anteriores">
+                                ❮
+                            </button>
+                        @endif
+
+                        <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing" id="ep-sequence-rail" data-draggable-rail="true">
+                            @foreach($displayEpisodes as $ep)
+                                @php
+                                    $isCurrent = ($ep->number ?? 0) == $epNum;
+                                @endphp
+                                <div class="flex-none w-48 h-[210px] rounded-2xl border {{ $isCurrent ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-500/10' : 'border-theme-default bg-theme-raised/80 hover:border-theme-highlight' }} overflow-hidden cursor-pointer hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
+                                     onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($workTitle) }} • {{ $unitShort }} {{ $ep->number }}')">
+                                    <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
+                                        <img src="{{ $image }}" class="w-full h-full object-cover group-hover:scale-105 transition-all filter brightness-90 pointer-events-none" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
+                                        <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded {{ $isCurrent ? 'bg-emerald-400 text-black' : 'bg-black/80 text-theme-accent border border-white/10' }} uppercase">
+                                            {{ $unitShort }} {{ $ep->number }}
                                         </span>
-                                    @endif
-                                </div>
-                                <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
-                                    <div>
-                                        <h3 class="text-xs font-bold {{ $isCurrent ? 'text-emerald-300' : 'text-theme-primary group-hover:text-theme-accent' }} transition-colors truncate">
-                                            {{ $unitLabel }} {{ $ep->number }}
-                                        </h3>
-                                        <p class="text-[10px] font-mono text-theme-muted mt-0.5 truncate">
-                                            {{ $ep->air_date_utc ?? 'Catalogado' }}
-                                        </p>
+                                        @if($isCurrent)
+                                            <span class="absolute top-2 right-2 text-[8px] font-bold font-mono px-1.5 py-0.5 rounded bg-emerald-400 text-black uppercase">
+                                                EM TELA
+                                            </span>
+                                        @endif
                                     </div>
-                                    <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
-                                        <span class="text-[9px] font-mono {{ $isCurrent ? 'text-emerald-400 font-bold' : 'text-theme-muted' }}">
-                                            {{ $isCurrent ? '● Selecionado' : 'Ir para ' . $unitShort . ' ' . $ep->number . ' ❯' }}
-                                        </span>
+                                    <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
+                                        <div>
+                                            <h3 class="text-xs font-bold {{ $isCurrent ? 'text-emerald-300' : 'text-theme-primary group-hover:text-theme-accent' }} transition-colors truncate">
+                                                {{ $unitLabel }} {{ $ep->number }}
+                                            </h3>
+                                            <p class="text-[10px] font-mono text-theme-muted mt-0.5 truncate">
+                                                {{ $ep->air_date_utc ?? 'Catalogado' }}
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
+                                            <span class="text-[9px] font-mono {{ $isCurrent ? 'text-emerald-400 font-bold' : 'text-theme-muted' }}">
+                                                {{ $isCurrent ? '● Selecionado' : 'Ir para ' . $unitShort . ' ' . $ep->number . ' ❯' }}
+                                            </span>
+                                            @if(!$isManga)
+                                                <button type="button"
+                                                        data-requires-addon-capability="video"
+                                                        onclick="event.stopPropagation(); window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $ep->id }}', '{{ $ep->number }}', '{{ addslashes($workTitle) }}')"
+                                                        class="hidden px-2 py-0.5 rounded bg-emerald-400 text-black text-[9px] font-mono font-bold hover:scale-105 transition-transform cursor-pointer">
+                                                    ▶ Play
+                                                </button>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        @endforeach
+                            @endforeach
+                        </div>
+
+                        @if(count($displayEpisodes) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('ep-sequence-rail', 1)"
+                                    class="absolute right-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-emerald-400 text-white hover:text-black border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                                    title="Próximos episódios">
+                                ❯
+                            </button>
+                        @endif
                     </div>
                 </div>
 

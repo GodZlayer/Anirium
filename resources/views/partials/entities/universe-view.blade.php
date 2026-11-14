@@ -129,54 +129,100 @@
             <!-- 3. CONTAINER DE CONTEÚDO DAS ABAS (100% RESPONSIVO, SEM SCROLL VERTICAL NA PÁGINA) -->
             <div class="min-h-[245px] lg:min-h-0 lg:flex-1 overflow-hidden flex flex-col justify-center">
                 
-                <!-- ABA 1: OBRAS DO UNIVERSO (GRID HORIZONTAL FLUIDO PAGINADO) -->
+                <!-- ABA 1: OBRAS DO UNIVERSO (GRID HORIZONTAL FLUIDO PAGINADO COM BOTÕES DE ARRASTO) -->
                 <div id="universe-tab-works" class="universe-tab-pane flex flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">Catálogo de animações e produções canônicas</span>
-                        <span class="text-xs font-mono text-theme-accent font-bold">{{ $totalWorks }} <span data-i18n="entity.productions_suffix">produções</span></span>
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">Catálogo de animações e produções canônicas</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-theme-accent font-bold">{{ $totalWorks }} <span data-i18n="entity.productions_suffix">produções</span></span>
+                            @if(count($works) > 1)
+                                <div class="flex items-center gap-1">
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('universe-works-rail', -1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow"
+                                            title="Rolar para a esquerda">
+                                        ❮
+                                    </button>
+                                    <button type="button"
+                                            onclick="window.scrollEntityRail('universe-works-rail', 1)"
+                                            class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow"
+                                            title="Rolar para a direita">
+                                        ❯
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
-                        @forelse($works as $w)
-                            <div class="flex-none w-44 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
-                                 onclick="window.pushNavigation('work', '{{ $w->id }}', '{{ addslashes($w->title) }}')">
-                                <div class="relative w-full h-32 overflow-hidden bg-black shrink-0">
-                                    <img src="{{ $w->image_url ?? $leadImage }}" class="w-full h-full object-cover group-hover:scale-105 transition-all">
-                                    <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-black/80 text-theme-accent border border-white/10 uppercase">
-                                        {{ $w->format ?? 'TV' }}
-                                    </span>
+                    <div class="relative flex-1 flex items-center min-h-0">
+                        @if(count($works) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('universe-works-rail', -1)"
+                                    class="absolute left-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                                    title="Produções anteriores">
+                                ❮
+                            </button>
+                        @endif
+
+                        <div id="universe-works-rail" data-draggable-rail="true" class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing">
+                            @forelse($works as $w)
+                                <div class="flex-none w-44 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
+                                     onclick="window.pushNavigation('work', '{{ $w->id }}', '{{ addslashes($w->title) }}')">
+                                    <div class="relative w-full h-32 overflow-hidden bg-black shrink-0">
+                                        <img src="{{ $w->image_url ?? $leadImage }}" class="w-full h-full object-cover group-hover:scale-105 transition-all pointer-events-none">
+                                        <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-black/80 text-theme-accent border border-white/10 uppercase">
+                                            {{ $w->format ?? 'TV' }}
+                                        </span>
+                                    </div>
+                                    <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
+                                        <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors line-clamp-2 leading-tight">
+                                            {{ $w->title }}
+                                        </h3>
+                                        <p class="text-[10px] font-mono text-theme-muted mt-1">
+                                            {{ $w->status ?? 'Lançado' }} • {{ $w->episode_count ?? '?' }} eps
+                                        </p>
+                                    </div>
                                 </div>
-                                <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
-                                    <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors line-clamp-2 leading-tight">
-                                        {{ $w->title }}
-                                    </h3>
-                                    <p class="text-[10px] font-mono text-theme-muted mt-1">
-                                        {{ $w->status ?? 'Lançado' }} • {{ $w->episode_count ?? '?' }} eps
-                                    </p>
+                            @empty
+                                <div class="w-full py-12 text-center text-xs font-mono text-theme-muted" data-i18n="entity.no_works_in_universe">
+                                    Nenhuma obra cadastrada para este universo.
                                 </div>
-                            </div>
-                        @empty
-                            <div class="w-full py-12 text-center text-xs font-mono text-theme-muted" data-i18n="entity.no_works_in_universe">
-                                Nenhuma obra cadastrada para este universo.
-                            </div>
-                        @endforelse
+                            @endforelse
+                        </div>
+
+                        @if(count($works) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('universe-works-rail', 1)"
+                                    class="absolute right-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                                    title="Próximas produções">
+                                ❯
+                            </button>
+                        @endif
                     </div>
                 </div>
 
                 <!-- ABA 2: GENEALOGIA DE OBRAS (LINHA DO TEMPO SEQUENCIAL) -->
                 <div id="universe-tab-genealogy" class="universe-tab-pane hidden flex flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">Continuidade cronológica oficial e conexões canônicas</span>
-                        <span class="text-xs font-mono text-theme-accent font-bold">{{ count($genealogy) }} conexões</span>
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">Continuidade cronológica oficial e conexões canônicas</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-theme-accent font-bold">{{ count($genealogy) }} conexões</span>
+                            @if(count($genealogy) > 2)
+                                <div class="flex items-center gap-1">
+                                    <button type="button" onclick="window.scrollEntityRail('universe-genealogy-rail', -1)" class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">❮</button>
+                                    <button type="button" onclick="window.scrollEntityRail('universe-genealogy-rail', 1)" class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">❯</button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    <div class="flex-1 p-5 rounded-3xl bg-theme-raised/60 border border-theme-default flex items-center gap-4 overflow-x-auto no-scrollbar">
+                    <div id="universe-genealogy-rail" data-draggable-rail="true" class="flex-1 p-5 rounded-3xl bg-theme-raised/60 border border-theme-default flex items-center gap-4 overflow-x-auto no-scrollbar scroll-smooth cursor-grab active:cursor-grabbing">
                         @forelse($genealogy as $index => $item)
                             <div class="flex items-center gap-4 shrink-0">
                                 <div class="flex items-center gap-3 p-3 pr-4 rounded-2xl bg-theme-card border border-theme-default hover:border-theme-accent cursor-pointer transition-all hover:scale-105 shadow-md"
                                      onclick="window.pushNavigation('work', '{{ $item->id }}', '{{ addslashes($item->title) }}')">
                                     <div class="w-12 h-12 rounded-xl overflow-hidden bg-black shrink-0 border border-theme-default">
-                                        <img src="{{ $item->image_url ?? $leadImage }}" class="w-full h-full object-cover">
+                                        <img src="{{ $item->image_url ?? $leadImage }}" class="w-full h-full object-cover pointer-events-none">
                                     </div>
                                     <div>
                                         <div class="flex items-center gap-2">
@@ -207,37 +253,63 @@
 
                 <!-- ABA 3: SAGAS & ARCOS NARRATIVOS (CARDS COM COBERTURA EXATA DE EPISÓDIOS) -->
                 <div id="universe-tab-arcs" class="universe-tab-pane hidden flex flex-col justify-between h-full gap-2">
-                    <div class="flex items-center justify-between flex-none">
-                        <span class="text-xs font-mono text-theme-muted">Faixas narrativas canônicas com de/até de temporadas e episódios</span>
-                        <span class="text-xs font-mono text-theme-accent font-bold">{{ $totalArcs }} <span data-i18n="entity.arcs_cataloged_suffix">arcos</span></span>
+                    <div class="flex items-center justify-between flex-none gap-2">
+                        <span class="text-xs font-mono text-theme-muted truncate">Faixas narrativas canônicas com de/até de temporadas e episódios</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-mono text-theme-accent font-bold">{{ $totalArcs }} <span data-i18n="entity.arcs_cataloged_suffix">arcos</span></span>
+                            @if(count($arcs) > 1)
+                                <div class="flex items-center gap-1">
+                                    <button type="button" onclick="window.scrollEntityRail('universe-arcs-rail', -1)" class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">❮</button>
+                                    <button type="button" onclick="window.scrollEntityRail('universe-arcs-rail', 1)" class="w-7 h-7 rounded-xl bg-theme-pill hover:bg-theme-accent hover:text-theme-inverse border border-theme-default text-theme-primary flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow">❯</button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
-                        @forelse($arcs as $arc)
-                            <div class="flex-none w-64 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 hover:bg-theme-raised hover:border-theme-accent transition-all cursor-pointer shadow-md group flex flex-col justify-between"
-                                 onclick="window.pushNavigation('arc', '{{ $arc->id }}', '{{ addslashes($arc->title) }}')">
-                                <div>
-                                    <div class="flex items-center justify-between gap-2 mb-2">
-                                        <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase {{ ($arc->classification ?? '') === 'filler' ? 'bg-[var(--color-state-filler,#F43F5E)]/20 text-[var(--color-state-filler,#F43F5E)] border border-[var(--color-state-filler,#F43F5E)]/30' : 'bg-[var(--color-state-canon,#10B981)]/20 text-[var(--color-state-canon,#10B981)] border border-[var(--color-state-canon,#10B981)]/30' }}">
-                                            {{ strtoupper($arc->classification ?? 'CANON') }}
-                                        </span>
-                                        <span class="text-xs text-theme-muted group-hover:text-theme-accent">❯</span>
+                    <div class="relative flex-1 flex items-center min-h-0">
+                        @if(count($arcs) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('universe-arcs-rail', -1)"
+                                    class="absolute left-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer">
+                                ❮
+                            </button>
+                        @endif
+
+                        <div id="universe-arcs-rail" data-draggable-rail="true" class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing">
+                            @forelse($arcs as $arc)
+                                <div class="flex-none w-64 h-[210px] p-4 rounded-2xl border border-theme-default bg-theme-raised/80 hover:bg-theme-raised hover:border-theme-accent transition-all cursor-pointer shadow-md group flex flex-col justify-between"
+                                     onclick="window.pushNavigation('arc', '{{ $arc->id }}', '{{ addslashes($arc->title) }}')">
+                                    <div>
+                                        <div class="flex items-center justify-between gap-2 mb-2">
+                                            <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase {{ ($arc->classification ?? '') === 'filler' ? 'bg-[var(--color-state-filler,#F43F5E)]/20 text-[var(--color-state-filler,#F43F5E)] border border-[var(--color-state-filler,#F43F5E)]/30' : 'bg-[var(--color-state-canon,#10B981)]/20 text-[var(--color-state-canon,#10B981)] border border-[var(--color-state-canon,#10B981)]/30' }}">
+                                                {{ strtoupper($arc->classification ?? 'CANON') }}
+                                            </span>
+                                            <span class="text-xs text-theme-muted group-hover:text-theme-accent">❯</span>
+                                        </div>
+                                        <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors line-clamp-2 leading-snug">
+                                            {{ $arc->title }}
+                                        </h3>
                                     </div>
-                                    <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors line-clamp-2 leading-snug">
-                                        {{ $arc->title }}
-                                    </h3>
+                                    <div class="mt-2 pt-2 border-t border-theme-default/40">
+                                        <p class="text-[10px] font-mono text-theme-accent truncate" title="{{ $arc->span_description ?? ($arc->work_title ?? $name) }}">
+                                            {{ $arc->span_description ?? ($arc->work_title ?? $name) }}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div class="mt-2 pt-2 border-t border-theme-default/40">
-                                    <p class="text-[10px] font-mono text-theme-accent truncate" title="{{ $arc->span_description ?? ($arc->work_title ?? $name) }}">
-                                        {{ $arc->span_description ?? ($arc->work_title ?? $name) }}
-                                    </p>
+                            @empty
+                                <div class="w-full py-12 text-center text-xs font-mono text-theme-muted" data-i18n="entity.no_arcs">
+                                    Nenhum arco narrativo vinculado a este universo.
                                 </div>
-                            </div>
-                        @empty
-                            <div class="w-full py-12 text-center text-xs font-mono text-theme-muted" data-i18n="entity.no_arcs">
-                                Nenhum arco narrativo vinculado a este universo.
-                            </div>
-                        @endforelse
+                            @endforelse
+                        </div>
+
+                        @if(count($arcs) > 3)
+                            <button type="button"
+                                    onclick="window.scrollEntityRail('universe-arcs-rail', 1)"
+                                    class="absolute right-1.5 z-20 w-9 h-9 rounded-full bg-black/85 hover:bg-theme-accent text-white hover:text-theme-inverse border border-white/20 shadow-2xl flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95 cursor-pointer">
+                                ❯
+                            </button>
+                        @endif
                     </div>
                 </div>
 
