@@ -2484,6 +2484,13 @@
             const workFormat = stage?.getAttribute('data-work-format') || 'TV';
             const cleanTitle = String(workTitle || stage?.getAttribute('data-work-title') || 'Anime').trim();
 
+            // Detecta temporada no título (ex: "2nd Season", "Season 2", "Temporada 2", "S2")
+            let resolvedSeason = 1;
+            const seasonMatch = cleanTitle.match(/(?:(\d+)(?:st|nd|rd|th)?\s+season)|(?:season\s+(\d+))|(?:temporada\s+(\d+))|(?:\bS(\d+)\b)/i);
+            if (seasonMatch) {
+                resolvedSeason = parseInt(seasonMatch[1] || seasonMatch[2] || seasonMatch[3] || seasonMatch[4], 10) || 1;
+            }
+
             window.currentPlayerProContext = {
                 workId: workId || '',
                 epId: resolvedEpId,
@@ -2625,7 +2632,7 @@
                     title: cleanTitle,
                     titleEnglish: cleanTitle,
                     titleRomaji: cleanTitle,
-                    season: 1,
+                    season: resolvedSeason,
                     episode: cleanEpNum
                 };
                 if (malId > 0) preparePayload.malId = malId;
@@ -2648,7 +2655,7 @@
                         title: cleanTitle,
                         titleEnglish: cleanTitle,
                         titleRomaji: cleanTitle,
-                        season: 1,
+                        season: resolvedSeason,
                         episode: cleanEpNum
                     };
                     prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
