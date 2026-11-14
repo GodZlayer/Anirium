@@ -735,7 +735,8 @@
             idleTimer: null,
             isCustomMedia: false,
             episodeOffset: 0,
-            renewTimer: null
+            renewTimer: null,
+            currentWindow: null
         };
 
         const episodeEpoch = Date.UTC(2000, 0, 1);
@@ -753,6 +754,9 @@
                     state.episodeOffset = programTime - dom.video.currentTime;
                     return programTime;
                 }
+            }
+            if (state.currentWindow && Number.isFinite(state.currentWindow.start)) {
+                return (dom.video.currentTime || 0) + state.currentWindow.start;
             }
             return Math.max(0, (dom.video.currentTime || 0) + (state.episodeOffset || 0));
         }
@@ -908,6 +912,7 @@
                 })
             }).then(r => r.json()).then(data => {
                 if (data.window && data.window.status === 'ready' && data.window.playlistUrl) {
+                    state.currentWindow = data.window;
                     const streamUrl = `http://127.0.0.1:4004${data.window.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
                     playStream(streamUrl, `Anirium+ (${state.selectedQuality})`);
                 }
@@ -1400,6 +1405,7 @@
                     if (res.ok) {
                         const data = await res.json().catch(() => ({}));
                         if (data.window && data.window.status === 'ready' && data.window.playlistUrl) {
+                            state.currentWindow = data.window;
                             const streamUrl = `http://127.0.0.1:4004${data.window.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
                             playStream(streamUrl, `Anirium+ Unificado (${state.selectedQuality})`);
                         }
