@@ -55,7 +55,7 @@ class ServiceSessionController extends Controller
             'accountId' => (string) $accountId,
             'level' => $level,
             'playerSessionId' => $playerSessionId,
-            'exp' => time() + 300, // 5 minutos de validade
+            'exp' => time() + 1800, // 30 minutos de validade para sessões contínuas de reprodução
         ];
 
         $encodedPayload = $this->base64UrlEncode(json_encode($payload));
@@ -146,7 +146,7 @@ class ServiceSessionController extends Controller
                     'deviceId' => $deviceId,
                     'playerSessionId' => $playerSessionId,
                     'timestamp' => time(),
-                ], 300);
+                ], 1800);
             } else {
                 return response()->json(['status' => 'session_in_use', 'reason' => 'session_in_use'], 409);
             }
@@ -155,7 +155,7 @@ class ServiceSessionController extends Controller
                 'deviceId' => $deviceId,
                 'playerSessionId' => $playerSessionId,
                 'timestamp' => time(),
-            ], 300);
+            ], 1800);
         }
 
         $token = $this->issueServiceToken($webSessionId, $deviceId, (string) $user->id, $tier, $playerSessionId);
@@ -163,7 +163,7 @@ class ServiceSessionController extends Controller
         return response()->json([
             'status' => 'authorized',
             'token' => $token,
-            'expiresIn' => 300,
+            'expiresIn' => 1800,
             'deviceId' => $deviceId,
         ], 200, ['Cache-Control' => 'no-store']);
     }
