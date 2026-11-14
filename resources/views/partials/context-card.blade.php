@@ -46,19 +46,28 @@
     // gera as unidades episódicas virtuais canônicas (1..N) para que o trilho de Episódios/Capítulos sempre exiba os cards clicáveis!
     // Para obras ainda não lançadas (ex: Demons' Crest), não gera episódios falsos vazios!
     $displayEpisodes = collect($episodes);
-    if ($displayEpisodes->isEmpty() && $totalEpisodes > 0 && ! $isUnreleased) {
-        $maxVirtual = min((int) $totalEpisodes, 200);
-        $virtualList = [];
+    $knownMaxEp = (int) ($displayEpisodes->max('number') ?? 0);
+    $targetMaxEp = max($knownMaxEp, (int) ($work->latest_episode_num ?? 0), (int) ($totalEpisodes ?? 0));
+
+    // Se a lista de episódios está vazia ou incompleta em relação aos episódios lançados/totais conhecidos,
+    // sintetiza as unidades episódicas complementares para que o trilho de Episódios/Capítulos sempre exiba os cards clicáveis!
+    if (! $isUnreleased && $targetMaxEp > $knownMaxEp) {
+        $maxVirtual = min($targetMaxEp, 500);
+        $virtualList = $displayEpisodes->all();
+        $existingNums = $displayEpisodes->pluck('number')->flip()->all();
         for ($i = 1; $i <= $maxVirtual; $i++) {
-            $virtualList[] = (object) [
-                'id' => ($work->id ?? 'work') . ':ep:' . $i,
-                'work_id' => $work->id ?? '',
-                'number' => $i,
-                'air_date_utc' => null,
-                'is_virtual' => true,
-            ];
+            if (! isset($existingNums[$i])) {
+                $virtualList[] = (object) [
+                    'id' => ($work->id ?? 'work') . ':ep:' . $i,
+                    'work_id' => $work->id ?? '',
+                    'number' => $i,
+                    'air_date_utc' => null,
+                    'is_virtual' => true,
+                ];
+            }
         }
-        $displayEpisodes = collect($virtualList);
+        $displayEpisodes = collect($virtualList)->sortBy('number')->values();
+        $totalEpisodes = max($totalEpisodes, $displayEpisodes->count());
     }
 
     // Identificadores externos para resolução aberta de Add-ons (Comunidade / Stremio & Anirium+)

@@ -320,13 +320,31 @@ def run_sync():
                 status = excluded.status
         """, (work_id, info['airing_day'], info['airing_time'], info['latest_episode_num'], info['status']))
         updated_db_count += 1
+
+        # Garantir que catalog_episodes possua registros para os episódios lançados
+        if info['latest_episode_num'] and info['latest_episode_num'] > 0:
+            max_existing = cur.execute("SELECT MAX(number) FROM catalog_episodes WHERE work_id = ?", (work_id,)).fetchone()[0] or 0
+            if info['latest_episode_num'] > max_existing:
+                import uuid
+                season_id = cur.execute("SELECT id FROM catalog_seasons WHERE work_id = ? ORDER BY number LIMIT 1", (work_id,)).fetchone()
+                s_id = season_id[0] if season_id else None
+                for ep_num in range(max_existing + 1, info['latest_episode_num'] + 1):
+                    ep_id = str(uuid.uuid4())
+                    cur.execute("INSERT OR IGNORE INTO catalog_entities (id, kind) VALUES (?, ?)", (ep_id, 'episode'))
+                    cur.execute("""
+                        INSERT OR IGNORE INTO catalog_episodes (id, work_id, season_id, numbering_scheme, number, air_date_utc, classification)
+                        VALUES (?, ?, ?, 'original', ?, NULL, 'unknown')
+                    """, (ep_id, work_id, s_id, ep_num))
         
     conn.commit()
     conn.close()
     print(f"[AiringSync] Tabela catalog_work_schedules atualizada com sucesso ({updated_db_count} obras sincronizadas).")
     
     # 2. Atualizar o Published Search Index SQLite (usado pelo feed canônico)
-    index_files = glob.glob(os.path.join(PUBLISHED_INDEX_DIR, '*.sqlite'))
+    index_files = [
+        f for f in glob.glob(os.path.join(PUBLISHED_INDEX_DIR, '*.sqlite'))
+        if not os.path.basename(f).startswith('schedules') and not os.path.basename(f).startswith('summaries')
+    ]
     if not index_files:
         print("[AiringSync] Nenhum índice compilado em published/indexes.")
         return
