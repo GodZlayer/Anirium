@@ -14,6 +14,7 @@ const maxLocalAPIBody = 64 * 1024
 func trustedPlayerOrigin(origin string) bool {
 	trusted := []string{
 		officialCoreURL,
+		"https://godzlayer.github.io",
 		"http://localhost:8080",
 		"http://127.0.0.1:8080",
 		"http://localhost:5173",

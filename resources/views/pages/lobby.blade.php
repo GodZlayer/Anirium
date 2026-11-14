@@ -2477,21 +2477,28 @@
 
             if (iconEl) iconEl.innerText = '▶';
             if (titleEl) titleEl.innerText = `${cleanTitle} • Episódio ${cleanEpNum}`;
-            if (subEl) subEl.innerText = 'Anirium Player Pro • Motor Unificado Multi-Magnet (Anirium+ Service)';
+            if (subEl) subEl.innerText = 'Embed Externo: github.com/GodZlayer/anirium-embeds • Motor Unificado Anirium+ Service';
 
             modal.classList.remove('opacity-0', 'pointer-events-none');
 
+            const playerAddon = (window.allUserAddons || []).find(a => a.id === 'player-pro');
+            const externalEmbedBaseUrl = playerAddon?.embed_url || 'https://godzlayer.github.io/anirium-embeds/video/';
+
             viewport.innerHTML = `
-                <div class="w-full flex flex-col gap-3">
-                    <!-- Barra de Controle Superior do Player Pro -->
+                <div class="w-full flex flex-col gap-3" data-external-embed-repo="https://github.com/GodZlayer/anirium-embeds" data-external-embed-url="${externalEmbedBaseUrl}">
+                    <!-- Barra de Controle Superior do Embed Player Pro -->
                     <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-2xl bg-theme-raised border border-theme-default">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span class="px-2.5 py-0.5 rounded-lg bg-theme-accent text-theme-inverse text-[10px] font-mono font-black uppercase">
                                 EPISÓDIO ${cleanEpNum}
                             </span>
                             <span id="anirium-player-pro-source-badge" class="px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-white/10 text-theme-muted border border-white/10">
                                 ● Conectando ao Anirium+ Service...
                             </span>
+                            <a href="https://github.com/GodZlayer/anirium-embeds" target="_blank" rel="noopener noreferrer"
+                               class="px-2 py-0.5 rounded-lg bg-theme-pill border border-theme-default text-[9px] font-mono text-theme-muted hover:text-theme-accent transition-colors">
+                                📦 Repo Embed ↗
+                            </a>
                         </div>
                         <div class="flex items-center gap-1.5">
                             ${cleanEpNum > 1 ? `
@@ -2505,7 +2512,7 @@
                         </div>
                     </div>
 
-                    <!-- Palco 16:9 do Anirium Player Pro -->
+                    <!-- Palco 16:9 do Embed Player Pro -->
                     <div class="relative w-full aspect-video max-h-[54vh] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl flex items-center justify-center">
                         <video id="anirium-player-pro-video" controls autoplay playsinline crossorigin="anonymous" class="hidden w-full h-full object-contain bg-black"></video>
 
@@ -2711,6 +2718,10 @@
                 return;
             }
 
+            const cleanChap = parseInt(chapterNum, 10) || 1;
+            const cleanTitle = String(workTitle || 'Mangá').trim();
+            window.currentMangaContext = { workId: workId || '', chapter: cleanChap, workTitle: cleanTitle };
+
             const modal = document.getElementById('modal-external-addon');
             const iconEl = document.getElementById('external-addon-icon');
             const titleEl = document.getElementById('external-addon-title');
@@ -2718,27 +2729,35 @@
             const viewport = document.getElementById('external-addon-viewport');
             if (!modal || !viewport) return;
 
+            const mangaAddon = (window.allUserAddons || []).find(a => a.id === 'manga-reader-pro');
+            const mangaEmbedBase = mangaAddon?.embed_url || 'https://godzlayer.github.io/anirium-embeds/manga/';
+            const embedSrc = `${mangaEmbedBase}?workId=${encodeURIComponent(workId || '')}&chapter=${cleanChap}&title=${encodeURIComponent(cleanTitle)}`;
+
             if (iconEl) iconEl.innerText = '📖';
-            if (titleEl) titleEl.innerText = `${workTitle || 'Mangá'} • Capítulo ${chapterNum || 1}`;
-            if (subEl) subEl.innerText = 'Leitor Externo via Add-on de Mangá (Imagens / CBZ / PDF)';
+            if (titleEl) titleEl.innerText = `${cleanTitle} • Capítulo ${cleanChap}`;
+            if (subEl) subEl.innerText = 'Embed Externo: github.com/GodZlayer/anirium-embeds (Manga Reader Pro)';
 
             modal.classList.remove('opacity-0', 'pointer-events-none');
             viewport.innerHTML = `
-                <div class="max-w-lg text-center space-y-4">
-                    <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl mx-auto text-amber-400">📖</div>
-                    <h4 class="text-sm font-bold font-serif text-white">Anirium Manga Reader Pro (PDF / Imagens)</h4>
-                    <p class="text-xs font-mono text-theme-muted leading-relaxed">
-                        Carregue um capítulo em PDF ou páginas de imagem no tocador do Add-on de Leitura para <strong>${workTitle} (Cap. ${chapterNum || 1})</strong>.
-                    </p>
-                    <div class="flex flex-wrap items-center justify-center gap-2.5 pt-2">
-                        <label class="px-4 py-2 rounded-xl bg-amber-400 text-black text-xs font-mono font-bold shadow-lg cursor-pointer">
-                            📄 Abrir PDF / Imagens do Capítulo
-                            <input type="file" accept=".pdf,image/*" multiple class="hidden" onchange="window.loadExternalMangaFiles(this)">
-                        </label>
-                    </div>
-                </div>
+                <iframe
+                    src="${embedSrc}"
+                    allow="fullscreen"
+                    allowfullscreen
+                    class="w-full h-[65vh] rounded-2xl border border-theme-default bg-black shadow-2xl">
+                </iframe>
             `;
         };
+
+        window.addEventListener('message', (event) => {
+            const msg = event.data;
+            if (!msg || typeof msg !== 'object') return;
+            if (msg.type === 'anirium:manga:step-chapter' && window.currentMangaContext) {
+                const nextChap = Math.max(1, (window.currentMangaContext.chapter || 1) + (Number(msg.delta) || 0));
+                window.launchExternalMangaAddon(window.currentMangaContext.workId, nextChap, window.currentMangaContext.workTitle);
+            } else if (msg.type === 'anirium:player:step-episode') {
+                window.stepPlayerProEpisode(Number(msg.delta) || 1);
+            }
+        });
 
         window.loadExternalMangaFiles = function(input) {
             const files = Array.from(input?.files || []);
