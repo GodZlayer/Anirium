@@ -74,4 +74,16 @@ class CatalogGraphApiTest extends TestCase
             ->assertJsonPath('relations.0.to_work_id', $hidden)->assertJsonPath('relations.0.relation_type', 'other');
         $this->getJson('/api/catalog/graph/universe/'.$universe)->assertOk()->assertJsonCount(2, 'work_ids');
     }
+
+    public function test_virtual_episode_endpoint_renders_episode_context_for_works_without_episode_rows(): void
+    {
+        $workId = (string) Str::uuid();
+        $this->work($workId, $workId);
+        $this->visible([$workId => false]);
+
+        $this->get('/api/catalog/graph/episode/'.$workId.':ep:1?render=blade&adult=0&v=v6')
+            ->assertOk()
+            ->assertSee('Episódio 1 — Fixture')
+            ->assertSee("window.pushNavigation('episode', '".$workId.":ep:1'", false);
+    }
 }

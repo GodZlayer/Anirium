@@ -208,7 +208,7 @@
 
                             <!-- Ação Oficial de Catálogo: Favoritar -->
                             <button type="button"
-                                    onclick="window.toggleUserBookmark?.('{{ $isEpisodeMode ? ($currentEpisode->id ?? $work->id) : ($work->id ?? '') }}', '{{ $isEpisodeMode ? 'episode' : ($isManga ? 'manga' : 'work') }}')"
+                                    onclick="window.toggleUserBookmark?.('{{ ($isEpisodeMode && empty($currentEpisode->is_virtual)) ? ($currentEpisode->id ?? $work->id) : ($work->id ?? '') }}', '{{ ($isEpisodeMode && empty($currentEpisode->is_virtual)) ? 'episode' : ($isManga ? 'manga' : 'work') }}')"
                                     class="px-3 py-1.5 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono font-bold {{ !empty($isBookmarked) ? 'text-theme-accent border-theme-accent' : 'text-theme-muted hover:text-white' }} transition-all cursor-pointer flex items-center gap-1.5">
                                 <span>📌</span> <span data-i18n="action.bookmark">Favoritar</span>
                             </button>
@@ -272,9 +272,7 @@
                                 $isVirtualEp = !empty($ep->is_virtual);
                             @endphp
                             <div class="flex-none w-52 h-[210px] rounded-2xl border {{ $isCurrentEp ? 'border-theme-accent ring-2 ring-theme-accent/30 bg-theme-raised' : 'border-theme-default bg-theme-raised/80 hover:border-theme-highlight' }} overflow-hidden cursor-pointer hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
-                                 @if(!$isVirtualEp)
-                                     onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($title) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')"
-                                 @endif>
+                                 onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($title) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')">
                                 <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
                                     <img src="{{ $image }}" class="w-full h-full object-cover group-hover:scale-105 transition-all filter brightness-90" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
                                     <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded {{ $isCurrentEp ? 'bg-theme-accent text-theme-inverse' : 'bg-black/80 text-theme-accent border border-white/10' }} uppercase">
@@ -296,7 +294,7 @@
                                         </p>
                                     </div>
                                     <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
-                                        <span class="text-[9px] font-mono text-theme-muted">{{ $isVirtualEp ? ($format . ' • Un. ' . $ep->number) : 'Ficha Ontológica ❯' }}</span>
+                                        <span class="text-[9px] font-mono text-theme-muted group-hover:text-theme-accent transition-colors">{{ $isManga ? 'Abrir Capítulo ❯' : 'Abrir Episódio ❯' }}</span>
                                         @if(!$isManga)
                                             <button type="button"
                                                     data-requires-addon-capability="video"
@@ -402,8 +400,8 @@
                 <!-- ABA 5: DISCUSSÃO COMUNITÁRIA -->
                 <div id="work-tab-pane-discussion" class="work-tab-pane hidden flex-col h-full overflow-y-auto no-scrollbar">
                     <x-shell.entity-discussion
-                        :targetType="$isEpisodeMode ? 'episode' : ($isManga ? 'manga' : 'work')"
-                        :targetId="$isEpisodeMode ? ($currentEpisode->id ?? '') : ($work->id ?? '')" />
+                        :targetType="($isEpisodeMode && empty($currentEpisode->is_virtual)) ? 'episode' : ($isManga ? 'manga' : 'work')"
+                        :targetId="($isEpisodeMode && empty($currentEpisode->is_virtual)) ? ($currentEpisode->id ?? '') : ($work->id ?? '')" />
                 </div>
 
             </div>

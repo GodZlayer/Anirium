@@ -26,6 +26,22 @@
     $isManga = $workMedia === 'manga';
     $totalArcEpisodes = count($episodes) ?: ($endNum ? max(1, (int) $endNum - $startNum + 1) : 0);
 
+    $displayArcEpisodes = collect($episodes);
+    if ($displayArcEpisodes->isEmpty() && $work && $totalArcEpisodes > 0) {
+        $maxArcVirtual = min((int) ($endNum ?: ($startNum + $totalArcEpisodes - 1)), $startNum + 199);
+        $vArcEps = [];
+        for ($i = max(1, $startNum); $i <= $maxArcVirtual; $i++) {
+            $vArcEps[] = (object) [
+                'id' => ($work->id ?? 'work') . ':ep:' . $i,
+                'work_id' => $work->id ?? '',
+                'number' => $i,
+                'air_date_utc' => null,
+                'is_virtual' => true,
+            ];
+        }
+        $displayArcEpisodes = collect($vArcEps);
+    }
+
     // Filtrar trilhas OP/ED que se sobrepõem à faixa de episódios deste arco
     $arcTracks = collect($tracks)->filter(function ($tr) use ($startNum, $endNum) {
         if (preg_match('/\(eps?\s*(\d+)\s*-\s*(\d+|\?)\)/i', $tr->title ?? '', $m)) {
@@ -143,7 +159,7 @@
                         onclick="window.switchArcTab('episodes')"
                         id="arc-tab-btn-episodes"
                         class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm cursor-pointer shrink-0">
-                    <span>📺</span> <span>Episódios do Arco ({{ count($episodes) }})</span>
+                    <span>📺</span> <span>Episódios do Arco ({{ count($displayArcEpisodes) ?: $totalArcEpisodes }})</span>
                 </button>
 
                 @if(count($arcTimeline) > 0)
@@ -183,26 +199,26 @@
                     </div>
 
                     <div class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1">
-                        @forelse($episodes as $ep)
+                        @forelse($displayArcEpisodes as $ep)
                             <div class="flex-none w-48 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
-                                 onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($workTitle) }} • Ep. {{ $ep->number }}')">
+                                 onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($workTitle) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')">
                                 <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
                                     <img src="{{ $leadImage }}" class="w-full h-full object-cover group-hover:scale-105 transition-all" loading="lazy" onerror="this.src='/assets/icons/actions/search.png'">
                                     <span class="absolute top-2 left-2 text-[9px] font-bold font-mono px-2 py-0.5 rounded bg-black/80 text-theme-accent border border-white/10 uppercase">
-                                        EP. {{ $ep->number }}
+                                        {{ $isManga ? 'CAP. ' : 'EP. ' }}{{ $ep->number }}
                                     </span>
                                 </div>
                                 <div class="p-3 flex-1 flex flex-col justify-between min-w-0">
                                     <div>
                                         <h3 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors truncate">
-                                            Episódio {{ $ep->number }}
+                                            {{ $isManga ? 'Capítulo ' : 'Episódio ' }}{{ $ep->number }}
                                         </h3>
                                         <p class="text-[10px] font-mono text-theme-muted mt-0.5">
                                             {{ $ep->air_date_utc ?? 'Catalogado' }}
                                         </p>
                                     </div>
                                     <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
-                                        <span class="text-[9px] font-mono text-theme-muted">Ficha ❯</span>
+                                        <span class="text-[9px] font-mono text-theme-muted group-hover:text-theme-accent transition-colors">{{ $isManga ? 'Abrir Capítulo ❯' : 'Abrir Episódio ❯' }}</span>
                                         @if($work)
                                             <button type="button"
                                                     data-requires-addon-capability="video"

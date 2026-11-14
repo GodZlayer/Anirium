@@ -1340,7 +1340,7 @@
             nav.innerHTML = html;
         };
 
-        const ENTITY_VIEW_SCHEMA_V = 'v5';
+        const ENTITY_VIEW_SCHEMA_V = 'v6';
         window.entityHtmlCache = new Map();
 
         window.renderCurrentState = async function() {

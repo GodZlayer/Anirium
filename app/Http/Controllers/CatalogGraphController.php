@@ -1076,25 +1076,101 @@ class CatalogGraphController extends Controller
 
     public function episode(Request $request, string $id, CatalogWorkGraph $graph): JsonResponse|Response
     {
-        $realId = $this->resolveUuid($id, 'episode');
+        $epMeta = null;
 
-        $epMeta = Cache::remember("catalog:episode:meta:v2:{$realId}", 3600, function () use ($realId) {
-            $episode = DB::table('catalog_episodes')->where('id', $realId)->first();
-            if (! $episode) {
-                return null;
-            }
+        // Suporte a identificadores de episódios/capítulos compostos ou virtuais (<workId>:ep:<number> ou <workId>:ep-<number>)
+        if (preg_match('/^(?:episode:)?(?:work:)?([0-9a-f-]{36}|[^:]+):ep[:-](\d+)$/i', trim($id), $m)) {
+            $workUuid = $this->resolveUuid($m[1], 'work');
+            $epNumber = max(1, (int) $m[2]);
 
-            $arcEpisode = DB::table('catalog_arc_episodes')->where('episode_id', $realId)->first();
-            $currentArc = null;
-            if ($arcEpisode) {
-                $currentArc = DB::table('catalog_arcs')->where('id', $arcEpisode->arc_id)->first();
-            }
+            $epMeta = Cache::remember("catalog:episode:virtual:v3:{$workUuid}:{$epNumber}", 3600, function () use ($workUuid, $epNumber) {
+                $workExists = DB::table('catalog_works')->where('id', $workUuid)->exists();
+                if (! $workExists) {
+                    return null;
+                }
 
-            return json_decode(json_encode([
-                'episode' => $episode,
-                'currentArc' => $currentArc,
-            ]), true);
-        });
+                $episode = DB::table('catalog_episodes')
+                    ->where('work_id', $workUuid)
+                    ->where('number', $epNumber)
+                    ->first();
+
+                if (! $episode) {
+                    $episode = (object) [
+                        'id' => "{$workUuid}:ep:{$epNumber}",
+                        'work_id' => $workUuid,
+                        'season_id' => null,
+                        'number' => $epNumber,
+                        'air_date_utc' => null,
+                        'classification' => 'canon',
+                        'is_virtual' => true,
+                    ];
+                }
+
+                $currentArc = null;
+                if (empty($episode->is_virtual) && ! empty($episode->id)) {
+                    $arcEpisode = DB::table('catalog_arc_episodes')->where('episode_id', $episode->id)->first();
+                    if ($arcEpisode) {
+                        $currentArc = DB::table('catalog_arcs')->where('id', $arcEpisode->arc_id)->first();
+                    }
+                }
+
+                if (! $currentArc) {
+                    $currentArc = DB::table('catalog_arc_works as aw')
+                        ->join('catalog_arcs as a', 'aw.arc_id', '=', 'a.id')
+                        ->where('aw.work_id', $workUuid)
+                        ->where(function ($q) use ($epNumber) {
+                            $q->whereNull('aw.start_number')->orWhere('aw.start_number', '<=', $epNumber);
+                        })
+                        ->where(function ($q) use ($epNumber) {
+                            $q->whereNull('aw.end_number')->orWhere('aw.end_number', '>=', $epNumber);
+                        })
+                        ->orderBy('aw.start_number')
+                        ->select('a.*')
+                        ->first();
+                }
+
+                return json_decode(json_encode([
+                    'episode' => $episode,
+                    'currentArc' => $currentArc,
+                ]), true);
+            });
+        } else {
+            $realId = $this->resolveUuid($id, 'episode');
+
+            $epMeta = Cache::remember("catalog:episode:meta:v3:{$realId}", 3600, function () use ($realId) {
+                $episode = DB::table('catalog_episodes')->where('id', $realId)->first();
+                if (! $episode) {
+                    return null;
+                }
+
+                $arcEpisode = DB::table('catalog_arc_episodes')->where('episode_id', $realId)->first();
+                $currentArc = null;
+                if ($arcEpisode) {
+                    $currentArc = DB::table('catalog_arcs')->where('id', $arcEpisode->arc_id)->first();
+                }
+
+                if (! $currentArc && ! empty($episode->work_id)) {
+                    $epNum = (int) ($episode->number ?? 1);
+                    $currentArc = DB::table('catalog_arc_works as aw')
+                        ->join('catalog_arcs as a', 'aw.arc_id', '=', 'a.id')
+                        ->where('aw.work_id', $episode->work_id)
+                        ->where(function ($q) use ($epNum) {
+                            $q->whereNull('aw.start_number')->orWhere('aw.start_number', '<=', $epNum);
+                        })
+                        ->where(function ($q) use ($epNum) {
+                            $q->whereNull('aw.end_number')->orWhere('aw.end_number', '>=', $epNum);
+                        })
+                        ->orderBy('aw.start_number')
+                        ->select('a.*')
+                        ->first();
+                }
+
+                return json_decode(json_encode([
+                    'episode' => $episode,
+                    'currentArc' => $currentArc,
+                ]), true);
+            });
+        }
 
         if (! $epMeta) {
             return response()->json(['error' => 'entity_not_found'], 404);
@@ -1105,6 +1181,9 @@ class CatalogGraphController extends Controller
 
         // Delegar para work() renderizando o contexto com o episódio ativo selecionado
         $workResponse = $this->work($request, $episode->work_id, $graph);
+        if ($workResponse->getStatusCode() !== 200) {
+            return $workResponse;
+        }
 
         if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             if ($workResponse instanceof Response) {
