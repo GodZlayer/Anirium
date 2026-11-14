@@ -2625,7 +2625,8 @@
                     statusText.innerText = 'Consultando provedores autorizados e agregando múltiplos magnets no Anirium+ Service...';
                 }
 
-                // Monta o payload conforme aceito pelo anirium-service (decoder.DisallowUnknownFields)
+                // Monta estritamente os 7 campos universais aceitos por todas as versões do Anirium Service (2.2.0 e 2.2.1.0)
+                // O Go usa decoder.DisallowUnknownFields(); campos extras causam 400 Bad Request imediato.
                 const preparePayload = {
                     token: tokenData.token,
                     deviceId: deviceId,
@@ -2635,35 +2636,12 @@
                     season: resolvedSeason,
                     episode: cleanEpNum
                 };
-                if (malId > 0) preparePayload.malId = malId;
-                if (episodeCount > 0) preparePayload.episodeCount = episodeCount;
-                if (workFormat) preparePayload.format = String(workFormat).toUpperCase();
 
-                let prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
+                const prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(preparePayload)
                 });
-
-                // Fallback de retrocompatibilidade para o Anirium Service da Windows Store (2.2.1.0)
-                // Se o binário rejeitar campos estendidos (400 Bad Request devido a decoder.DisallowUnknownFields),
-                // retenta instantaneamente com o conjunto estrito de 7 campos aceito por todas as versões.
-                if (prepRes.status === 400) {
-                    const minimalPayload = {
-                        token: tokenData.token,
-                        deviceId: deviceId,
-                        title: cleanTitle,
-                        titleEnglish: cleanTitle,
-                        titleRomaji: cleanTitle,
-                        season: resolvedSeason,
-                        episode: cleanEpNum
-                    };
-                    prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(minimalPayload)
-                    });
-                }
 
                 const prepData = await prepRes.json().catch(() => ({}));
 
