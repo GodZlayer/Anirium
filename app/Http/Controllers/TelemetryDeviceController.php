@@ -388,7 +388,23 @@ class TelemetryDeviceController extends Controller
                 ->where('id', $savedId)
                 ->first();
 
-            return response()->json(['status' => 'saved', 'preference' => $saved, 'catalog_completion' => app(CatalogUserCompletion::class)->read($user->id)]);
+            // Avalia automaticamente o Tier de Fã da Obra caso a preferência seja de obra ou episódio
+            $workIdToEvaluate = $targetType === 'work' ? $targetId : null;
+            if ($targetType === 'episode') {
+                $workIdToEvaluate = DB::table('catalog_episodes')->where('id', $targetId)->value('work_id');
+            }
+
+            $fanEvaluation = null;
+            if ($workIdToEvaluate) {
+                $fanEvaluation = app(\App\Support\EntityFanTierEvaluator::class)->evaluateWork($user, (string) $workIdToEvaluate);
+            }
+
+            return response()->json([
+                'status' => 'saved',
+                'preference' => $saved,
+                'fan_state' => $fanEvaluation,
+                'catalog_completion' => app(CatalogUserCompletion::class)->read($user->id),
+            ]);
         });
     }
 
@@ -523,7 +539,17 @@ class TelemetryDeviceController extends Controller
             ->where('ed.id', $id)
             ->first();
 
-        return response()->json(['status' => 'comment_created', 'comment' => $inserted], 201);
+        // Se o comentário for em uma obra, aciona a reavaliação de Fã da Obra
+        $fanEvaluation = null;
+        if ($targetType === 'work') {
+            $fanEvaluation = app(\App\Support\EntityFanTierEvaluator::class)->evaluateWork($user, (string) $targetId);
+        }
+
+        return response()->json([
+            'status' => 'comment_created',
+            'comment' => $inserted,
+            'fan_state' => $fanEvaluation,
+        ], 201);
     }
 
     /**
