@@ -2177,6 +2177,27 @@
             if (overlay) overlay.classList.add('hidden');
             video.classList.remove('hidden');
 
+            if (!video.hasAttribute('data-timeupdate-bound')) {
+                video.setAttribute('data-timeupdate-bound', '1');
+                video.addEventListener('timeupdate', () => {
+                    const st = window.aniriumPlayerProState;
+                    const subBox = document.getElementById('anirium-player-pro-sub-overlay');
+                    const subText = document.getElementById('anirium-player-pro-sub-text');
+                    if (!st || !st.selectedSubtitleTrackId || st.selectedSubtitleTrackId === 'off' || !Array.isArray(st.parsedSubtitleCues) || st.parsedSubtitleCues.length === 0) {
+                        if (subBox) subBox.classList.add('hidden');
+                        return;
+                    }
+                    const ct = video.currentTime;
+                    const active = st.parsedSubtitleCues.filter(c => ct >= c.start && ct <= c.end);
+                    if (active.length > 0 && subBox && subText) {
+                        subText.innerText = active.map(c => c.text).join('\n');
+                        subBox.classList.remove('hidden');
+                    } else if (subBox) {
+                        subBox.classList.add('hidden');
+                    }
+                });
+            }
+
             const isPlaylist = /\.m3u8(?:[?#]|$)/i.test(streamUrl);
             if (isPlaylist && typeof window.Hls !== 'undefined' && window.Hls.isSupported()) {
                 const hls = new window.Hls({
@@ -2215,40 +2236,78 @@
             }
         };
 
-        window.applyPlayerProSubtitleTrack = function(trackId) {
-            const state = window.aniriumPlayerProState;
-            const video = document.getElementById('anirium-player-pro-video');
-            if (!video || !state) return;
+        window.parseSubtitleVtt = function(text) {
+            const cues = [];
+            const parseTimestamp = (t) => {
+                const parts = t.trim().split(':');
+                if (parts.length === 3) {
+                    const h = parseFloat(parts[0]);
+                    const m = parseFloat(parts[1]);
+                    const s = parseFloat(parts[2].replace(',', '.'));
+                    return h * 3600 + m * 60 + s;
+                } else if (parts.length === 2) {
+                    const m = parseFloat(parts[0]);
+                    const s = parseFloat(parts[1].replace(',', '.'));
+                    return m * 60 + s;
+                }
+                return 0;
+            };
 
-            state.selectedSubtitleTrackId = trackId || '';
-            Array.from(video.querySelectorAll('track[data-anirium-sub]')).forEach(t => t.remove());
-
-            if (!trackId || trackId === 'off' || !state.playbackTicket) {
-                if (video.textTracks) {
-                    for (let i = 0; i < video.textTracks.length; i++) {
-                        video.textTracks[i].mode = 'disabled';
+            const blocks = text.replace(/\r\n|\r/g, '\n').split(/\n\s*\n/);
+            for (const block of blocks) {
+                const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].includes('-->')) {
+                        const timeParts = lines[i].split('-->');
+                        const start = parseTimestamp(timeParts[0]);
+                        const end = parseTimestamp(timeParts[1]);
+                        const cueLines = lines.slice(i + 1).filter(l => !l.startsWith('NOTE') && !l.startsWith('STYLE'));
+                        const cleanText = cueLines
+                            .join('\n')
+                            .replace(/<[^>]+>/g, '')
+                            .replace(/\{[^}]+\}/g, '')
+                            .trim();
+                        if (cleanText && end > start) {
+                            cues.push({ start, end, text: cleanText });
+                        }
+                        break;
                     }
                 }
+            }
+            return cues;
+        };
+
+        window.applyPlayerProSubtitleTrack = async function(trackId) {
+            const state = window.aniriumPlayerProState;
+            const subBox = document.getElementById('anirium-player-pro-sub-overlay');
+            const subText = document.getElementById('anirium-player-pro-sub-text');
+            if (!state) return;
+
+            state.selectedSubtitleTrackId = trackId || '';
+            state.parsedSubtitleCues = [];
+            if (subBox) subBox.classList.add('hidden');
+            if (subText) subText.innerText = '';
+
+            const subSelect = document.getElementById('player-pro-sub-select');
+            if (subSelect && subSelect.value !== state.selectedSubtitleTrackId) {
+                subSelect.value = state.selectedSubtitleTrackId;
+            }
+
+            if (!trackId || trackId === 'off' || !state.playbackTicket) {
                 return;
             }
 
-            const trackMeta = (state.subtitleTracks || []).find(t => t.id === trackId);
-            const trackEl = document.createElement('track');
-            trackEl.setAttribute('data-anirium-sub', '1');
-            trackEl.kind = 'subtitles';
-            trackEl.label = trackMeta?.title || trackMeta?.language?.toUpperCase() || 'Legenda';
-            trackEl.srclang = trackMeta?.language || 'pt';
-            trackEl.src = `http://127.0.0.1:4004/subtitles?trackId=${encodeURIComponent(trackId)}&playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
-            trackEl.default = true;
-            video.appendChild(trackEl);
-
-            setTimeout(() => {
-                if (video.textTracks) {
-                    for (let i = 0; i < video.textTracks.length; i++) {
-                        video.textTracks[i].mode = (i === video.textTracks.length - 1) ? 'showing' : 'disabled';
-                    }
+            try {
+                const subUrl = `http://127.0.0.1:4004/subtitles?trackId=${encodeURIComponent(trackId)}&playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
+                const res = await fetch(subUrl);
+                if (!res.ok) return;
+                const text = await res.text();
+                if (state.selectedSubtitleTrackId === trackId) {
+                    state.parsedSubtitleCues = window.parseSubtitleVtt(text);
                 }
-            }, 150);
+            } catch (err) {
+                console.warn('[Player Pro] Falha ao carregar legenda VTT:', err);
+            }
         };
 
         window.selectPlayerProQuality = async function(quality) {
@@ -2269,7 +2328,10 @@
                 const idx = state.hlsInstance.audioTracks.findIndex(t => t.lang === audioLang);
                 if (idx >= 0) state.hlsInstance.audioTrack = idx;
             }
-            window.renderPlayerProUnifiedBar();
+            const audioSelect = document.getElementById('player-pro-audio-select');
+            if (audioSelect && audioSelect.value !== state.selectedAudio) {
+                audioSelect.value = state.selectedAudio;
+            }
             if (state.manifest?.windowOnDemand) {
                 state.requestedQuality = '';
                 await window.syncPlayerProStreamSelection(true);
@@ -2293,6 +2355,50 @@
             const rate = m.downloadRate || '0 KB/s';
             const bufferPct = Number(m.bufferPercent ?? 0).toFixed(0);
 
+            // Atualiza telemetria contínua sem recriar o DOM (evita fechar dropdowns e recarregamento visual)
+            const elLinks = document.getElementById('player-pro-telemetry-links');
+            const elPeers = document.getElementById('player-pro-telemetry-peers');
+            const elRate = document.getElementById('player-pro-telemetry-rate');
+            const elBuffer = document.getElementById('player-pro-telemetry-buffer');
+
+            if (elLinks) elLinks.innerText = `⚡ SWARM UNIFICADO: ${activeLinks} Magnet(s)`;
+            if (elPeers) elPeers.innerText = `👥 ${peers} Peers`;
+            if (elRate) elRate.innerText = `⬇ ${rate}`;
+            if (elBuffer) {
+                if (bufferPct > 0) {
+                    elBuffer.innerText = `Buffer ${bufferPct}%`;
+                    elBuffer.classList.remove('hidden');
+                } else {
+                    elBuffer.classList.add('hidden');
+                }
+            }
+
+            // Sincroniza botões de qualidade se já existirem
+            const qualityContainer = document.getElementById('player-pro-quality-container');
+            if (qualityContainer && qualities.length > 0) {
+                qualityContainer.querySelectorAll('button[data-quality]').forEach(btn => {
+                    const q = btn.getAttribute('data-quality');
+                    if (q === state.selectedQuality) {
+                        btn.className = 'px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer bg-theme-accent text-theme-inverse shadow-sm';
+                    } else {
+                        btn.className = 'px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer text-theme-muted hover:text-white';
+                    }
+                });
+            }
+
+            // Se o markup base da barra ainda não foi construído ou a contagem de opções mudou, monta o layout uma única vez
+            const currentSubCount = Number(bar.getAttribute('data-sub-count') || -1);
+            const currentAudioCount = Number(bar.getAttribute('data-audio-count') || -1);
+            const currentQualitiesCount = Number(bar.getAttribute('data-qualities-count') || -1);
+
+            if (currentSubCount === subTracks.length && currentAudioCount === audios.length && currentQualitiesCount === qualities.length) {
+                return;
+            }
+
+            bar.setAttribute('data-sub-count', subTracks.length);
+            bar.setAttribute('data-audio-count', audios.length);
+            bar.setAttribute('data-qualities-count', qualities.length);
+
             const langLabel = (code) => {
                 const map = { jpn: 'Japonês (Original)', por: 'Português (BR)', 'pt-br': 'Português (BR)', eng: 'Inglês', spa: 'Espanhol', und: 'Original' };
                 return map[String(code || '').toLowerCase()] || String(code || '').toUpperCase();
@@ -2302,29 +2408,28 @@
                 <div class="p-3 rounded-2xl bg-theme-raised border border-theme-default flex flex-wrap items-center justify-between gap-3">
                     <!-- Telemetria do Swarm Multi-Magnet Unificado -->
                     <div class="flex flex-wrap items-center gap-2 text-[10px] font-mono">
-                        <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+                        <span id="player-pro-telemetry-links" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
                             ⚡ SWARM UNIFICADO: ${activeLinks} Magnet(s)
                         </span>
-                        <span class="px-2 py-1 rounded-lg bg-theme-pill border border-theme-default text-theme-secondary">
+                        <span id="player-pro-telemetry-peers" class="px-2 py-1 rounded-lg bg-theme-pill border border-theme-default text-theme-secondary">
                             👥 ${peers} Peers
                         </span>
-                        <span class="px-2 py-1 rounded-lg bg-theme-pill border border-theme-default text-theme-accent font-bold">
+                        <span id="player-pro-telemetry-rate" class="px-2 py-1 rounded-lg bg-theme-pill border border-theme-default text-theme-accent font-bold">
                             ⬇ ${rate}
                         </span>
-                        ${bufferPct > 0 ? `
-                            <span class="px-2 py-1 rounded-lg bg-theme-pill border border-theme-default text-emerald-300">
-                                Buffer ${bufferPct}%
-                            </span>
-                        ` : ''}
+                        <span id="player-pro-telemetry-buffer" class="${bufferPct > 0 ? '' : 'hidden'} px-2 py-1 rounded-lg bg-theme-pill border border-theme-default text-emerald-300">
+                            Buffer ${bufferPct}%
+                        </span>
                     </div>
 
                     <!-- Seletores Unificados: Qualidade • Áudio • Legenda -->
                     <div class="flex flex-wrap items-center gap-2">
                         ${qualities.length > 0 ? `
-                            <div class="flex items-center gap-1 bg-theme-pill px-2 py-1 rounded-xl border border-theme-default">
+                            <div id="player-pro-quality-container" class="flex items-center gap-1 bg-theme-pill px-2 py-1 rounded-xl border border-theme-default">
                                 <span class="text-[9px] font-mono text-theme-muted uppercase font-bold">Qualidade:</span>
                                 ${qualities.map(q => `
                                     <button type="button"
+                                            data-quality="${q}"
                                             onclick="window.selectPlayerProQuality('${q}')"
                                             class="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${state.selectedQuality === q ? 'bg-theme-accent text-theme-inverse shadow-sm' : 'text-theme-muted hover:text-white'}">
                                         ${q}
@@ -2340,17 +2445,17 @@
                         ${audios.length > 0 ? `
                             <label class="flex items-center gap-1.5 bg-theme-pill px-2.5 py-1 rounded-xl border border-theme-default text-[10px] font-mono">
                                 <span class="text-theme-muted uppercase font-bold text-[9px]">Áudio:</span>
-                                <select onchange="window.selectPlayerProAudio(this.value)" class="bg-transparent text-white font-bold focus:outline-none cursor-pointer">
-                                    ${audios.map(a => `<option value="${a}" class="bg-[#141720] text-white" ${state.selectedAudio === a ? 'selected' : ''}>${langLabel(a)}</option>`).join('')}
+                                <select id="player-pro-audio-select" onchange="window.selectPlayerProAudio(this.value)" class="bg-theme-surface text-theme-primary font-bold focus:outline-none cursor-pointer rounded-lg px-1.5 py-0.5 border border-theme-default">
+                                    ${audios.map(a => `<option value="${a}" class="bg-theme-surface text-theme-primary" ${state.selectedAudio === a ? 'selected' : ''}>${langLabel(a)}</option>`).join('')}
                                 </select>
                             </label>
                         ` : ''}
 
                         <label class="flex items-center gap-1.5 bg-theme-pill px-2.5 py-1 rounded-xl border border-theme-default text-[10px] font-mono">
                             <span class="text-theme-muted uppercase font-bold text-[9px]">Legenda:</span>
-                            <select onchange="window.applyPlayerProSubtitleTrack(this.value)" class="bg-transparent text-white font-bold focus:outline-none cursor-pointer">
-                                <option value="off" class="bg-[#141720] text-white" ${!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off' ? 'selected' : ''}>Desativada</option>
-                                ${subTracks.map((st, idx) => `<option value="${st.id}" class="bg-[#141720] text-white" ${state.selectedSubtitleTrackId === st.id ? 'selected' : ''}>${st.title || langLabel(st.language)} #${idx + 1}</option>`).join('')}
+                            <select id="player-pro-sub-select" onchange="window.applyPlayerProSubtitleTrack(this.value)" class="bg-theme-surface text-theme-primary font-bold focus:outline-none cursor-pointer rounded-lg px-1.5 py-0.5 border border-theme-default">
+                                <option value="off" class="bg-theme-surface text-theme-primary" ${!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off' ? 'selected' : ''}>Desativada</option>
+                                ${subTracks.map((st, idx) => `<option value="${st.id}" class="bg-theme-surface text-theme-primary" ${state.selectedSubtitleTrackId === st.id ? 'selected' : ''}>${st.title || langLabel(st.language)} #${idx + 1}</option>`).join('')}
                             </select>
                         </label>
                     </div>
@@ -2543,8 +2648,15 @@
                     </div>
 
                     <!-- Palco 16:9 do Embed Player Pro -->
-                    <div class="relative w-full aspect-video max-h-[54vh] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl flex items-center justify-center">
+                    <div class="relative w-full aspect-video h-[54vh] max-h-[54vh] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl flex items-center justify-center">
                         <video id="anirium-player-pro-video" controls autoplay playsinline crossorigin="anonymous" class="hidden w-full h-full object-contain bg-black"></video>
+
+                        <!-- Overlay Nativo de Legenda Sincronizada (Evita falhas de track em cross-origin HLS) -->
+                        <div id="anirium-player-pro-sub-overlay" class="hidden absolute bottom-12 inset-x-4 flex justify-center pointer-events-none select-none z-30 transition-all">
+                            <div class="bg-black/85 backdrop-blur-md text-white font-medium text-center rounded-xl px-4 py-1.5 shadow-2xl border border-white/20 max-w-2xl whitespace-pre-line text-xs sm:text-sm leading-relaxed">
+                                <span id="anirium-player-pro-sub-text"></span>
+                            </div>
+                        </div>
 
                         <div id="anirium-player-pro-overlay" class="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-3 bg-gradient-to-b from-black/80 via-[#0B0F17] to-black">
                             <div class="w-12 h-12 rounded-2xl bg-theme-accent/15 border border-theme-accent/40 flex items-center justify-center text-xl text-theme-accent shadow-lg animate-pulse">
