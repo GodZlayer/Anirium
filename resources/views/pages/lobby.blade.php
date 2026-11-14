@@ -2595,7 +2595,7 @@
                     statusText.innerText = 'Consultando provedores autorizados e agregando múltiplos magnets no Anirium+ Service...';
                 }
 
-                // Monta estritamente o schema PlaybackPrepareRequest exigido pelo anirium-service (decoder.DisallowUnknownFields)
+                // Monta estritamente os 7 campos aceitos pelo anirium-service 2.2.1.0 (decoder.DisallowUnknownFields)
                 const preparePayload = {
                     token: tokenData.token,
                     deviceId: deviceId,
@@ -2605,9 +2605,6 @@
                     season: 1,
                     episode: cleanEpNum
                 };
-                if (malId > 0) preparePayload.malId = malId;
-                if (episodeCount > 0) preparePayload.episodeCount = episodeCount;
-                if (workFormat) preparePayload.format = workFormat;
 
                 const prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
                     method: 'POST',
@@ -2623,7 +2620,7 @@
                     return;
                 }
 
-                if (prepData.sources === 0 || prepData.status === 'no-sources') {
+                if (prepData.status === 'no-sources' && !prepData.playbackTicket) {
                     if (badge) {
                         badge.innerText = '● Sem Fontes no Swarm';
                         badge.className = 'px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40';
@@ -2662,7 +2659,7 @@
                 };
 
                 if (statusText) {
-                    statusText.innerText = `Swarm iniciado com ${prepData.sources || 1} fonte(s) unificada(s)! Sondando trilhas de vídeo, áudio e legendas...`;
+                    statusText.innerText = `Sessão unificada iniciada no Anirium+ Service! Sondando fontes, trilhas de vídeo, áudio e legendas...`;
                 }
 
                 const pollManifest = async () => {
