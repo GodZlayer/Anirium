@@ -29,12 +29,20 @@
     $epNum = $isEpisodeMode ? ($currentEpisode->number ?? 1) : 1;
     $episodeTitle = $isEpisodeMode ? (($isManga ? 'Capítulo ' : 'Episódio ') . $epNum) : null;
     $totalEpisodes = count($episodes) ?: ($work->episode_count ?? 0);
+    if ($totalEpisodes <= 0 && count($arcs) > 0) {
+        $maxArcEnd = collect($arcs)->max('end_number');
+        $maxArcStart = collect($arcs)->max('start_number');
+        $totalEpisodes = max((int) $maxArcEnd, (int) $maxArcStart);
+    }
+    if ($totalEpisodes <= 0) {
+        $totalEpisodes = 1;
+    }
     $totalArcs = count($arcs);
     $totalRelations = count($relations);
     $totalTracks = count($tracks);
 
-    // Se a obra possui episode_count (ex: 12 eps), mas a tabela catalog_episodes ainda não populou as linhas individuais,
-    // gera as unidades episódicas virtuais canônicas (1..N) para que o trilho de Episódios/Capítulos sempre exiba os cards!
+    // Se a obra possui episode_count (ex: 12 eps) ou fallback canônico, mas a tabela catalog_episodes ainda não populou as linhas individuais,
+    // gera as unidades episódicas virtuais canônicas (1..N) para que o trilho de Episódios/Capítulos sempre exiba os cards clicáveis!
     $displayEpisodes = collect($episodes);
     if ($displayEpisodes->isEmpty() && $totalEpisodes > 0) {
         $maxVirtual = min((int) $totalEpisodes, 200);
@@ -49,17 +57,6 @@
             ];
         }
         $displayEpisodes = collect($virtualList);
-    } elseif ($displayEpisodes->isEmpty() && $format === 'MOVIE') {
-        $displayEpisodes = collect([
-            (object) [
-                'id' => ($work->id ?? 'work') . ':ep:1',
-                'work_id' => $work->id ?? '',
-                'number' => 1,
-                'air_date_utc' => null,
-                'is_virtual' => true,
-            ],
-        ]);
-        $totalEpisodes = 1;
     }
 
     // Identificadores externos para resolução aberta de Add-ons (Comunidade / Stremio & Anirium+)
@@ -438,6 +435,17 @@
                     </div>
                 @endif
 
+                @if($isEpisodeMode && $currentArc)
+                    <div class="p-2.5 rounded-2xl bg-[var(--color-state-canon,#10B981)]/10 border border-[var(--color-state-canon,#10B981)]/30 hover:border-[var(--color-state-canon,#10B981)] cursor-pointer transition-all group"
+                         onclick="window.pushNavigation('arc', '{{ $currentArc->id }}', '{{ addslashes($currentArc->title) }}')">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[9px] font-mono uppercase tracking-wider text-[var(--color-state-canon,#10B981)] font-bold">📜 Arco deste {{ $isManga ? 'Capítulo' : 'Episódio' }}</span>
+                            <span class="text-xs text-[var(--color-state-canon,#10B981)] group-hover:translate-x-0.5 transition-transform">❯</span>
+                        </div>
+                        <p class="text-xs font-bold text-white truncate mt-1">{{ $currentArc->title }}</p>
+                    </div>
+                @endif
+
                 @if($isEpisodeMode)
                     <div class="p-2.5 rounded-2xl bg-theme-raised/70 border border-theme-default/50 hover:border-theme-accent cursor-pointer transition-all group"
                          onclick="window.pushNavigation('{{ $isManga ? 'manga' : 'work' }}', '{{ $work->id }}', '{{ addslashes($title) }}')">
@@ -446,6 +454,32 @@
                             <span class="text-xs text-theme-muted group-hover:text-white">❯</span>
                         </div>
                         <p class="text-xs font-bold text-white truncate mt-1">{{ $title }} ({{ $format }})</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        @if($epNum > 1)
+                            <button type="button"
+                                    onclick="window.pushNavigation('episode', '{{ ($work->id ?? 'work') . ':ep:' . ($epNum - 1) }}', '{{ addslashes($title) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $epNum - 1 }}')"
+                                    class="p-2 rounded-xl bg-theme-raised border border-theme-default hover:border-theme-accent text-[10px] font-mono font-bold text-theme-muted hover:text-white transition-all cursor-pointer text-center">
+                                ❮ {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $epNum - 1 }}
+                            </button>
+                        @else
+                            <div class="p-2 rounded-xl bg-theme-raised/30 border border-theme-default/30 text-[10px] font-mono text-theme-muted/40 text-center">
+                                Início (1)
+                            </div>
+                        @endif
+
+                        @if($epNum < $totalEpisodes)
+                            <button type="button"
+                                    onclick="window.pushNavigation('episode', '{{ ($work->id ?? 'work') . ':ep:' . ($epNum + 1) }}', '{{ addslashes($title) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $epNum + 1 }}')"
+                                    class="p-2 rounded-xl bg-theme-raised border border-theme-default hover:border-theme-accent text-[10px] font-mono font-bold text-theme-accent hover:text-white transition-all cursor-pointer text-center">
+                                {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $epNum + 1 }} ❯
+                            </button>
+                        @else
+                            <div class="p-2 rounded-xl bg-theme-raised/30 border border-theme-default/30 text-[10px] font-mono text-theme-muted/40 text-center">
+                                Final ({{ $totalEpisodes }})
+                            </div>
+                        @endif
                     </div>
                 @endif
 
@@ -586,4 +620,11 @@ window.switchWorkEntityTab = function(tabName) {
 if (window.syncAddonCapabilityButtons) {
     window.syncAddonCapabilityButtons();
 }
+
+(function() {
+    const activeEpCard = document.querySelector('#work-tab-pane-episodes .ring-2');
+    if (activeEpCard && typeof activeEpCard.scrollIntoView === 'function') {
+        activeEpCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+})();
 </script>

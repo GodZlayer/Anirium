@@ -1340,7 +1340,7 @@
             nav.innerHTML = html;
         };
 
-        const ENTITY_VIEW_SCHEMA_V = 'v6';
+        const ENTITY_VIEW_SCHEMA_V = 'v7';
         window.entityHtmlCache = new Map();
 
         window.renderCurrentState = async function() {
@@ -2160,6 +2160,15 @@
         };
 
         window.refreshEntityComments = async function(type, id) {
+            if (!type || !id) {
+                const container = document.getElementById('entity-discussions-container');
+                if (container) {
+                    type = type || container.getAttribute('data-target-type');
+                    id = id || container.getAttribute('data-target-id');
+                }
+            }
+            if (!type || !id) return;
+
             const listEl = document.getElementById('discussion-comments-list');
             if (!listEl) return;
 
