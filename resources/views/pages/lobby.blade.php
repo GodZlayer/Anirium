@@ -447,9 +447,9 @@
     </div>
 
     <!-- 7. MODAL EXTERNO DE EXECUÇÃO DE ADD-ON (VÍDEO PLAYER PRO / MANGA READER PRO / COMUNIDADE) -->
-    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-200">
-        <div class="w-full max-w-4xl rounded-3xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="px-5 py-3.5 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0">
+    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 opacity-0 pointer-events-none transition-all duration-200">
+        <div class="w-full max-w-6xl h-[92vh] max-h-[92vh] rounded-3xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col">
+            <div class="px-5 py-3 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0">
                 <div class="flex items-center gap-2.5 min-w-0">
                     <span id="external-addon-icon" class="text-theme-accent">⚡</span>
                     <div class="min-w-0">
@@ -465,7 +465,7 @@
                     <button type="button" onclick="window.closeExternalAddonModal()" class="p-1.5 rounded-xl bg-theme-pill text-theme-muted hover:text-white cursor-pointer">✕</button>
                 </div>
             </div>
-            <div id="external-addon-viewport" class="flex-1 min-h-[340px] bg-black flex flex-col items-center justify-center p-6 overflow-y-auto no-scrollbar">
+            <div id="external-addon-viewport" class="flex-1 w-full h-full bg-black flex flex-col p-0 overflow-hidden">
             </div>
         </div>
     </div>
@@ -2662,7 +2662,7 @@
                     src="${embedSrc}"
                     allow="fullscreen; autoplay; encrypted-media"
                     allowfullscreen
-                    class="w-full h-[72vh] rounded-2xl border border-theme-default bg-black shadow-2xl">
+                    class="w-full h-full flex-1 border-0 bg-black">
                 </iframe>
             `;
         };
