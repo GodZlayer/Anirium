@@ -2612,102 +2612,16 @@
 
             if (iconEl) iconEl.innerText = '▶';
             if (titleEl) titleEl.innerText = `${cleanTitle} • Episódio ${cleanEpNum}`;
-            if (subEl) subEl.innerText = 'Embed Externo: github.com/GodZlayer/anirium-embeds • Motor Unificado Anirium+ Service';
+            if (subEl) subEl.innerText = 'Embed Externo Soberano: github.com/GodZlayer/anirium-embeds (Player Pro)';
 
             modal.classList.remove('opacity-0', 'pointer-events-none');
 
-            const playerAddon = (window.allUserAddons || []).find(a => a.id === 'player-pro');
-            const externalEmbedBaseUrl = playerAddon?.embed_url || 'https://godzlayer.github.io/anirium-embeds/video/';
-
-            viewport.innerHTML = `
-                <div class="w-full flex flex-col gap-3" data-external-embed-repo="https://github.com/GodZlayer/anirium-embeds" data-external-embed-url="${externalEmbedBaseUrl}">
-                    <!-- Barra de Controle Superior do Embed Player Pro -->
-                    <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-2xl bg-theme-raised border border-theme-default">
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <span class="px-2.5 py-0.5 rounded-lg bg-theme-accent text-theme-inverse text-[10px] font-mono font-black uppercase">
-                                EPISÓDIO ${cleanEpNum}
-                            </span>
-                            <span id="anirium-player-pro-source-badge" class="px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-white/10 text-theme-muted border border-white/10">
-                                ● Conectando ao Anirium+ Service...
-                            </span>
-                            <a href="https://github.com/GodZlayer/anirium-embeds" target="_blank" rel="noopener noreferrer"
-                               class="px-2 py-0.5 rounded-lg bg-theme-pill border border-theme-default text-[9px] font-mono text-theme-muted hover:text-theme-accent transition-colors">
-                                📦 Repo Embed ↗
-                            </a>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            ${cleanEpNum > 1 ? `
-                                <button type="button" onclick="window.stepPlayerProEpisode(-1)" class="px-2.5 py-1 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-[10px] font-mono font-bold text-theme-muted hover:text-white cursor-pointer">
-                                    ❮ Ep. ${cleanEpNum - 1}
-                                </button>
-                            ` : ''}
-                            <button type="button" onclick="window.stepPlayerProEpisode(1)" class="px-2.5 py-1 rounded-xl bg-theme-accent/20 hover:bg-theme-accent border border-theme-accent/40 text-[10px] font-mono font-bold text-theme-accent hover:text-theme-inverse cursor-pointer">
-                                Ep. ${cleanEpNum + 1} ❯
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Palco 16:9 do Embed Player Pro -->
-                    <div class="relative w-full aspect-video h-[54vh] max-h-[54vh] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl flex items-center justify-center">
-                        <video id="anirium-player-pro-video" controls autoplay playsinline crossorigin="anonymous" class="hidden w-full h-full object-contain bg-black"></video>
-
-                        <!-- Overlay Nativo de Legenda Sincronizada (Evita falhas de track em cross-origin HLS) -->
-                        <div id="anirium-player-pro-sub-overlay" class="hidden absolute bottom-12 inset-x-4 flex justify-center pointer-events-none select-none z-30 transition-all">
-                            <div class="bg-black/85 backdrop-blur-md text-white font-medium text-center rounded-xl px-4 py-1.5 shadow-2xl border border-white/20 max-w-2xl whitespace-pre-line text-xs sm:text-sm leading-relaxed">
-                                <span id="anirium-player-pro-sub-text"></span>
-                            </div>
-                        </div>
-
-                        <div id="anirium-player-pro-overlay" class="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-3 bg-gradient-to-b from-black/80 via-[#0B0F17] to-black">
-                            <div class="w-12 h-12 rounded-2xl bg-theme-accent/15 border border-theme-accent/40 flex items-center justify-center text-xl text-theme-accent shadow-lg animate-pulse">
-                                ▶
-                            </div>
-                            <div class="space-y-1.5 max-w-lg">
-                                <h4 class="text-sm md:text-base font-black font-serif text-white">
-                                    ${cleanTitle} — Episódio ${cleanEpNum}
-                                </h4>
-                                <p id="anirium-player-pro-status-text" class="text-[11px] font-mono text-theme-muted leading-relaxed">
-                                    Autenticando sessão Anirium+ e unificando múltiplas fontes P2P no motor local...
-                                </p>
-                            </div>
-
-                            <!-- Ações Auxiliares (Arquivo Local / Link Direto) -->
-                            <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
-                                <label class="px-3.5 py-2 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold shadow-lg cursor-pointer hover:scale-105 transition-transform">
-                                    📂 Abrir Arquivo Local (.mp4/.mkv)
-                                    <input type="file" accept="video/*,.mkv" class="hidden" onchange="window.loadExternalVideoFile(this)">
-                                </label>
-                                <button type="button" onclick="window.promptAddonDirectStreamUrl()" class="px-3 py-2 rounded-xl bg-theme-pill hover:bg-white/10 border border-theme-default text-xs font-mono font-bold text-theme-primary cursor-pointer">
-                                    🔗 Link Direto (.m3u8/.mp4)
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Barra Unificada de Qualidade, Áudio, Legendas e Telemetria do Swarm -->
-                    <div id="anirium-player-pro-unified-bar" class="w-full"></div>
-                </div>
-            `;
-
-            const serviceOnline = await window.checkAniriumServiceHealth();
-            const badge = document.getElementById('anirium-player-pro-source-badge');
-            const statusText = document.getElementById('anirium-player-pro-status-text');
-
-            if (!serviceOnline) {
-                if (badge) {
-                    badge.innerText = '● Anirium+ Service (4004) Offline';
-                    badge.className = 'px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40';
-                }
-                if (statusText) {
-                    statusText.innerHTML = 'O motor <strong>Anirium+ Service (porta 4004)</strong> não foi detectado em execução. Inicie o aplicativo Anirium Service no Windows para ativar o mixer unificado multi-magnet, ou abra um arquivo/link abaixo.';
-                }
-                return;
-            }
+            // 1. Obtém credencial de sessão do dispositivo para o Anirium Service 4004
+            const deviceId = window.getValidDeviceId();
+            const playerSessionId = window.getValidPlayerSessionId();
+            let sessionToken = '';
 
             try {
-                const deviceId = window.getValidDeviceId();
-                const playerSessionId = window.getValidPlayerSessionId();
-
                 const tokenRes = await fetch('/api/service/session', {
                     cache: 'no-store',
                     headers: {
@@ -2716,126 +2630,38 @@
                         'x-anirium-player-session': playerSessionId
                     }
                 });
-                const tokenData = await tokenRes.json().catch(() => ({}));
-
-                if (!tokenRes.ok || !tokenData.token) {
-                    if (badge) {
-                        badge.innerText = `● Sessão Recusada (${tokenData.reason || tokenRes.status})`;
-                        badge.className = 'px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-red-500/20 text-red-300 border border-red-500/40';
-                    }
-                    if (statusText) {
-                        statusText.innerText = 'Não foi possível autorizar a sessão do Anirium Player Pro. Verifique se você está autenticado com uma conta Anirium+.';
-                    }
-                    return;
+                if (tokenRes.ok) {
+                    const tokenData = await tokenRes.json().catch(() => ({}));
+                    sessionToken = tokenData.token || '';
                 }
+            } catch (err) {}
 
-                if (badge) {
-                    badge.innerText = '● Service 4004 Autenticado';
-                    badge.className = 'px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-                }
-                if (statusText) {
-                    statusText.innerText = 'Consultando provedores autorizados e agregando múltiplos magnets no Anirium+ Service...';
-                }
+            const playerAddon = (window.allUserAddons || []).find(a => a.id === 'player-pro');
+            const externalEmbedBaseUrl = playerAddon?.embed_url || 'https://godzlayer.github.io/anirium-embeds/video/';
 
-                // Monta estritamente os 7 campos universais aceitos por todas as versões do Anirium Service (2.2.0 e 2.2.1.0)
-                // O Go usa decoder.DisallowUnknownFields(); campos extras causam 400 Bad Request imediato.
-                const preparePayload = {
-                    token: tokenData.token,
-                    deviceId: deviceId,
-                    title: cleanTitle,
-                    titleEnglish: cleanTitle,
-                    titleRomaji: cleanTitle,
-                    season: resolvedSeason,
-                    episode: cleanEpNum
-                };
+            const embedQuery = new URLSearchParams({
+                token: sessionToken,
+                deviceId: deviceId,
+                workId: workId || '',
+                epId: resolvedEpId,
+                ep: String(cleanEpNum),
+                season: String(resolvedSeason),
+                title: cleanTitle,
+                malId: String(malId),
+                format: workFormat
+            });
 
-                const prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(preparePayload)
-                });
+            const embedSrc = `${externalEmbedBaseUrl}?${embedQuery.toString()}`;
 
-                const prepData = await prepRes.json().catch(() => ({}));
-
-                if (!prepRes.ok) {
-                    if (statusText) {
-                        statusText.innerText = `O Anirium+ Service recusou a preparação (${prepData.reason || prepRes.status}).`;
-                    }
-                    return;
-                }
-
-                if (prepData.status === 'no-sources' && !prepData.playbackTicket) {
-                    if (badge) {
-                        badge.innerText = '● Sem Fontes no Swarm';
-                        badge.className = 'px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40';
-                    }
-                    if (statusText) {
-                        statusText.innerHTML = `Nenhuma fonte P2P/magnet retornada pelos seus provedores habilitados para <strong>${cleanTitle} — Episódio ${cleanEpNum}</strong>. Verifique seus provedores na aba Add-ons do Perfil.`;
-                    }
-                    return;
-                }
-
-                const playbackTicket = prepData.playbackTicket || '';
-                if (!playbackTicket) {
-                    if (statusText) {
-                        statusText.innerText = 'O Anirium+ Service não retornou um ticket de reprodução válido.';
-                    }
-                    return;
-                }
-
-                window.aniriumPlayerProState = {
-                    deviceId,
-                    playerSessionId,
-                    serviceToken: tokenData.token,
-                    playbackTicket,
-                    sourcesCount: Number(prepData.sources || 0),
-                    manifest: null,
-                    selectedQuality: '',
-                    selectedAudio: '',
-                    selectedSubtitleTrackId: '',
-                    subtitleTracks: [],
-                    requestedQuality: '',
-                    currentStreamUrl: '',
-                    hlsInstance: null,
-                    windowController: null,
-                    manifestTimer: null,
-                    renewTimer: null
-                };
-
-                if (statusText) {
-                    statusText.innerText = `Sessão unificada iniciada no Anirium+ Service! Sondando fontes, trilhas de vídeo, áudio e legendas...`;
-                }
-
-                const pollManifest = async () => {
-                    const st = window.aniriumPlayerProState;
-                    if (!st || st.playbackTicket !== playbackTicket) return;
-                    try {
-                        const mRes = await fetch('http://127.0.0.1:4004/manifest', {
-                            cache: 'no-store',
-                            headers: {
-                                'Authorization': `Bearer ${st.serviceToken}`,
-                                'X-Anirium-Device': st.deviceId
-                            }
-                        });
-                        if (!mRes.ok) return;
-                        const manifest = await mRes.json();
-                        if (!window.aniriumPlayerProState || window.aniriumPlayerProState.playbackTicket !== playbackTicket) return;
-
-                        st.manifest = manifest;
-                        await window.syncPlayerProStreamSelection(false);
-                    } catch (err) {}
-                };
-
-                await pollManifest();
-                if (window.aniriumPlayerProState && window.aniriumPlayerProState.playbackTicket === playbackTicket) {
-                    window.aniriumPlayerProState.manifestTimer = setInterval(pollManifest, 2000);
-                }
-            } catch (e) {
-                console.warn('[Anirium Player Pro] Erro ao comunicar com o Anirium+ Service:', e);
-                if (statusText) {
-                    statusText.innerText = 'Falha de comunicação com o Anirium+ Service local na porta 4004.';
-                }
-            }
+            viewport.innerHTML = `
+                <iframe
+                    id="anirium-player-pro-iframe"
+                    src="${embedSrc}"
+                    allow="fullscreen; autoplay; encrypted-media"
+                    allowfullscreen
+                    class="w-full h-[72vh] rounded-2xl border border-theme-default bg-black shadow-2xl">
+                </iframe>
+            `;
         };
 
         window.loadExternalVideoFile = function(input) {
