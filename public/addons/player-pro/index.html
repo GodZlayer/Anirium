@@ -716,6 +716,7 @@
             season: parseInt(params.get('season') || '1', 10) || 1,
             title: params.get('title') || 'Anime',
             token: params.get('token') || '',
+            playerSessionId: params.get('playerSessionId') || '',
             deviceId: params.get('deviceId') || '',
             playbackTicket: '',
             sourcesCount: 0,
@@ -1518,16 +1519,21 @@
                         // Solicita ao parent (Core) uma renovação de token segura
                         window.parent.postMessage({
                             type: 'anirium:player:request-token-renewal',
-                            deviceId: state.deviceId
+                            deviceId: state.deviceId,
+                            playerSessionId: state.playerSessionId
                         }, '*');
 
-                        // Também tenta obter diretamente se estiver sob a mesma origem
+                        // Também tenta obter diretamente se estiver sob a mesma origem com o header obrigatório
+                        const headers = {
+                            'Accept': 'application/json',
+                            'x-anirium-device': state.deviceId
+                        };
+                        if (state.playerSessionId) {
+                            headers['x-anirium-player-session'] = state.playerSessionId;
+                        }
                         const sRes = await fetch('/api/service/session', {
                             cache: 'no-store',
-                            headers: {
-                                'Accept': 'application/json',
-                                'x-anirium-device': state.deviceId
-                            }
+                            headers: headers
                         });
                         if (sRes.ok) {
                             const sData = await sRes.json().catch(() => ({}));

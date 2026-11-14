@@ -2645,6 +2645,7 @@
             const embedQuery = new URLSearchParams({
                 token: sessionToken,
                 deviceId: deviceId,
+                playerSessionId: playerSessionId,
                 workId: workId || '',
                 epId: resolvedEpId,
                 ep: String(cleanEpNum),
