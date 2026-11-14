@@ -724,6 +724,7 @@
             selectedQuality: '',
             selectedAudio: '',
             selectedSubtitleTrackId: '',
+            loadedSubtitleKey: '',
             subtitleTracks: [],
             parsedSubtitleCues: [],
             requestedQuality: '',
@@ -1043,19 +1044,37 @@
         }
 
         let subtitleAbortController = null;
+        let isFetchingSubtitle = false;
 
         async function fetchSubtitleTrack(trackId, force = false) {
             if (!trackId || trackId === 'off') {
                 state.selectedSubtitleTrackId = 'off';
+                state.loadedSubtitleKey = '';
                 state.parsedSubtitleCues = [];
+                isFetchingSubtitle = false;
+                if (subtitleAbortController) {
+                    try { subtitleAbortController.abort(); } catch (e) {}
+                    subtitleAbortController = null;
+                }
                 dom.subtitleOverlay.style.display = 'none';
                 dom.subtitleText.innerText = '';
                 renderSubMenu();
                 return;
             }
 
-            // Se já tem legendas carregadas para a mesma faixa/idioma e não foi forçado, não zera nem re-faz fetch
-            if (!force && state.selectedSubtitleTrackId === trackId && state.parsedSubtitleCues.length > 0) {
+            // Normaliza/extrai idioma pretendido da faixa
+            const targetTrack = state.manifest && Array.isArray(state.manifest.subtitleTracks)
+                ? (state.manifest.subtitleTracks.find(t => t.id === trackId) || state.manifest.subtitleTracks[0])
+                : null;
+            const targetLang = targetTrack?.language || (trackId.includes('por') || trackId.includes('pt') ? 'por' : 'und');
+
+            // Se já tem legendas carregadas com sucesso e não foi uma ação forçada do usuário (force === false), não re-faz fetch
+            if (!force && state.parsedSubtitleCues.length > 0 && state.loadedSubtitleKey) {
+                return;
+            }
+
+            // Se uma busca já está em andamento (ex: loop 202 do ffmpeg) e não é uma troca manual do usuário, não interrompe!
+            if (!force && isFetchingSubtitle) {
                 return;
             }
 
@@ -1064,12 +1083,13 @@
 
             if (!state.playbackTicket) return;
 
-            // Cancela requisições anteriores de legenda para evitar concorrência e 404s
+            // Cancela requisições anteriores de legenda SOMENTE quando o usuário explicitamente trocou
             if (subtitleAbortController) {
                 try { subtitleAbortController.abort(); } catch (e) {}
             }
             subtitleAbortController = new AbortController();
             const signal = subtitleAbortController.signal;
+            isFetchingSubtitle = true;
 
             // Resolve o ID atual da faixa diretamente do manifesto ativo
             let resolvedTrackId = trackId;
@@ -1077,7 +1097,7 @@
                 const exact = state.manifest.subtitleTracks.find(t => t.id === trackId);
                 if (!exact) {
                     // Tenta encontrar por idioma equivalente (ex: pt, por, eng)
-                    const langMatch = state.manifest.subtitleTracks.find(t => (t.language && trackId.includes(t.language)) || (t.id && t.id.includes('por')));
+                    const langMatch = state.manifest.subtitleTracks.find(t => (t.language && (t.language === targetLang || targetLang.includes(t.language))) || (t.id && t.id.includes(targetLang)));
                     const fallback = langMatch || state.manifest.subtitleTracks[0];
                     if (fallback) {
                         resolvedTrackId = fallback.id;
@@ -1086,52 +1106,62 @@
                 }
             }
 
-            console.info('[PlayerPro] Solicitando faixa de legenda:', resolvedTrackId);
+            const currentKey = `${state.playbackTicket}:${resolvedTrackId}`;
+            console.info('[PlayerPro] Solicitando faixa de legenda:', resolvedTrackId, 'Idioma:', targetLang);
             const url = `http://127.0.0.1:4004/subtitles?trackId=${encodeURIComponent(resolvedTrackId)}&playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
             
             // Loop de Retry para 202 Accepted (anirium-service extraindo faixa)
-            for (let attempt = 0; attempt < 30; attempt++) {
-                if (signal.aborted) return;
-                try {
-                    const res = await fetch(url, { signal });
-                    if (res.status === 202) {
-                        const delayHeader = parseInt(res.headers.get('Retry-After') || '2', 10);
-                        const waitSec = Number.isFinite(delayHeader) && delayHeader >= 1 && delayHeader <= 10 ? delayHeader : 2;
-                        await new Promise((resolve, reject) => {
-                            const timer = setTimeout(resolve, waitSec * 1000);
-                            signal.addEventListener('abort', () => { clearTimeout(timer); reject(); }, { once: true });
-                        });
-                        continue;
+            try {
+                for (let attempt = 0; attempt < 30; attempt++) {
+                    if (signal.aborted) {
+                        isFetchingSubtitle = false;
+                        return;
                     }
-                    if (res.status === 404) {
-                        console.warn('[PlayerPro] Faixa de legenda não encontrada (404):', resolvedTrackId);
-                        // Se falhou 404 com trackId específico, tenta outra faixa disponível se houver
-                        if (state.manifest && Array.isArray(state.manifest.subtitleTracks)) {
-                            const alt = state.manifest.subtitleTracks.find(t => t.id !== resolvedTrackId);
-                            if (alt && attempt === 0) {
-                                resolvedTrackId = alt.id;
-                                state.selectedSubtitleTrackId = alt.id;
-                                continue;
+                    try {
+                        const res = await fetch(url, { signal });
+                        if (res.status === 202) {
+                            const delayHeader = parseInt(res.headers.get('Retry-After') || '2', 10);
+                            const waitSec = Number.isFinite(delayHeader) && delayHeader >= 1 && delayHeader <= 10 ? delayHeader : 2;
+                            await new Promise((resolve, reject) => {
+                                const timer = setTimeout(resolve, waitSec * 1000);
+                                signal.addEventListener('abort', () => { clearTimeout(timer); reject(); }, { once: true });
+                            });
+                            continue;
+                        }
+                        if (res.status === 404) {
+                            console.warn('[PlayerPro] Faixa de legenda não encontrada (404):', resolvedTrackId);
+                            // Se falhou 404 com trackId específico, tenta outra faixa disponível se houver
+                            if (state.manifest && Array.isArray(state.manifest.subtitleTracks)) {
+                                const alt = state.manifest.subtitleTracks.find(t => t.id !== resolvedTrackId);
+                                if (alt && attempt === 0) {
+                                    resolvedTrackId = alt.id;
+                                    state.selectedSubtitleTrackId = alt.id;
+                                    continue;
+                                }
                             }
+                            break;
                         }
-                        break;
-                    }
-                    if (res.ok) {
-                        const vttContent = await res.text();
-                        if (state.selectedSubtitleTrackId === resolvedTrackId || state.selectedSubtitleTrackId === trackId) {
-                            state.parsedSubtitleCues = parseVtt(vttContent);
-                            console.info(`[PlayerPro] Legenda carregada com sucesso (${state.parsedSubtitleCues.length} falas sincronizadas)`);
-                            updateSubtitleCue(getEpisodeTime());
+                        if (res.ok) {
+                            const vttContent = await res.text();
+                            if (!signal.aborted) {
+                                const cues = parseVtt(vttContent);
+                                state.parsedSubtitleCues = cues;
+                                state.loadedSubtitleKey = currentKey;
+                                console.info(`[PlayerPro] Legenda carregada com sucesso (${cues.length} falas sincronizadas)`);
+                                updateSubtitleCue(getEpisodeTime());
+                            }
+                            break;
                         }
-                        break;
+                    } catch (e) {
+                        if (signal.aborted) break;
                     }
-                } catch (e) {
-                    if (signal.aborted) return;
-                    break;
                 }
+            } finally {
+                isFetchingSubtitle = false;
             }
         }
 
+        let lastLoggedCueTime = -1;
         function updateSubtitleCue(currentTime) {
             if (!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off' || state.parsedSubtitleCues.length === 0) {
                 dom.subtitleOverlay.style.display = 'none';
@@ -1140,8 +1170,15 @@
 
             const activeCues = state.parsedSubtitleCues.filter(c => currentTime >= c.start && currentTime <= c.end);
             if (activeCues.length > 0) {
-                dom.subtitleText.innerText = activeCues.map(c => c.text).join('\n');
+                const text = activeCues.map(c => c.text).join('\n');
+                if (dom.subtitleText.innerText !== text) {
+                    dom.subtitleText.innerText = text;
+                }
                 dom.subtitleOverlay.style.display = 'flex';
+                if (Math.floor(currentTime) !== lastLoggedCueTime) {
+                    lastLoggedCueTime = Math.floor(currentTime);
+                    console.info('[PlayerPro] Exibindo fala:', text.replace(/\n/g, ' '));
+                }
             } else {
                 dom.subtitleOverlay.style.display = 'none';
             }
@@ -1277,8 +1314,8 @@
                 dom.badgeStatus.className = 'badge-status mono';
             }
 
-            if (state.selectedSubtitleTrackId && state.selectedSubtitleTrackId !== 'off' && state.playbackTicket && state.parsedSubtitleCues.length === 0) {
-                fetchSubtitleTrack(state.selectedSubtitleTrackId);
+            if (state.selectedSubtitleTrackId && state.selectedSubtitleTrackId !== 'off' && state.playbackTicket && state.parsedSubtitleCues.length === 0 && !isFetchingSubtitle) {
+                fetchSubtitleTrack(state.selectedSubtitleTrackId, false);
             }
         }
 
@@ -1330,10 +1367,12 @@
             state.subtitleTracks = Array.isArray(m.subtitleTracks) ? m.subtitleTracks : [];
             const activeTrackExists = state.subtitleTracks.some(t => t.id === state.selectedSubtitleTrackId);
             // Só inicializa/busca legenda se ainda não tiver nenhuma legenda selecionada ou se não houver cues carregados
-            if (state.selectedSubtitleTrackId !== 'off' && (!state.selectedSubtitleTrackId || (!activeTrackExists && state.parsedSubtitleCues.length === 0)) && state.subtitleTracks.length > 0) {
-                const ptTrack = state.subtitleTracks.find(t => /por|pt/i.test(t.language || ''));
-                state.selectedSubtitleTrackId = (ptTrack || state.subtitleTracks[0]).id;
-                fetchSubtitleTrack(state.selectedSubtitleTrackId, false);
+            if (state.selectedSubtitleTrackId !== 'off' && state.subtitleTracks.length > 0) {
+                if (!state.selectedSubtitleTrackId || (!activeTrackExists && state.parsedSubtitleCues.length === 0 && !isFetchingSubtitle)) {
+                    const ptTrack = state.subtitleTracks.find(t => /por|pt/i.test(t.language || ''));
+                    state.selectedSubtitleTrackId = (ptTrack || state.subtitleTracks[0]).id;
+                    fetchSubtitleTrack(state.selectedSubtitleTrackId, false);
+                }
             }
 
             // Atualiza botões e popovers
