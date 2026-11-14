@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Anirium Player Pro — Reprodutor Soberano</title>
+    <script src="./hls.min.js"></script>
+    <style>
+        :root {
+            --bg: #07080C;
+            --surface: #0E1118;
+            --raised: #161B26;
+            --border: rgba(255, 255, 255, 0.12);
+            --border-hover: rgba(255, 199, 102, 0.45);
+            --accent: #FFC766;
+            --accent-glow: rgba(255, 199, 102, 0.25);
+            --canon: #10B981;
+            --text: #FFF9F0;
+            --muted: #94A3B8;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .mono {
+            font-family: var(--font-mono);
+        }
+
+        /* Container Principal do Player */
+        #player-wrapper {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+
+        /* Camadas de Gradiente / Sombras */
+        .gradient-top {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 96px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
+            pointer-events: none;
+            z-index: 20;
+            transition: opacity 0.3s ease;
+        }
+
+        .gradient-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 130px;
+            background: linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 60%, transparent 100%);
+            pointer-events: none;
+            z-index: 20;
+            transition: opacity 0.3s ease;
+        }
+
+        /* Barra Superior Suspensa no Player */
+        .player-header {
+            position: absolute;
+            top: 14px;
+            left: 18px;
+            right: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            z-index: 25;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .header-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge-ep {
+            background: var(--accent);
+            color: #0B0B0D;
+            font-size: 11px;
+            font-weight: 900;
+            padding: 4px 10px;
+            border-radius: 8px;
+            letter-spacing: 0.5px;
+            text-shadow: none;
+        }
+
+        .badge-status {
+            background: rgba(16, 185, 129, 0.15);
+            color: #6EE7B7;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            font-size: 10px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 999px;
+            text-transform: uppercase;
+        }
+
+        .badge-status.warn {
+            background: rgba(245, 158, 11, 0.15);
+            color: #FCD34D;
+            border-color: rgba(245, 158, 11, 0.35);
+        }
+
+        .badge-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            max-width: 48vw;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-ep-step {
+            background: rgba(22, 27, 38, 0.75);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-ep-step:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(255, 199, 102, 0.15);
+        }
+
+        /* Overlay Central de Espera / Abertura de Arquivo */
+        #central-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            gap: 14px;
+            background: radial-gradient(circle at center, rgba(14, 17, 24, 0.95) 0%, rgba(7, 8, 12, 0.98) 100%);
+            z-index: 30;
+            transition: opacity 0.3s ease;
+        }
+
+        .orb-pulse {
+            width: 58px;
+            height: 58px;
+            border-radius: 20px;
+            background: rgba(255, 199, 102, 0.15);
+            border: 1px solid rgba(255, 199, 102, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: var(--accent);
+            box-shadow: 0 0 24px var(--accent-glow);
+            animation: pulseSlow 2.5s infinite ease-in-out;
+        }
+
+        @keyframes pulseSlow {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.06); opacity: 1; }
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #0B0B0D;
+            border: none;
+            box-shadow: 0 4px 14px rgba(255, 199, 102, 0.35);
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.03);
+            filter: brightness(1.08);
+        }
+
+        .btn-secondary {
+            background: rgba(22, 27, 38, 0.85);
+            border: 1px solid var(--border);
+            color: var(--text);
+            backdrop-filter: blur(6px);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Overlay Flutuante de Legenda Sincronizada */
+        #subtitle-overlay {
+            position: absolute;
+            bottom: 84px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 35;
+            transition: bottom 0.25s ease;
+        }
+
+        #subtitle-text {
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(8px);
+            color: #FFFFFF;
+            font-weight: 600;
+            text-align: center;
+            border-radius: 10px;
+            padding: 6px 18px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            max-width: 820px;
+            white-space: pre-line;
+            line-height: 1.45;
+            font-size: 17px;
+            text-shadow: 0 2px 4px rgba(0,0,0,1), 0 0 2px rgba(0,0,0,0.8);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Controles Inferiores Netflix-Style */
+        .player-controls {
+            position: absolute;
+            bottom: 12px;
+            left: 18px;
+            right: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 25;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        /* Barra de Progresso / Timeline */
+        .timeline-container {
+            position: relative;
+            width: 100%;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .timeline-track {
+            position: relative;
+            width: 100%;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 999px;
+            overflow: hidden;
+            transition: height 0.15s ease;
+        }
+
+        .timeline-container:hover .timeline-track {
+            height: 7px;
+        }
+
+        .timeline-buffer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            background: rgba(255, 255, 255, 0.38);
+            border-radius: 999px;
+            transition: width 0.2s ease;
+        }
+
+        .timeline-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            background: linear-gradient(90deg, #FFC766 0%, #FFA826 100%);
+            border-radius: 999px;
+            box-shadow: 0 0 8px rgba(255, 199, 102, 0.8);
+        }
+
+        .timeline-thumb {
+            position: absolute;
+            top: 50%;
+            left: 0%;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background: #FFC766;
+            box-shadow: 0 0 6px rgba(0,0,0,0.6);
+            transform: translate(-50%, -50%) scale(0);
+            transition: transform 0.15s ease;
+            pointer-events: none;
+        }
+
+        .timeline-container:hover .timeline-thumb {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Linha de Botões de Ação do Player */
+        .controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .controls-left, .controls-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ctrl-btn {
+            background: transparent;
+            border: none;
+            color: var(--text);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        .ctrl-btn:hover {
+            color: var(--accent);
+            transform: scale(1.1);
+        }
+
+        .ctrl-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        .ctrl-btn.play-circle {
+            background: var(--accent);
+            color: #0B0B0D;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(255, 199, 102, 0.35);
+        }
+
+        .ctrl-btn.play-circle:hover {
+            transform: scale(1.08);
+            filter: brightness(1.1);
+            color: #0B0B0D;
+        }
+
+        .time-display {
+            font-size: 11px;
+            color: #E2E8F0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        /* Controle de Volume */
+        .volume-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .volume-slider {
+            width: 0;
+            opacity: 0;
+            transition: width 0.2s ease, opacity 0.2s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 999px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .volume-group:hover .volume-slider {
+            width: 65px;
+            opacity: 1;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+
+        /* Menus Flutuantes Elegantes (Qualidade, Áudio, Legenda) */
+        .popover-menu {
+            position: relative;
+        }
+
+        .popover-card {
+            position: absolute;
+            bottom: calc(100% + 12px);
+            right: 0;
+            background: rgba(14, 17, 24, 0.96);
+            backdrop-filter: blur(14px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 6px;
+            min-width: 180px;
+            display: none;
+            flex-direction: column;
+            gap: 2px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+            z-index: 50;
+        }
+
+        .popover-card.open {
+            display: flex;
+        }
+
+        .popover-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            text-align: left;
+        }
+
+        .popover-item:hover {
+            background: rgba(255, 199, 102, 0.15);
+            color: var(--accent);
+        }
+
+        .popover-item.active {
+            background: rgba(255, 199, 102, 0.2);
+            color: var(--accent);
+            font-weight: 800;
+        }
+
+        /* Barra de Telemetria Integrada no Player */
+        .telemetry-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 10px;
+            color: var(--muted);
+            flex-wrap: wrap;
+        }
+
+        .tele-tag {
+            background: rgba(22, 27, 38, 0.8);
+            border: 1px solid var(--border);
+            padding: 2px 7px;
+            border-radius: 6px;
+        }
+
+        .tele-tag.online {
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #6EE7B7;
+        }
+
+        /* Auto-Hide de Controles */
+        .hide-controls .player-header,
+        .hide-controls .player-controls,
+        .hide-controls .gradient-top,
+        .hide-controls .gradient-bottom {
+            opacity: 0;
+            transform: translateY(6px);
+            pointer-events: none;
+        }
+
+        .hide-controls .player-header {
+            transform: translateY(-6px);
+        }
+
+        .hide-controls #subtitle-overlay {
+            bottom: 30px;
+        }
+
+        .hide-cursor {
+            cursor: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="player-wrapper">
+        <video id="video-element" playsinline crossorigin="anonymous"></video>
+
+        <!-- Sombras de Contraste Superior e Inferior -->
+        <div class="gradient-top"></div>
+        <div class="gradient-bottom"></div>
+
+        <!-- Barra Superior Integrada -->
+        <header class="player-header">
+            <div class="header-meta">
+                <span id="badge-ep" class="badge-ep mono">EPISÓDIO 1</span>
+                <span id="badge-status" class="badge-status mono">● CONECTANDO AO SERVICE 4004</span>
+                <h2 id="video-title" class="badge-title">Anirium Player Pro</h2>
+            </div>
+            <div class="header-actions">
+                <button type="button" id="btn-prev-ep" class="btn-ep-step mono" onclick="stepEpisode(-1)">❮ Ep. Anterior</button>
+                <button type="button" id="btn-next-ep" class="btn-ep-step mono" onclick="stepEpisode(1)">Próximo Ep. ❯</button>
+            </div>
+        </header>
+
+        <!-- Overlay Central de Inicialização / Arquivo Local -->
+        <div id="central-overlay">
+            <div class="orb-pulse">▶</div>
+            <div style="max-width: 520px; display: flex; flex-direction: column; gap: 8px;">
+                <h3 id="overlay-heading" style="font-size: 17px; font-weight: 800; color: #FFF9F0;">
+                    Carregando Episódio...
+                </h3>
+                <p id="overlay-status" class="mono" style="font-size: 11px; color: var(--muted); line-height: 1.6;">
+                    Inicializando mixer multi-magnet e autenticando sessão de vídeo local...
+                </p>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin-top: 6px;">
+                <label class="btn-action btn-primary mono">
+                    📂 Abrir Arquivo Local (.mp4/.mkv)
+                    <input type="file" accept="video/*,.mkv" style="display:none;" onchange="openLocalFile(this)">
+                </label>
+                <button type="button" class="btn-action btn-secondary mono" onclick="promptDirectUrl()">
+                    🔗 Link Direto (.m3u8/.mp4)
+                </button>
+            </div>
+        </div>
+
+        <!-- Overlay Dinâmico de Legendas WebVTT -->
+        <div id="subtitle-overlay" style="display: none;">
+            <div id="subtitle-text"></div>
+        </div>
+
+        <!-- Painel Inferior de Controles Customizados -->
+        <footer class="player-controls">
+            <!-- Timeline / Progress Bar -->
+            <div class="timeline-container" id="timeline-box">
+                <div class="timeline-track">
+                    <div class="timeline-buffer" id="timeline-buffer"></div>
+                    <div class="timeline-progress" id="timeline-progress"></div>
+                </div>
+                <div class="timeline-thumb" id="timeline-thumb"></div>
+            </div>
+
+            <!-- Linha de Botões de Controle e Telemetria -->
+            <div class="controls-row">
+                <!-- Lado Esquerdo: Play/Pause, -10s, +10s, Volume, Tempo -->
+                <div class="controls-left">
+                    <button type="button" class="ctrl-btn play-circle" id="btn-play-pause" onclick="togglePlay()" title="Reproduzir / Pausar (Espaço)">
+                        <svg viewBox="0 0 24 24" id="icon-play"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                        <svg viewBox="0 0 24 24" id="icon-pause" style="display: none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    </button>
+
+                    <!-- Pular -10s -->
+                    <button type="button" class="ctrl-btn" onclick="seekRelative(-10)" title="Voltar 10s (←)">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+                            <text x="12" y="14.5" font-size="7" font-weight="900" text-anchor="middle" fill="currentColor">10</text>
+                        </svg>
+                    </button>
+
+                    <!-- Pular +10s -->
+                    <button type="button" class="ctrl-btn" onclick="seekRelative(10)" title="Avançar 10s (→)">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/>
+                            <text x="12" y="14.5" font-size="7" font-weight="900" text-anchor="middle" fill="currentColor">10</text>
+                        </svg>
+                    </button>
+
+                    <!-- Volume & Mute -->
+                    <div class="volume-group">
+                        <button type="button" class="ctrl-btn" id="btn-volume" onclick="toggleMute()" title="Silenciar / Ativar Som (M)">
+                            <svg viewBox="0 0 24 24" id="icon-vol-high"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                            <svg viewBox="0 0 24 24" id="icon-vol-mute" style="display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                        </button>
+                        <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.02" value="1">
+                    </div>
+
+                    <!-- Tempo Decorrido / Duração -->
+                    <div class="time-display mono">
+                        <span id="time-current">0:00</span>
+                        <span>/</span>
+                        <span id="time-total">0:00</span>
+                    </div>
+
+                    <!-- Telemetria do Swarm -->
+                    <div class="telemetry-row mono" id="telemetry-box" style="margin-left: 10px;">
+                        <span class="tele-tag online" id="tele-links">⚡ 0 Magnets</span>
+                        <span class="tele-tag" id="tele-peers">👥 0 Peers</span>
+                        <span class="tele-tag" id="tele-rate" style="color: var(--accent);">⬇ 0 KB/s</span>
+                    </div>
+                </div>
+
+                <!-- Lado Direito: Seletores (Qualidade, Áudio, Legenda) e Tela Cheia -->
+                <div class="controls-right">
+                    <!-- Menu de Qualidades -->
+                    <div class="popover-menu">
+                        <button type="button" class="ctrl-btn mono" id="btn-quality" onclick="togglePopover('card-quality')" title="Qualidade de Vídeo" style="font-size: 11px; font-weight: 800;">
+                            HD
+                        </button>
+                        <div class="popover-card mono" id="card-quality"></div>
+                    </div>
+
+                    <!-- Menu de Áudio -->
+                    <div class="popover-menu">
+                        <button type="button" class="ctrl-btn" id="btn-audio" onclick="togglePopover('card-audio')" title="Faixas de Áudio">
+                            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                        </button>
+                        <div class="popover-card mono" id="card-audio"></div>
+                    </div>
+
+                    <!-- Menu de Legendas -->
+                    <div class="popover-menu">
+                        <button type="button" class="ctrl-btn" id="btn-sub" onclick="togglePopover('card-sub')" title="Legendas (C)">
+                            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" ry="2"/><path d="M7 15h3"/><path d="M14 15h3"/><path d="M7 11h10"/></svg>
+                        </button>
+                        <div class="popover-card mono" id="card-sub"></div>
+                    </div>
+
+                    <!-- Tela Cheia -->
+                    <button type="button" class="ctrl-btn" id="btn-fullscreen" onclick="toggleFullscreen()" title="Tela Cheia (F)">
+                        <svg viewBox="0 0 24 24" id="icon-fs-enter"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                        <svg viewBox="0 0 24 24" id="icon-fs-exit" style="display: none;"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const state = {
+            workId: params.get('workId') || '',
+            epId: params.get('epId') || '',
+            episode: parseInt(params.get('ep') || '1', 10) || 1,
+            season: parseInt(params.get('season') || '1', 10) || 1,
+            title: params.get('title') || 'Anime',
+            token: params.get('token') || '',
+            deviceId: params.get('deviceId') || '',
+            playbackTicket: '',
+            sourcesCount: 0,
+            manifest: null,
+            selectedQuality: '',
+            selectedAudio: '',
+            selectedSubtitleTrackId: '',
+            subtitleTracks: [],
+            parsedSubtitleCues: [],
+            requestedQuality: '',
+            currentStreamUrl: '',
+            hls: null,
+            manifestTimer: null,
+            windowController: null,
+            isSeeking: false,
+            idleTimer: null,
+            isCustomMedia: false
+        };
+
+        const dom = {
+            wrapper: document.getElementById('player-wrapper'),
+            video: document.getElementById('video-element'),
+            centralOverlay: document.getElementById('central-overlay'),
+            overlayHeading: document.getElementById('overlay-heading'),
+            overlayStatus: document.getElementById('overlay-status'),
+            badgeEp: document.getElementById('badge-ep'),
+            badgeStatus: document.getElementById('badge-status'),
+            videoTitle: document.getElementById('video-title'),
+            btnPrevEp: document.getElementById('btn-prev-ep'),
+            btnNextEp: document.getElementById('btn-next-ep'),
+            subtitleOverlay: document.getElementById('subtitle-overlay'),
+            subtitleText: document.getElementById('subtitle-text'),
+            timelineBox: document.getElementById('timeline-box'),
+            timelineProgress: document.getElementById('timeline-progress'),
+            timelineBuffer: document.getElementById('timeline-buffer'),
+            timelineThumb: document.getElementById('timeline-thumb'),
+            timeCurrent: document.getElementById('time-current'),
+            timeTotal: document.getElementById('time-total'),
+            iconPlay: document.getElementById('icon-play'),
+            iconPause: document.getElementById('icon-pause'),
+            iconVolHigh: document.getElementById('icon-vol-high'),
+            iconVolMute: document.getElementById('icon-vol-mute'),
+            volumeSlider: document.getElementById('volume-slider'),
+            teleLinks: document.getElementById('tele-links'),
+            telePeers: document.getElementById('tele-peers'),
+            teleRate: document.getElementById('tele-rate'),
+            btnQuality: document.getElementById('btn-quality'),
+            cardQuality: document.getElementById('card-quality'),
+            cardAudio: document.getElementById('card-audio'),
+            cardSub: document.getElementById('card-sub'),
+            iconFsEnter: document.getElementById('icon-fs-enter'),
+            iconFsExit: document.getElementById('icon-fs-exit')
+        };
+
+        function formatTime(sec) {
+            if (!Number.isFinite(sec) || sec < 0) return '0:00';
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function langLabel(code) {
+            const map = {
+                jpn: 'Japonês (Original)',
+                por: 'Português (BR)',
+                'pt-br': 'Português (BR)',
+                eng: 'Inglês',
+                spa: 'Espanhol',
+                und: 'Original'
+            };
+            return map[String(code || '').toLowerCase()] || String(code || '').toUpperCase();
+        }
+
+        // ==========================================
+        //  CONTROLE DE ATIVIDADE E AUTO-HIDE
+        // ==========================================
+        function resetIdleTimer() {
+            dom.wrapper.classList.remove('hide-controls');
+            dom.wrapper.classList.remove('hide-cursor');
+            if (state.idleTimer) clearTimeout(state.idleTimer);
+            if (!dom.video.paused) {
+                state.idleTimer = setTimeout(() => {
+                    // Não esconde se houver menu aberto
+                    if (document.querySelector('.popover-card.open')) return;
+                    dom.wrapper.classList.add('hide-controls');
+                    dom.wrapper.classList.add('hide-cursor');
+                }, 3200);
+            }
+        }
+
+        dom.wrapper.addEventListener('mousemove', resetIdleTimer);
+        dom.wrapper.addEventListener('click', (e) => {
+            // Fecha popovers se clicou fora deles
+            if (!e.target.closest('.popover-menu')) {
+                closeAllPopovers();
+            }
+            resetIdleTimer();
+        });
+
+        function closeAllPopovers() {
+            document.querySelectorAll('.popover-card').forEach(c => c.classList.remove('open'));
+        }
+
+        function togglePopover(cardId) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+            const isOpen = card.classList.contains('open');
+            closeAllPopovers();
+            if (!isOpen) card.classList.add('open');
+        }
+
+        // ==========================================
+        //  REPRODUÇÃO, SEEK E VOLUME
+        // ==========================================
+        function togglePlay() {
+            if (dom.video.paused) {
+                dom.video.play().catch(() => {});
+            } else {
+                dom.video.pause();
+            }
+        }
+
+        dom.video.addEventListener('play', () => {
+            dom.iconPlay.style.display = 'none';
+            dom.iconPause.style.display = 'block';
+            resetIdleTimer();
+        });
+
+        dom.video.addEventListener('pause', () => {
+            dom.iconPlay.style.display = 'block';
+            dom.iconPause.style.display = 'none';
+            resetIdleTimer();
+        });
+
+        function seekRelative(deltaSeconds) {
+            const current = dom.video.currentTime || 0;
+            const dur = dom.video.duration || 0;
+            const target = Math.max(0, Math.min(dur ? dur - 0.5 : 99999, current + deltaSeconds));
+            seekTo(target);
+        }
+
+        function seekTo(targetSeconds) {
+            if (state.isCustomMedia || !state.manifest?.windowOnDemand) {
+                dom.video.currentTime = targetSeconds;
+                return;
+            }
+
+            // Seek sob demanda no Anirium Service
+            if (state.windowController) {
+                try { state.windowController.abort(); } catch (e) {}
+            }
+            const ctrl = new AbortController();
+            state.windowController = ctrl;
+
+            fetch(`http://127.0.0.1:4004/playback/session?playbackTicket=${encodeURIComponent(state.playbackTicket)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: ctrl.signal,
+                body: JSON.stringify({
+                    action: 'seek',
+                    quality: state.selectedQuality,
+                    position: Math.floor(targetSeconds),
+                    playing: !dom.video.paused,
+                    audio: state.selectedAudio || '',
+                    subtitle: state.selectedSubtitleTrackId && state.selectedSubtitleTrackId !== 'off' ? state.selectedSubtitleTrackId : ''
+                })
+            }).then(r => r.json()).then(data => {
+                if (data.window && data.window.status === 'ready' && data.window.playlistUrl) {
+                    const streamUrl = `http://127.0.0.1:4004${data.window.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
+                    playStream(streamUrl, `Anirium+ (${state.selectedQuality})`);
+                }
+            }).catch(() => {});
+        }
+
+        // Timeline Scrubber
+        dom.timelineBox.addEventListener('click', (e) => {
+            const rect = dom.timelineBox.getBoundingClientRect();
+            const clickPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            const dur = dom.video.duration || 0;
+            if (dur > 0) {
+                seekTo(clickPos * dur);
+            }
+        });
+
+        dom.video.addEventListener('timeupdate', () => {
+            const ct = dom.video.currentTime || 0;
+            const dur = dom.video.duration || 0;
+            dom.timeCurrent.innerText = formatTime(ct);
+            dom.timeTotal.innerText = formatTime(dur);
+
+            if (dur > 0) {
+                const pct = (ct / dur) * 100;
+                dom.timelineProgress.style.width = `${pct}%`;
+                dom.timelineThumb.style.left = `${pct}%`;
+
+                // Buffer do navegador
+                if (dom.video.buffered && dom.video.buffered.length > 0) {
+                    for (let i = 0; i < dom.video.buffered.length; i++) {
+                        if (ct >= dom.video.buffered.start(i) && ct <= dom.video.buffered.end(i)) {
+                            const bufPct = (dom.video.buffered.end(i) / dur) * 100;
+                            dom.timelineBuffer.style.width = `${bufPct}%`;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Atualiza exibição de legendas
+            updateSubtitleCue(ct);
+        });
+
+        // Volume
+        function toggleMute() {
+            dom.video.muted = !dom.video.muted;
+            updateVolumeUI();
+        }
+
+        dom.volumeSlider.addEventListener('input', (e) => {
+            dom.video.volume = parseFloat(e.target.value);
+            dom.video.muted = false;
+            updateVolumeUI();
+        });
+
+        function updateVolumeUI() {
+            const isMuted = dom.video.muted || dom.video.volume === 0;
+            dom.iconVolHigh.style.display = isMuted ? 'none' : 'block';
+            dom.iconVolMute.style.display = isMuted ? 'block' : 'none';
+            dom.volumeSlider.value = isMuted ? 0 : dom.video.volume;
+        }
+
+        // Fullscreen
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                dom.wrapper.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            const isFs = Boolean(document.fullscreenElement);
+            dom.iconFsEnter.style.display = isFs ? 'none' : 'block';
+            dom.iconFsExit.style.display = isFs ? 'block' : 'none';
+        });
+
+        // ==========================================
+        //  PARSER DE LEGENDAS WEBVTT & OVERLAY
+        // ==========================================
+        function parseVtt(text) {
+            const cues = [];
+            const parseTimestamp = (t) => {
+                const parts = t.trim().split(':');
+                if (parts.length === 3) {
+                    const h = parseFloat(parts[0]);
+                    const m = parseFloat(parts[1]);
+                    const s = parseFloat(parts[2].replace(',', '.'));
+                    return h * 3600 + m * 60 + s;
+                } else if (parts.length === 2) {
+                    const m = parseFloat(parts[0]);
+                    const s = parseFloat(parts[1].replace(',', '.'));
+                    return m * 60 + s;
+                }
+                return 0;
+            };
+
+            const blocks = text.replace(/\r\n|\r/g, '\n').split(/\n\s*\n/);
+            for (const block of blocks) {
+                const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].includes('-->')) {
+                        const timeParts = lines[i].split('-->');
+                        const start = parseTimestamp(timeParts[0]);
+                        const end = parseTimestamp(timeParts[1]);
+                        const cueLines = lines.slice(i + 1).filter(l => !l.startsWith('NOTE') && !l.startsWith('STYLE'));
+                        const cleanText = cueLines
+                            .join('\n')
+                            .replace(/<[^>]+>/g, '')
+                            .replace(/\{[^}]+\}/g, '')
+                            .trim();
+                        if (cleanText && end > start) {
+                            cues.push({ start, end, text: cleanText });
+                        }
+                        break;
+                    }
+                }
+            }
+            return cues;
+        }
+
+        async function fetchSubtitleTrack(trackId) {
+            state.selectedSubtitleTrackId = trackId;
+            state.parsedSubtitleCues = [];
+            dom.subtitleOverlay.style.display = 'none';
+            dom.subtitleText.innerText = '';
+            renderSubMenu();
+
+            if (!trackId || trackId === 'off' || !state.playbackTicket) return;
+
+            const url = `http://127.0.0.1:4004/subtitles?trackId=${encodeURIComponent(trackId)}&playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
+            
+            // Loop de Retry para 202 Accepted (mesma estratégia soberana do Animeflix)
+            for (let attempt = 0; attempt < 15; attempt++) {
+                try {
+                    const res = await fetch(url);
+                    if (res.status === 202) {
+                        const waitSec = parseInt(res.headers.get('Retry-After') || '2', 10) || 2;
+                        await new Promise(r => setTimeout(r, waitSec * 1000));
+                        continue;
+                    }
+                    if (res.ok) {
+                        const vttContent = await res.text();
+                        if (state.selectedSubtitleTrackId === trackId) {
+                            state.parsedSubtitleCues = parseVtt(vttContent);
+                        }
+                        break;
+                    }
+                } catch (e) {
+                    break;
+                }
+            }
+        }
+
+        function updateSubtitleCue(currentTime) {
+            if (!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off' || state.parsedSubtitleCues.length === 0) {
+                dom.subtitleOverlay.style.display = 'none';
+                return;
+            }
+
+            const activeCues = state.parsedSubtitleCues.filter(c => currentTime >= c.start && currentTime <= c.end);
+            if (activeCues.length > 0) {
+                dom.subtitleText.innerText = activeCues.map(c => c.text).join('\n');
+                dom.subtitleOverlay.style.display = 'flex';
+            } else {
+                dom.subtitleOverlay.style.display = 'none';
+            }
+        }
+
+        // ==========================================
+        //  POPULANDO MENUS SUSPENSOS DE MÍDIA
+        // ==========================================
+        function renderQualityMenu() {
+            const m = state.manifest || {};
+            const qualities = Array.isArray(m.qualities) ? m.qualities : [];
+            dom.btnQuality.innerText = state.selectedQuality || 'HD';
+
+            dom.cardQuality.innerHTML = `
+                <div style="padding: 6px 10px; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;">
+                    QUALIDADES DISPONÍVEIS
+                </div>
+                ${qualities.map(q => `
+                    <button type="button" class="popover-item ${state.selectedQuality === q ? 'active' : ''}" onclick="selectQuality('${q}')">
+                        <span>${q}</span>
+                        ${state.selectedQuality === q ? '<span>✓</span>' : ''}
+                    </button>
+                `).join('')}
+            `;
+        }
+
+        function renderAudioMenu() {
+            const m = state.manifest || {};
+            const audios = Array.isArray(m.audioChoices) && m.audioChoices.length > 0
+                ? m.audioChoices
+                : (Array.isArray(m.audios) ? m.audios : []);
+
+            dom.cardAudio.innerHTML = `
+                <div style="padding: 6px 10px; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;">
+                    FAIXAS DE ÁUDIO
+                </div>
+                ${audios.map(a => `
+                    <button type="button" class="popover-item ${state.selectedAudio === a ? 'active' : ''}" onclick="selectAudio('${a}')">
+                        <span>${langLabel(a)}</span>
+                        ${state.selectedAudio === a ? '<span>✓</span>' : ''}
+                    </button>
+                `).join('')}
+            `;
+        }
+
+        function renderSubMenu() {
+            const subTracks = Array.isArray(state.subtitleTracks) ? state.subtitleTracks : [];
+            dom.cardSub.innerHTML = `
+                <div style="padding: 6px 10px; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;">
+                    LEGENDAS SINCRONIZADAS
+                </div>
+                <button type="button" class="popover-item ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? 'active' : ''}" onclick="fetchSubtitleTrack('off')">
+                    <span>Desativada</span>
+                    ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? '<span>✓</span>' : ''}
+                </button>
+                ${subTracks.map((st, i) => `
+                    <button type="button" class="popover-item ${state.selectedSubtitleTrackId === st.id ? 'active' : ''}" onclick="fetchSubtitleTrack('${st.id}')">
+                        <span>${st.title || langLabel(st.language)} #${i + 1}</span>
+                        ${state.selectedSubtitleTrackId === st.id ? '<span>✓</span>' : ''}
+                    </button>
+                `).join('')}
+            `;
+        }
+
+        async function selectQuality(q) {
+            if (!q || state.selectedQuality === q) return;
+            state.selectedQuality = q;
+            state.requestedQuality = '';
+            state.currentStreamUrl = '';
+            closeAllPopovers();
+            renderQualityMenu();
+            await syncStreamSelection(true);
+        }
+
+        async function selectAudio(lang) {
+            if (!lang) return;
+            state.selectedAudio = lang;
+            if (state.hls && Array.isArray(state.hls.audioTracks)) {
+                const idx = state.hls.audioTracks.findIndex(t => t.lang === lang);
+                if (idx >= 0) state.hls.audioTrack = idx;
+            }
+            closeAllPopovers();
+            renderAudioMenu();
+            if (state.manifest?.windowOnDemand) {
+                state.requestedQuality = '';
+                await syncStreamSelection(true);
+            }
+        }
+
+        // ==========================================
+        //  PLAYBACK DE VÍDEO & HLS
+        // ==========================================
+        function playStream(streamUrl, sourceLabel) {
+            if (!streamUrl || state.currentStreamUrl === streamUrl) return;
+            state.currentStreamUrl = streamUrl;
+
+            if (state.hls) {
+                try { state.hls.destroy(); } catch (e) {}
+                state.hls = null;
+            }
+
+            dom.centralOverlay.style.display = 'none';
+
+            const isM3u8 = /\.m3u8(?:[?#]|$)/i.test(streamUrl);
+            if (isM3u8 && window.Hls && window.Hls.isSupported()) {
+                const hls = new window.Hls({
+                    maxBufferLength: 60,
+                    maxMaxBufferLength: 120,
+                    backBufferLength: 48
+                });
+                state.hls = hls;
+
+                hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+                    if (state.selectedAudio && Array.isArray(hls.audioTracks)) {
+                        const idx = hls.audioTracks.findIndex(t => t.lang === state.selectedAudio);
+                        if (idx >= 0) hls.audioTrack = idx;
+                    }
+                });
+
+                hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+                    dom.video.play().catch(() => {});
+                });
+
+                hls.loadSource(streamUrl);
+                hls.attachMedia(dom.video);
+            } else {
+                dom.video.src = streamUrl;
+                dom.video.play().catch(() => {});
+            }
+
+            if (sourceLabel) {
+                dom.badgeStatus.innerText = `● ${sourceLabel.toUpperCase()}`;
+                dom.badgeStatus.className = 'badge-status mono';
+            }
+
+            if (state.selectedSubtitleTrackId && state.playbackTicket) {
+                fetchSubtitleTrack(state.selectedSubtitleTrackId);
+            }
+        }
+
+        function openLocalFile(input) {
+            const file = input?.files?.[0];
+            if (!file) return;
+            state.isCustomMedia = true;
+            const url = URL.createObjectURL(file);
+            playStream(url, `Arquivo Local: ${file.name}`);
+        }
+
+        function promptDirectUrl() {
+            const url = prompt('Cole a URL direta do vídeo (.mp4, .webm, .m3u8):');
+            if (url && url.trim()) {
+                state.isCustomMedia = true;
+                playStream(url.trim(), 'Stream Direto');
+            }
+        }
+
+        function stepEpisode(delta) {
+            const nextEp = Math.max(1, state.episode + delta);
+            window.parent.postMessage({
+                type: 'anirium:player:step-episode',
+                delta: delta,
+                episode: nextEp,
+                workId: state.workId
+            }, '*');
+        }
+
+        // ==========================================
+        //  SINCRONIZAÇÃO COM ANIRIUM SERVICE (4004)
+        // ==========================================
+        async function syncStreamSelection(forceRequest = false) {
+            const m = state.manifest;
+            if (!m || !state.playbackTicket) return;
+
+            const qualities = Array.isArray(m.qualities) ? m.qualities : [];
+            if (qualities.length > 0 && (!state.selectedQuality || !qualities.includes(state.selectedQuality))) {
+                state.selectedQuality = qualities[0];
+            }
+
+            const audios = Array.isArray(m.audioChoices) && m.audioChoices.length > 0
+                ? m.audioChoices
+                : (Array.isArray(m.audios) ? m.audios : []);
+            if (audios.length > 0 && (!state.selectedAudio || !audios.includes(state.selectedAudio))) {
+                state.selectedAudio = audios.includes('jpn') ? 'jpn' : audios[0];
+            }
+
+            state.subtitleTracks = Array.isArray(m.subtitleTracks) ? m.subtitleTracks : [];
+            if (!state.selectedSubtitleTrackId && state.subtitleTracks.length > 0) {
+                const ptTrack = state.subtitleTracks.find(t => /por|pt/i.test(t.language || ''));
+                state.selectedSubtitleTrackId = (ptTrack || state.subtitleTracks[0]).id;
+                fetchSubtitleTrack(state.selectedSubtitleTrackId);
+            }
+
+            // Atualiza botões e popovers
+            renderQualityMenu();
+            renderAudioMenu();
+            renderSubMenu();
+
+            // Atualiza telemetria no player
+            const links = Number(m.activeLinks ?? state.sourcesCount ?? 0);
+            const peers = Number(m.peers ?? 0);
+            const rate = m.downloadRate || '0 KB/s';
+            dom.teleLinks.innerText = `⚡ ${links} Magnets`;
+            dom.telePeers.innerText = `👥 ${peers} Peers`;
+            dom.teleRate.innerText = `⬇ ${rate}`;
+
+            if (!state.selectedQuality) return;
+
+            // Variante já pronta?
+            const readyVariant = (Array.isArray(m.variants) ? m.variants : []).find(
+                v => v.quality === state.selectedQuality && v.status === 'ready' && v.playlistUrl
+            );
+            if (readyVariant && readyVariant.playlistUrl) {
+                const streamUrl = `http://127.0.0.1:4004${readyVariant.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
+                playStream(streamUrl, `Anirium+ Unificado (${state.selectedQuality})`);
+                return;
+            }
+
+            // Solicitação sob demanda
+            const sig = `${state.selectedQuality}:${state.selectedAudio || ''}`;
+            if (!forceRequest && state.requestedQuality === sig) return;
+            state.requestedQuality = sig;
+
+            dom.overlayStatus.innerText = `Unificando ${links} fonte(s) P2P em ${state.selectedQuality} (${peers} peers)...`;
+
+            try {
+                if (m.windowOnDemand) {
+                    if (state.windowController) {
+                        try { state.windowController.abort(); } catch (e) {}
+                    }
+                    const ctrl = new AbortController();
+                    state.windowController = ctrl;
+                    const pos = (dom.video && Number.isFinite(dom.video.currentTime) && dom.video.currentTime > 0) ? Math.floor(dom.video.currentTime) : 0;
+
+                    const res = await fetch(`http://127.0.0.1:4004/playback/session?playbackTicket=${encodeURIComponent(state.playbackTicket)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        signal: ctrl.signal,
+                        body: JSON.stringify({
+                            action: 'seek',
+                            quality: state.selectedQuality,
+                            position: pos,
+                            playing: true,
+                            audio: state.selectedAudio || '',
+                            subtitle: state.selectedSubtitleTrackId && state.selectedSubtitleTrackId !== 'off' ? state.selectedSubtitleTrackId : ''
+                        })
+                    });
+                    if (res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        if (data.window && data.window.status === 'ready' && data.window.playlistUrl) {
+                            const streamUrl = `http://127.0.0.1:4004${data.window.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
+                            playStream(streamUrl, `Anirium+ Unificado (${state.selectedQuality})`);
+                        }
+                    }
+                } else if (m.qualityOnDemand) {
+                    await fetch(`http://127.0.0.1:4004/playback/variant?quality=${encodeURIComponent(state.selectedQuality)}&playbackTicket=${encodeURIComponent(state.playbackTicket)}`, {
+                        method: 'POST'
+                    });
+                }
+            } catch (e) {}
+        }
+
+        async function initPlayer() {
+            dom.badgeEp.innerText = `EPISÓDIO ${state.episode}`;
+            dom.videoTitle.innerText = `${state.title} — Episódio ${state.episode}`;
+            dom.overlayHeading.innerText = `${state.title} — Episódio ${state.episode}`;
+            dom.btnPrevEp.style.display = state.episode > 1 ? 'inline-flex' : 'none';
+
+            // 1. Checa Service 4004
+            let serviceOnline = false;
+            try {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 1800);
+                const hRes = await fetch('http://127.0.0.1:4004/health', { signal: ctrl.signal });
+                clearTimeout(t);
+                serviceOnline = hRes.ok;
+            } catch (e) {
+                serviceOnline = false;
+            }
+
+            if (!serviceOnline) {
+                dom.badgeStatus.innerText = '● SERVICE 4004 OFFLINE';
+                dom.badgeStatus.className = 'badge-status warn mono';
+                dom.overlayStatus.innerHTML = 'O aplicativo <strong>Anirium Service (porta 4004)</strong> não foi detectado em execução no seu computador. Inicie o Anirium Service no Windows ou utilize um arquivo/link abaixo.';
+                return;
+            }
+
+            if (!state.token || !state.deviceId) {
+                dom.badgeStatus.innerText = '● AGUARDANDO SESSÃO';
+                dom.badgeStatus.className = 'badge-status warn mono';
+                dom.overlayStatus.innerText = 'Aguardando autorização de sessão do Anirium...';
+                return;
+            }
+
+            dom.badgeStatus.innerText = '● AUTENTICADO NO SERVICE 4004';
+            dom.overlayStatus.innerText = 'Sondando provedores P2P e preparando mixer de streaming...';
+
+            // Preparação do Playback
+            const preparePayload = {
+                token: state.token,
+                deviceId: state.deviceId,
+                title: state.title,
+                titleEnglish: state.title,
+                titleRomaji: state.title,
+                season: state.season || 1,
+                episode: state.episode || 1
+            };
+
+            try {
+                const prepRes = await fetch('http://127.0.0.1:4004/playback/prepare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(preparePayload)
+                });
+                const prepData = await prepRes.json().catch(() => ({}));
+
+                if (!prepRes.ok) {
+                    dom.badgeStatus.innerText = `● ERRO (${prepData.reason || prepRes.status})`;
+                    dom.badgeStatus.className = 'badge-status warn mono';
+                    dom.overlayStatus.innerText = `O Anirium Service recusou a preparação (${prepData.reason || prepRes.status}).`;
+                    return;
+                }
+
+                if (prepData.status === 'no-sources' && !prepData.playbackTicket) {
+                    dom.badgeStatus.innerText = '● SEM FONTES NO SWARM';
+                    dom.badgeStatus.className = 'badge-status warn mono';
+                    dom.overlayStatus.innerHTML = `Nenhuma fonte P2P retornada pelos provedores para <strong>${state.title} — Episódio ${state.episode}</strong>.`;
+                    return;
+                }
+
+                state.playbackTicket = prepData.playbackTicket || '';
+                state.sourcesCount = Number(prepData.sources || 0);
+
+                dom.badgeStatus.innerText = '● SWARM CONECTADO';
+                dom.overlayStatus.innerText = 'Sessão unificada ativa! Sintonizando áudio, vídeo e legendas...';
+
+                // Polling do Manifesto
+                const poll = async () => {
+                    if (!state.playbackTicket) return;
+                    try {
+                        const mRes = await fetch('http://127.0.0.1:4004/manifest', {
+                            cache: 'no-store',
+                            headers: {
+                                'Authorization': `Bearer ${state.token}`,
+                                'X-Anirium-Device': state.deviceId
+                            }
+                        });
+                        if (!mRes.ok) return;
+                        state.manifest = await mRes.json();
+                        await syncStreamSelection(false);
+                    } catch (e) {}
+                };
+
+                await poll();
+                if (state.manifestTimer) clearInterval(state.manifestTimer);
+                state.manifestTimer = setInterval(poll, 2000);
+
+            } catch (e) {
+                dom.badgeStatus.innerText = '● ERRO DE CONEXÃO 4004';
+                dom.badgeStatus.className = 'badge-status warn mono';
+                dom.overlayStatus.innerText = 'Falha ao comunicar com o Anirium Service local na porta 4004.';
+            }
+        }
+
+        // Teclado (Atalhos Globais do Player)
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            switch (e.code) {
+                case 'Space':
+                case 'KeyK':
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    seekRelative(-10);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    seekRelative(10);
+                    break;
+                case 'KeyF':
+                    e.preventDefault();
+                    toggleFullscreen();
+                    break;
+                case 'KeyM':
+                    e.preventDefault();
+                    toggleMute();
+                    break;
+                case 'KeyC':
+                    e.preventDefault();
+                    togglePopover('card-sub');
+                    break;
+            }
+        });
+
+        // Recebe credenciais e contexto do Core via postMessage
+        window.addEventListener('message', (event) => {
+            const msg = event.data;
+            if (!msg || typeof msg !== 'object') return;
+            if (msg.type === 'anirium:core:init-player') {
+                Object.assign(state, msg.payload || {});
+                initPlayer();
+            }
+        });
+
+        initPlayer();
+    </script>
+</body>
+</html>

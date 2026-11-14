@@ -2636,8 +2636,11 @@
                 }
             } catch (err) {}
 
+            // Prioriza servir o módulo Player Pro com a mesma origem canônica (https://anirium.com.br/addons/player-pro/)
+            // para garantir conformidade imediata com o Go anirium-service (CORS/Private Network/trustedPlayerOrigin)
             const playerAddon = (window.allUserAddons || []).find(a => a.id === 'player-pro');
-            const externalEmbedBaseUrl = playerAddon?.embed_url || 'https://godzlayer.github.io/anirium-embeds/video/';
+            const canonicalEmbedUrl = '/addons/player-pro/';
+            const externalEmbedBaseUrl = canonicalEmbedUrl;
 
             const embedQuery = new URLSearchParams({
                 token: sessionToken,
