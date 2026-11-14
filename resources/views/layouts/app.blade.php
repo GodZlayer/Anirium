@@ -148,6 +148,7 @@
     <!-- Host de Modais Ontológicos Globais -->
     <div id="modal-container" class="relative z-50"></div>
 
+    <script src="/js/hls.min.js"></script>
     <script src="/js/theme-lang-engine.js"></script>
     @stack('scripts')
 </body>

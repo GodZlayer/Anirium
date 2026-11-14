@@ -8,6 +8,7 @@
     'creators' => [],
     'studios' => [],
     'tracks' => [],
+    'externalIds' => [],
     'isLiked' => false,
     'isBookmarked' => false,
     'userScore' => null,
@@ -23,8 +24,11 @@
     $leadImage = $work->image_url ?? '/assets/icons/actions/search.png';
     $workTitle = $work->title ?? 'Obra Associada';
     $workMedia = strtolower($work->media ?? 'anime');
+    $workFormat = strtoupper($work->format ?? ($workMedia === 'manga' ? 'MANGA' : 'TV'));
     $isManga = $workMedia === 'manga';
     $totalArcEpisodes = count($episodes) ?: ($endNum ? max(1, (int) $endNum - $startNum + 1) : 0);
+    $malId = collect($externalIds)->firstWhere('provider', 'mal')->external_id ?? null;
+    $imdbId = collect($externalIds)->firstWhere('provider', 'imdb')->external_id ?? null;
 
     $displayArcEpisodes = collect($episodes);
     if ($displayArcEpisodes->isEmpty() && $work && $totalArcEpisodes > 0) {
@@ -57,7 +61,15 @@
     $arcTimeline = count($allWorkArcs) > 0 ? $allWorkArcs : $otherArcs;
 @endphp
 
-<div class="w-full h-full flex flex-col overflow-hidden select-none bg-theme-base text-theme-primary">
+<div class="w-full h-full flex flex-col overflow-hidden select-none bg-theme-base text-theme-primary"
+     id="arc-context-stage"
+     data-work-id="{{ $work->id ?? '' }}"
+     data-work-title="{{ $workTitle }}"
+     data-work-media="{{ $isManga ? 'manga' : 'anime' }}"
+     data-work-format="{{ $workFormat }}"
+     data-episode-count="{{ $work->episode_count ?? $totalArcEpisodes }}"
+     data-mal-id="{{ $malId ?? '' }}"
+     data-imdb-id="{{ $imdbId ?? '' }}">
     <!-- BARRA SUPERIOR: NAVEGAÇÃO ONTOLÓGICA -->
     <header class="h-14 w-full flex items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-theme-default bg-theme-header shrink-0 z-20 gap-2">
         <div class="flex items-center gap-2 sm:gap-4 min-w-0">

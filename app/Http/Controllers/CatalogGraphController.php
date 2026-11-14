@@ -988,6 +988,7 @@ class CatalogGraphController extends Controller
             $creators = [];
             $studios = [];
             $tracks = [];
+            $externalIds = [];
             if ($work) {
                 $creators = DB::table('catalog_work_creators as wc')
                     ->join('catalog_creators as c', 'wc.creator_id', '=', 'c.id')
@@ -1010,6 +1011,12 @@ class CatalogGraphController extends Controller
                     ->limit(16)
                     ->get(['t.id', 't.title', 't.track_type'])
                     ->toArray();
+
+                $externalIds = DB::table('catalog_external_identities')
+                    ->where('entity_id', $work->id)
+                    ->select('provider', 'external_id', 'namespace')
+                    ->get()
+                    ->toArray();
             }
 
             return json_decode(json_encode([
@@ -1022,6 +1029,7 @@ class CatalogGraphController extends Controller
                 'creators' => $creators,
                 'studios' => $studios,
                 'tracks' => $tracks,
+                'externalIds' => $externalIds,
             ]), true);
         });
 
@@ -1038,6 +1046,7 @@ class CatalogGraphController extends Controller
         $creators = collect($data['creators'] ?? [])->map(fn ($c) => (object) $c);
         $studios = collect($data['studios'] ?? [])->map(fn ($s) => (object) $s);
         $tracks = collect($data['tracks'] ?? [])->map(fn ($t) => (object) $t);
+        $externalIds = collect($data['externalIds'] ?? [])->map(fn ($e) => (object) $e);
 
         if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             $user = $request->user();
@@ -1059,6 +1068,7 @@ class CatalogGraphController extends Controller
                 'creators' => $creators,
                 'studios' => $studios,
                 'tracks' => $tracks,
+                'externalIds' => $externalIds,
                 'isLiked' => (bool) ($pref->liked ?? false),
                 'isBookmarked' => (bool) ($pref->bookmarked ?? false),
                 'userScore' => $pref->user_score ?? null,

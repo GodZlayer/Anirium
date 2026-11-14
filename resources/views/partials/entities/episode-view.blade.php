@@ -100,6 +100,8 @@
      data-work-id="{{ $work->id ?? '' }}"
      data-work-title="{{ $workTitle }}"
      data-work-media="{{ $isManga ? 'manga' : 'anime' }}"
+     data-work-format="{{ $format }}"
+     data-episode-count="{{ $totalEpisodes }}"
      data-mal-id="{{ $malId ?? '' }}"
      data-imdb-id="{{ $imdbId ?? '' }}"
      data-anilist-id="{{ $anilistId ?? '' }}"
