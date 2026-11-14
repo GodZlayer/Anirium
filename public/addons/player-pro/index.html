@@ -732,8 +732,28 @@
             windowController: null,
             isSeeking: false,
             idleTimer: null,
-            isCustomMedia: false
+            isCustomMedia: false,
+            episodeOffset: 0
         };
+
+        const episodeEpoch = Date.UTC(2000, 0, 1);
+        function episodeTimeFromProgramDate(date) {
+            if (!date) return null;
+            const pos = (date.getTime() - episodeEpoch) / 1000;
+            return Number.isFinite(pos) && pos >= 0 && pos <= 86400 ? pos : null;
+        }
+
+        function getEpisodeTime() {
+            if (state.isCustomMedia || !dom.video) return dom.video ? dom.video.currentTime || 0 : 0;
+            if (state.manifest?.continuousBuffer && state.hls?.playingDate) {
+                const programTime = episodeTimeFromProgramDate(state.hls.playingDate);
+                if (programTime !== null) {
+                    state.episodeOffset = programTime - dom.video.currentTime;
+                    return programTime;
+                }
+            }
+            return Math.max(0, (dom.video.currentTime || 0) + (state.episodeOffset || 0));
+        }
 
         const dom = {
             wrapper: document.getElementById('player-wrapper'),
@@ -903,21 +923,24 @@
         });
 
         dom.video.addEventListener('timeupdate', () => {
-            const ct = dom.video.currentTime || 0;
-            const dur = dom.video.duration || 0;
+            const ct = getEpisodeTime();
+            const dur = (state.manifest?.episodeDuration && state.manifest.episodeDuration > 0)
+                ? state.manifest.episodeDuration
+                : (dom.video.duration || 0);
+
             dom.timeCurrent.innerText = formatTime(ct);
             dom.timeTotal.innerText = formatTime(dur);
 
             if (dur > 0) {
-                const pct = (ct / dur) * 100;
+                const pct = Math.min(100, (ct / dur) * 100);
                 dom.timelineProgress.style.width = `${pct}%`;
                 dom.timelineThumb.style.left = `${pct}%`;
 
                 // Buffer do navegador
                 if (dom.video.buffered && dom.video.buffered.length > 0) {
                     for (let i = 0; i < dom.video.buffered.length; i++) {
-                        if (ct >= dom.video.buffered.start(i) && ct <= dom.video.buffered.end(i)) {
-                            const bufPct = (dom.video.buffered.end(i) / dur) * 100;
+                        if (dom.video.currentTime >= dom.video.buffered.start(i) && dom.video.currentTime <= dom.video.buffered.end(i)) {
+                            const bufPct = Math.min(100, ((dom.video.buffered.end(i) + (state.episodeOffset || 0)) / dur) * 100);
                             dom.timelineBuffer.style.width = `${bufPct}%`;
                             break;
                         }
@@ -925,7 +948,7 @@
                 }
             }
 
-            // Atualiza exibição de legendas
+            // Atualiza exibição de legendas usando o relógio real do episódio
             updateSubtitleCue(ct);
         });
 
@@ -989,16 +1012,21 @@
                 for (let i = 0; i < lines.length; i++) {
                     if (lines[i].includes('-->')) {
                         const timeParts = lines[i].split('-->');
-                        const start = parseTimestamp(timeParts[0]);
-                        const end = parseTimestamp(timeParts[1]);
-                        const cueLines = lines.slice(i + 1).filter(l => !l.startsWith('NOTE') && !l.startsWith('STYLE'));
-                        const cleanText = cueLines
-                            .join('\n')
-                            .replace(/<[^>]+>/g, '')
-                            .replace(/\{[^}]+\}/g, '')
-                            .trim();
-                        if (cleanText && end > start) {
-                            cues.push({ start, end, text: cleanText });
+                        if (timeParts.length >= 2) {
+                            // Pega timestamp final limpando configurações de alinhamento como "line:90% position:50%"
+                            const startStr = timeParts[0].trim();
+                            const endStr = timeParts[1].trim().split(/\s+/)[0];
+                            const start = parseTimestamp(startStr);
+                            const end = parseTimestamp(endStr);
+                            const cueLines = lines.slice(i + 1).filter(l => !l.startsWith('NOTE') && !l.startsWith('STYLE') && !l.startsWith('REGION'));
+                            const cleanText = cueLines
+                                .join('\n')
+                                .replace(/<[^>]+>/g, '')
+                                .replace(/\{[^}]+\}/g, '')
+                                .trim();
+                            if (cleanText && end > start) {
+                                cues.push({ start, end, text: cleanText });
+                            }
                         }
                         break;
                     }
@@ -1049,7 +1077,7 @@
                         const vttContent = await res.text();
                         if (state.selectedSubtitleTrackId === trackId) {
                             state.parsedSubtitleCues = parseVtt(vttContent);
-                            updateSubtitleCue(dom.video.currentTime || 0);
+                            updateSubtitleCue(getEpisodeTime());
                         }
                         break;
                     }
@@ -1121,12 +1149,12 @@
                 <div style="padding: 6px 10px; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;">
                     LEGENDAS SINCRONIZADAS
                 </div>
-                <button type="button" class="popover-item ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? 'active' : ''}" onclick="fetchSubtitleTrack('off')">
+                <button type="button" class="popover-item ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? 'active' : ''}" onclick="fetchSubtitleTrack('off'); closeAllPopovers();">
                     <span>Desativada</span>
                     ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? '<span>✓</span>' : ''}
                 </button>
                 ${subTracks.map((st, i) => `
-                    <button type="button" class="popover-item ${state.selectedSubtitleTrackId === st.id ? 'active' : ''}" onclick="fetchSubtitleTrack('${st.id}')">
+                    <button type="button" class="popover-item ${state.selectedSubtitleTrackId === st.id ? 'active' : ''}" onclick="fetchSubtitleTrack('${st.id}'); closeAllPopovers();">
                         <span>${st.title || langLabel(st.language)} #${i + 1}</span>
                         ${state.selectedSubtitleTrackId === st.id ? '<span>✓</span>' : ''}
                     </button>
