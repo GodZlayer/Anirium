@@ -2718,7 +2718,7 @@
             `;
         };
 
-        window.addEventListener('message', (event) => {
+        window.addEventListener('message', async (event) => {
             const msg = event.data;
             if (!msg || typeof msg !== 'object') return;
             if (msg.type === 'anirium:manga:step-chapter' && window.currentMangaContext) {
@@ -2726,6 +2726,28 @@
                 window.launchExternalMangaAddon(window.currentMangaContext.workId, nextChap, window.currentMangaContext.workTitle);
             } else if (msg.type === 'anirium:player:step-episode') {
                 window.stepPlayerProEpisode(Number(msg.delta) || 1);
+            } else if (msg.type === 'anirium:player:request-token-renewal') {
+                const deviceId = msg.deviceId || window.getValidDeviceId();
+                const playerSessionId = window.getValidPlayerSessionId();
+                try {
+                    const res = await fetch('/api/service/session', {
+                        cache: 'no-store',
+                        headers: {
+                            'Accept': 'application/json',
+                            'x-anirium-device': deviceId,
+                            'x-anirium-player-session': playerSessionId
+                        }
+                    });
+                    if (res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        if (data.token && event.source) {
+                            event.source.postMessage({
+                                type: 'anirium:core:token-renewed',
+                                token: data.token
+                            }, '*');
+                        }
+                    }
+                } catch (e) {}
             }
         });
 

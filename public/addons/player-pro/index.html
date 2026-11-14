@@ -733,7 +733,8 @@
             isSeeking: false,
             idleTimer: null,
             isCustomMedia: false,
-            episodeOffset: 0
+            episodeOffset: 0,
+            renewTimer: null
         };
 
         const episodeEpoch = Date.UTC(2000, 0, 1);
@@ -1054,12 +1055,13 @@
             const signal = subtitleAbortController.signal;
 
             // Resolve o ID atual da faixa diretamente do manifesto ativo
-            // Caso o ID tenha mudado de geração (ex: subtitle-6 -> subtitle-7), pega pelo idioma ou match
             let resolvedTrackId = trackId;
             if (state.manifest && Array.isArray(state.manifest.subtitleTracks)) {
                 const exact = state.manifest.subtitleTracks.find(t => t.id === trackId);
                 if (!exact) {
-                    const fallback = state.manifest.subtitleTracks[0];
+                    // Tenta encontrar por idioma equivalente (ex: pt, por, eng)
+                    const langMatch = state.manifest.subtitleTracks.find(t => (t.language && trackId.includes(t.language)) || (t.id && t.id.includes('por')));
+                    const fallback = langMatch || state.manifest.subtitleTracks[0];
                     if (fallback) {
                         resolvedTrackId = fallback.id;
                         state.selectedSubtitleTrackId = resolvedTrackId;
@@ -1067,15 +1069,17 @@
                 }
             }
 
+            console.info('[PlayerPro] Solicitando faixa de legenda:', resolvedTrackId);
             const url = `http://127.0.0.1:4004/subtitles?trackId=${encodeURIComponent(resolvedTrackId)}&playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
             
-            // Loop de Retry para 202 Accepted (estratégia oficial do anirium-service)
-            for (let attempt = 0; attempt < 25; attempt++) {
+            // Loop de Retry para 202 Accepted (anirium-service extraindo faixa)
+            for (let attempt = 0; attempt < 30; attempt++) {
                 if (signal.aborted) return;
                 try {
                     const res = await fetch(url, { signal });
                     if (res.status === 202) {
-                        const waitSec = parseInt(res.headers.get('Retry-After') || '2', 10) || 2;
+                        const delayHeader = parseInt(res.headers.get('Retry-After') || '2', 10);
+                        const waitSec = Number.isFinite(delayHeader) && delayHeader >= 1 && delayHeader <= 10 ? delayHeader : 2;
                         await new Promise((resolve, reject) => {
                             const timer = setTimeout(resolve, waitSec * 1000);
                             signal.addEventListener('abort', () => { clearTimeout(timer); reject(); }, { once: true });
@@ -1084,12 +1088,22 @@
                     }
                     if (res.status === 404) {
                         console.warn('[PlayerPro] Faixa de legenda não encontrada (404):', resolvedTrackId);
+                        // Se falhou 404 com trackId específico, tenta outra faixa disponível se houver
+                        if (state.manifest && Array.isArray(state.manifest.subtitleTracks)) {
+                            const alt = state.manifest.subtitleTracks.find(t => t.id !== resolvedTrackId);
+                            if (alt && attempt === 0) {
+                                resolvedTrackId = alt.id;
+                                state.selectedSubtitleTrackId = alt.id;
+                                continue;
+                            }
+                        }
                         break;
                     }
                     if (res.ok) {
                         const vttContent = await res.text();
                         if (state.selectedSubtitleTrackId === resolvedTrackId || state.selectedSubtitleTrackId === trackId) {
                             state.parsedSubtitleCues = parseVtt(vttContent);
+                            console.info(`[PlayerPro] Legenda carregada com sucesso (${state.parsedSubtitleCues.length} falas sincronizadas)`);
                             updateSubtitleCue(getEpisodeTime());
                         }
                         break;
@@ -1475,7 +1489,53 @@
 
                 await poll();
                 if (state.manifestTimer) clearInterval(state.manifestTimer);
-                state.manifestTimer = setInterval(poll, 2000);
+                state.manifestTimer = setInterval(poll, 2500);
+
+                // ==========================================
+                //  RENOVAÇÃO CONTÍNUA DE SESSÃO / TOKEN
+                // ==========================================
+                const renewSession = async () => {
+                    if (!state.playbackTicket || !state.deviceId) return;
+                    try {
+                        // Solicita ao parent (Core) uma renovação de token segura
+                        window.parent.postMessage({
+                            type: 'anirium:player:request-token-renewal',
+                            deviceId: state.deviceId
+                        }, '*');
+
+                        // Também tenta obter diretamente se estiver sob a mesma origem
+                        const sRes = await fetch('/api/service/session', {
+                            cache: 'no-store',
+                            headers: {
+                                'Accept': 'application/json',
+                                'x-anirium-device': state.deviceId
+                            }
+                        });
+                        if (sRes.ok) {
+                            const sData = await sRes.json().catch(() => ({}));
+                            if (sData.token && typeof sData.token === 'string') {
+                                state.token = sData.token;
+                                // Notifica o anirium-service da renovação do lease
+                                await fetch('http://127.0.0.1:4004/playback/renew', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        playbackTicket: state.playbackTicket,
+                                        token: state.token,
+                                        deviceId: state.deviceId
+                                    })
+                                }).catch(() => {});
+                                console.info('[PlayerPro] Sessão e token renovados com sucesso');
+                            }
+                        }
+                    } catch (e) {}
+                };
+
+                if (state.renewTimer) clearInterval(state.renewTimer);
+                state.renewTimer = setInterval(renewSession, 120000); // A cada 2 minutos
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') void renewSession();
+                });
 
             } catch (e) {
                 dom.badgeStatus.innerText = '● ERRO DE CONEXÃO 4004';
@@ -1523,6 +1583,9 @@
             if (msg.type === 'anirium:core:init-player') {
                 Object.assign(state, msg.payload || {});
                 initPlayer();
+            } else if (msg.type === 'anirium:core:token-renewed' && msg.token) {
+                state.token = msg.token;
+                console.info('[PlayerPro] Token renovado pelo Core');
             }
         });
 
