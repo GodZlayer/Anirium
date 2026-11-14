@@ -1038,14 +1038,25 @@
 
         let subtitleAbortController = null;
 
-        async function fetchSubtitleTrack(trackId) {
+        async function fetchSubtitleTrack(trackId, force = false) {
+            if (!trackId || trackId === 'off') {
+                state.selectedSubtitleTrackId = 'off';
+                state.parsedSubtitleCues = [];
+                dom.subtitleOverlay.style.display = 'none';
+                dom.subtitleText.innerText = '';
+                renderSubMenu();
+                return;
+            }
+
+            // Se já tem legendas carregadas para a mesma faixa/idioma e não foi forçado, não zera nem re-faz fetch
+            if (!force && state.selectedSubtitleTrackId === trackId && state.parsedSubtitleCues.length > 0) {
+                return;
+            }
+
             state.selectedSubtitleTrackId = trackId;
-            state.parsedSubtitleCues = [];
-            dom.subtitleOverlay.style.display = 'none';
-            dom.subtitleText.innerText = '';
             renderSubMenu();
 
-            if (!trackId || trackId === 'off' || !state.playbackTicket) return;
+            if (!state.playbackTicket) return;
 
             // Cancela requisições anteriores de legenda para evitar concorrência e 404s
             if (subtitleAbortController) {
@@ -1176,12 +1187,12 @@
                 <div style="padding: 6px 10px; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;">
                     LEGENDAS SINCRONIZADAS
                 </div>
-                <button type="button" class="popover-item ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? 'active' : ''}" onclick="fetchSubtitleTrack('off'); closeAllPopovers();">
+                <button type="button" class="popover-item ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? 'active' : ''}" onclick="fetchSubtitleTrack('off', true); closeAllPopovers();">
                     <span>Desativada</span>
                     ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? '<span>✓</span>' : ''}
                 </button>
                 ${subTracks.map((st, i) => `
-                    <button type="button" class="popover-item ${state.selectedSubtitleTrackId === st.id ? 'active' : ''}" onclick="fetchSubtitleTrack('${st.id}'); closeAllPopovers();">
+                    <button type="button" class="popover-item ${state.selectedSubtitleTrackId === st.id ? 'active' : ''}" onclick="fetchSubtitleTrack('${st.id}', true); closeAllPopovers();">
                         <span>${st.title || langLabel(st.language)} #${i + 1}</span>
                         ${state.selectedSubtitleTrackId === st.id ? '<span>✓</span>' : ''}
                     </button>
@@ -1312,10 +1323,11 @@
 
             state.subtitleTracks = Array.isArray(m.subtitleTracks) ? m.subtitleTracks : [];
             const activeTrackExists = state.subtitleTracks.some(t => t.id === state.selectedSubtitleTrackId);
-            if (!activeTrackExists && state.subtitleTracks.length > 0) {
+            // Só inicializa/busca legenda se ainda não tiver nenhuma legenda selecionada ou se não houver cues carregados
+            if (state.selectedSubtitleTrackId !== 'off' && (!state.selectedSubtitleTrackId || (!activeTrackExists && state.parsedSubtitleCues.length === 0)) && state.subtitleTracks.length > 0) {
                 const ptTrack = state.subtitleTracks.find(t => /por|pt/i.test(t.language || ''));
                 state.selectedSubtitleTrackId = (ptTrack || state.subtitleTracks[0]).id;
-                fetchSubtitleTrack(state.selectedSubtitleTrackId);
+                fetchSubtitleTrack(state.selectedSubtitleTrackId, false);
             }
 
             // Atualiza botões e popovers
@@ -1332,6 +1344,12 @@
             dom.teleRate.innerText = `⬇ ${rate}`;
 
             if (!state.selectedQuality) return;
+
+            // Se o vídeo já estiver ativo e reproduzindo sem erros, NÃO interrompe o playback
+            // durante o polling do manifesto, a menos que o usuário tenha forçado a troca (ex: clicou em outra qualidade)
+            if (!forceRequest && state.currentStreamUrl && dom.video && !dom.video.error) {
+                return;
+            }
 
             // Variante já pronta?
             const readyVariant = (Array.isArray(m.variants) ? m.variants : []).find(
@@ -1489,7 +1507,7 @@
 
                 await poll();
                 if (state.manifestTimer) clearInterval(state.manifestTimer);
-                state.manifestTimer = setInterval(poll, 2500);
+                state.manifestTimer = setInterval(poll, 4000);
 
                 // ==========================================
                 //  RENOVAÇÃO CONTÍNUA DE SESSÃO / TOKEN
