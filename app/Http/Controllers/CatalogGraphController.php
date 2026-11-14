@@ -1193,7 +1193,7 @@ class CatalogGraphController extends Controller
                     $viewData['currentArc'] = $currentArc;
                 }
 
-                return response()->view('partials.context-card', $viewData);
+                return response()->view('partials.entities.episode-view', $viewData);
             }
         }
 

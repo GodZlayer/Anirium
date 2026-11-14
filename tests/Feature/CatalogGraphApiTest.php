@@ -81,9 +81,10 @@ class CatalogGraphApiTest extends TestCase
         $this->work($workId, $workId);
         $this->visible([$workId => false]);
 
-        $this->get('/api/catalog/graph/episode/'.$workId.':ep:1?render=blade&adult=0&v=v6')
+        $this->get('/api/catalog/graph/episode/'.$workId.':ep:1?render=blade&adult=0&v=v8')
             ->assertOk()
-            ->assertSee('Episódio 1 — Fixture')
+            ->assertSee('UNIDADE #01')
+            ->assertSee('Raio-X do Episódio')
             ->assertSee("window.pushNavigation('episode', '".$workId.":ep:1'", false);
     }
 }
