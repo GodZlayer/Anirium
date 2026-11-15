@@ -11,6 +11,7 @@ use App\Support\CatalogPreferenceProjection;
 use App\Support\CatalogPreferenceReconciliation;
 use App\Support\CatalogUserCompletion;
 use App\Support\EntityContextAliases;
+use App\Support\EntityFanTierEvaluator;
 use App\Support\RemoteAddonReference;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -191,7 +192,7 @@ class TelemetryDeviceController extends Controller
                 $upBytes = max(0, min((int) ($payload['delta_uploaded_bytes'] ?? 0), 200 * 1024 * 1024)); // teto máx 200MB/min
                 $downBytes = max(0, min((int) ($payload['delta_downloaded_bytes'] ?? 0), 500 * 1024 * 1024));
                 $seedSec = max(0, min((int) ($payload['seeding_seconds'] ?? 60), 300));
-                
+
                 $uploadedBytesIncrement += $upBytes;
                 $downloadedBytesIncrement += $downBytes;
                 $seedingSecondsIncrement += $seedSec;
@@ -238,12 +239,12 @@ class TelemetryDeviceController extends Controller
                 $user->bytes_uploaded = (int) ($user->bytes_uploaded ?? 0) + $uploadedBytesIncrement;
                 $user->bytes_downloaded = (int) ($user->bytes_downloaded ?? 0) + $downloadedBytesIncrement;
                 $user->seeding_seconds = (int) ($user->seeding_seconds ?? 0) + $seedingSecondsIncrement;
-                
+
                 // 1 MB seeded = 1 XP | cada 60s seeding ativo = 2 XP
                 $mbSeededXp = (int) floor($uploadedBytesIncrement / (1024 * 1024));
                 $timeSeededXp = (int) floor($seedingSecondsIncrement / 30);
                 $newSeedingXp = $mbSeededXp + $timeSeededXp;
-                
+
                 if ($newSeedingXp > 0) {
                     $user->seeding_xp = (int) ($user->seeding_xp ?? 0) + $newSeedingXp;
                 }
@@ -396,7 +397,7 @@ class TelemetryDeviceController extends Controller
 
             $fanEvaluation = null;
             if ($workIdToEvaluate) {
-                $fanEvaluation = app(\App\Support\EntityFanTierEvaluator::class)->evaluateWork($user, (string) $workIdToEvaluate);
+                $fanEvaluation = app(EntityFanTierEvaluator::class)->evaluateWork($user, (string) $workIdToEvaluate);
             }
 
             return response()->json([
@@ -542,7 +543,7 @@ class TelemetryDeviceController extends Controller
         // Se o comentário for em uma obra, aciona a reavaliação de Fã da Obra
         $fanEvaluation = null;
         if ($targetType === 'work') {
-            $fanEvaluation = app(\App\Support\EntityFanTierEvaluator::class)->evaluateWork($user, (string) $targetId);
+            $fanEvaluation = app(EntityFanTierEvaluator::class)->evaluateWork($user, (string) $targetId);
         }
 
         return response()->json([

@@ -2,16 +2,16 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
 
 class UserAddonSeeder extends Seeder
 {
     public function run(): void
     {
         $user = User::where('email', 'santoss.cog@gmail.com')->first();
-        if (!$user) {
+        if (! $user) {
             return;
         }
 

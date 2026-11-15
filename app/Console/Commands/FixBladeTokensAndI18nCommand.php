@@ -7,14 +7,15 @@ use Illuminate\Console\Command;
 class FixBladeTokensAndI18nCommand extends Command
 {
     protected $signature = 'fix:blade-tokens';
+
     protected $description = 'Substitui todas as cores Tailwind fixas por classes de tokens semânticos e adiciona chaves i18n';
 
     public function handle(): int
     {
-        $this->info("1. Atualizando dicionários i18n com as chaves faltantes...");
+        $this->info('1. Atualizando dicionários i18n com as chaves faltantes...');
         $this->updateI18nDictionaries();
 
-        $this->info("2. Tokenizando views Blade...");
+        $this->info('2. Tokenizando views Blade...');
         $this->fixViews();
 
         return 0;
@@ -238,12 +239,14 @@ class FixBladeTokensAndI18nCommand extends Command
 
         foreach ($locales as $loc) {
             $path = public_path("i18n/{$loc}.json");
-            if (!file_exists($path)) continue;
+            if (! file_exists($path)) {
+                continue;
+            }
             $json = json_decode(file_get_contents($path), true);
             $json['strings'] = array_merge($json['strings'] ?? [], $newStrings[$loc] ?? $newStrings['en-US']);
             file_put_contents($path, json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
-        $this->info("   -> Dicionários i18n atualizados com sucesso.");
+        $this->info('   -> Dicionários i18n atualizados com sucesso.');
     }
 
     private function fixViews(): void
@@ -262,7 +265,9 @@ class FixBladeTokensAndI18nCommand extends Command
         ];
 
         foreach ($viewFiles as $file) {
-            if (!file_exists($file)) continue;
+            if (! file_exists($file)) {
+                continue;
+            }
             $content = file_get_contents($file);
 
             // Mapeamentos universais de cores fixas para tokens
@@ -341,26 +346,26 @@ class FixBladeTokensAndI18nCommand extends Command
             $content = str_replace('>Falha de conexão com o backend PHP.<', ' data-i18n="state.error_connection">Falha de conexão com o backend PHP.<', $content);
 
             // Injeção do processador de Google OAuth Hash (#id_token=...) em lobby.blade.php
-            if (basename($file) === 'lobby.blade.php' && !str_contains($content, 'handleGoogleOAuthHash')) {
+            if (basename($file) === 'lobby.blade.php' && ! str_contains($content, 'handleGoogleOAuthHash')) {
                 $targetTag = "@push('scripts')";
                 $oauthScript = "@push('scripts')\n    <script>\n        // PROCESSAMENTO DE AUTENTICACAO GOOGLE OAUTH (#id_token=...)\n        (function handleGoogleOAuthHash() {\n            if (typeof window === 'undefined') return;\n            const hash = window.location.hash;\n            if (hash && (hash.includes('id_token=') || hash.includes('access_token='))) {\n                const params = new URLSearchParams(hash.substring(1));\n                const idToken = params.get('id_token');\n                window.history.replaceState(null, '', window.location.pathname + window.location.search);\n\n                if (idToken) {\n                    fetch('/api/auth/google', {\n                        method: 'POST',\n                        headers: {\n                            'Content-Type': 'application/json',\n                            'Accept': 'application/json',\n                            'X-Requested-With': 'XMLHttpRequest',\n                            'X-CSRF-TOKEN': '{{ csrf_token() }}'\n                        },\n                        body: JSON.stringify({ credential: idToken })\n                    })\n                    .then(res => res.json())\n                    .then(data => {\n                        if (data && data.success) {\n                            window.location.reload();\n                        } else {\n                            console.error('[Anirium Auth] Falha na validacao do token Google:', data);\n                        }\n                    })\n                    .catch(err => {\n                        console.error('[Anirium Auth] Erro de rede ao autenticar com o Google:', err);\n                    });\n                }\n            }\n        })();\n    </script>";
                 $content = str_replace($targetTag, $oauthScript, $content);
             }
 
             // Injeção do Modal de 5 Abas de Perfil Canônico em lobby.blade.php
-            if (basename($file) === 'lobby.blade.php' && str_contains($content, 'id="modal-profile"') && !str_contains($content, '<x-modals.user-profile-modal')) {
-                $startStr = "<!-- 5. MODAL DE PERFIL / GOOGLE LOGIN (UserProfileModal Oficial) -->";
+            if (basename($file) === 'lobby.blade.php' && str_contains($content, 'id="modal-profile"') && ! str_contains($content, '<x-modals.user-profile-modal')) {
+                $startStr = '<!-- 5. MODAL DE PERFIL / GOOGLE LOGIN (UserProfileModal Oficial) -->';
                 $endStr = "@push('scripts')";
                 $p1 = strpos($content, $startStr);
                 $p2 = strpos($content, $endStr);
                 if ($p1 !== false && $p2 !== false) {
                     $sub = "<!-- 5. MODAL DE PERFIL CANÔNICO DE 5 ABAS -->\n    <x-modals.user-profile-modal :user=\"\$user\" :userPreferences=\"\$userPreferences ?? []\" />\n\n    ";
-                    $content = substr($content, 0, $p1) . $sub . substr($content, $p2);
+                    $content = substr($content, 0, $p1).$sub.substr($content, $p2);
                 }
             }
 
             // Injeção dos métodos das 5 abas de usuário e interações no lobby.blade.php
-            if (basename($file) === 'lobby.blade.php' && !str_contains($content, 'switchProfileTab')) {
+            if (basename($file) === 'lobby.blade.php' && ! str_contains($content, 'switchProfileTab')) {
                 $targetCode = 'window.openProfileModal = function() {';
                 $userMethods = <<<'JS'
         // 9. GERENCIAMENTO DAS 5 ABAS DO PERFIL CANÔNICO DO USUÁRIO
@@ -726,11 +731,11 @@ class FixBladeTokensAndI18nCommand extends Command
         };
 
 JS;
-                $content = str_replace($targetCode, $userMethods . "\n        " . $targetCode, $content);
+                $content = str_replace($targetCode, $userMethods."\n        ".$targetCode, $content);
             }
 
             file_put_contents($file, $content);
-            $this->info("   -> Processado: " . basename($file));
+            $this->info('   -> Processado: '.basename($file));
         }
     }
 }

@@ -139,7 +139,7 @@ return [
     */
 
     'serializable_classes' => [
-        \stdClass::class,
+        stdClass::class,
     ],
 
 ];

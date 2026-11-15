@@ -1,29 +1,33 @@
 <?php
 
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CatalogGraphController;
+use App\Http\Controllers\CatalogLibraryController;
+use App\Http\Controllers\CatalogPreviewController;
+use App\Http\Controllers\CatalogSearchController;
+use App\Http\Controllers\LobbyController;
+use App\Http\Controllers\ServiceSessionController;
+use App\Http\Controllers\TelemetryDeviceController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\TelemetryDeviceController;
-use App\Http\Controllers\ServiceSessionController;
-use Inertia\Inertia;
+Route::get('/', [LobbyController::class, 'index'])->name('lobby');
 
-Route::get('/', [\App\Http\Controllers\LobbyController::class, 'index'])->name('lobby');
-
-Route::get('/api/catalog/feed', [\App\Http\Controllers\CatalogSearchController::class, 'feed'])->middleware('throttle:300,1');
-Route::get('/api/account/library', \App\Http\Controllers\CatalogLibraryController::class)->middleware('throttle:300,1');
-Route::get('/api/catalog/search', \App\Http\Controllers\CatalogSearchController::class)->middleware('throttle:300,1');
-Route::get('/api/catalog/work/{reference}', [\App\Http\Controllers\CatalogSearchController::class, 'work'])->middleware('throttle:300,1');
-Route::get('/api/catalog/graph/work/{id}', [\App\Http\Controllers\CatalogGraphController::class, 'work'])->middleware('throttle:300,1');
-Route::get('/api/catalog/graph/episode/{id}', [\App\Http\Controllers\CatalogGraphController::class, 'episode'])->middleware('throttle:300,1');
-Route::get('/api/catalog/graph/arc/{id}', [\App\Http\Controllers\CatalogGraphController::class, 'arc'])->middleware('throttle:300,1');
-Route::get('/api/catalog/graph/universe/{id}', [\App\Http\Controllers\CatalogGraphController::class, 'universe'])->middleware('throttle:300,1');
-Route::get('/api/catalog/graph/creator/{id}', [\App\Http\Controllers\CatalogGraphController::class, 'creator'])->middleware('throttle:300,1');
-Route::get('/api/catalog/graph/studio/{id}', [\App\Http\Controllers\CatalogGraphController::class, 'studio'])->middleware('throttle:300,1');
-Route::get('/api/catalog/graph/track/{id}', [\App\Http\Controllers\CatalogGraphController::class, 'track'])->middleware('throttle:300,1');
-Route::get('/api/system/strings/{locale?}', [\App\Http\Controllers\CatalogGraphController::class, 'strings'])->middleware('throttle:300,1');
-Route::get('/api/system/theme/{name?}', [\App\Http\Controllers\CatalogGraphController::class, 'theme'])->middleware('throttle:300,1');
-Route::get('/api/catalog/context/{kind}/{id}', [\App\Http\Controllers\CatalogGraphController::class, 'context'])->whereIn('kind', ['universe', 'work', 'season', 'episode', 'arc', 'creator', 'track', 'studio'])->middleware('throttle:300,1');
-Route::prefix('/api/catalog/candidate')->controller(\App\Http\Controllers\CatalogPreviewController::class)->group(function () {
+Route::get('/api/catalog/feed', [CatalogSearchController::class, 'feed'])->middleware('throttle:300,1');
+Route::get('/api/account/library', CatalogLibraryController::class)->middleware('throttle:300,1');
+Route::get('/api/catalog/search', CatalogSearchController::class)->middleware('throttle:300,1');
+Route::get('/api/catalog/work/{reference}', [CatalogSearchController::class, 'work'])->middleware('throttle:300,1');
+Route::get('/api/catalog/graph/work/{id}', [CatalogGraphController::class, 'work'])->middleware('throttle:300,1');
+Route::get('/api/catalog/graph/episode/{id}', [CatalogGraphController::class, 'episode'])->middleware('throttle:300,1');
+Route::get('/api/catalog/graph/arc/{id}', [CatalogGraphController::class, 'arc'])->middleware('throttle:300,1');
+Route::get('/api/catalog/graph/universe/{id}', [CatalogGraphController::class, 'universe'])->middleware('throttle:300,1');
+Route::get('/api/catalog/graph/creator/{id}', [CatalogGraphController::class, 'creator'])->middleware('throttle:300,1');
+Route::get('/api/catalog/graph/studio/{id}', [CatalogGraphController::class, 'studio'])->middleware('throttle:300,1');
+Route::get('/api/catalog/graph/track/{id}', [CatalogGraphController::class, 'track'])->middleware('throttle:300,1');
+Route::get('/api/system/strings/{locale?}', [CatalogGraphController::class, 'strings'])->middleware('throttle:300,1');
+Route::get('/api/system/theme/{name?}', [CatalogGraphController::class, 'theme'])->middleware('throttle:300,1');
+Route::get('/api/catalog/context/{kind}/{id}', [CatalogGraphController::class, 'context'])->whereIn('kind', ['universe', 'work', 'season', 'episode', 'arc', 'creator', 'track', 'studio'])->middleware('throttle:300,1');
+Route::prefix('/api/catalog/candidate')->controller(CatalogPreviewController::class)->group(function () {
     Route::get('/feed', 'feed');
     Route::get('/search', 'search');
     Route::get('/work/{reference}', 'work');
@@ -33,11 +37,12 @@ Route::prefix('/api/catalog/candidate')->controller(\App\Http\Controllers\Catalo
 });
 
 // Qualquer acesso direto a /view/:type/:id redireciona imediatamente para / mantendo a barra de endereÃ§o limpa e oculta
-Route::get('/view/{type}/{id}', function (\Illuminate\Http\Request $request, string $type, string $id) {
+Route::get('/view/{type}/{id}', function (Request $request, string $type, string $id) {
     $request->session()->put('initial_context', [
         'type' => $type,
         'id' => $id,
     ]);
+
     return redirect('/');
 })->name('context.view');
 
@@ -71,6 +76,7 @@ Route::get('/download/service', function () {
     if (file_exists($path)) {
         return response()->download($path, 'anirium-service.exe');
     }
+
     return response()->json(['error' => 'not_found'], 404);
 })->name('service.download');
 

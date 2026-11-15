@@ -43,7 +43,7 @@ return [
             'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
             'transaction_mode' => 'DEFERRED',
             'options' => [
-                \PDO::ATTR_PERSISTENT => false,
+                PDO::ATTR_PERSISTENT => false,
             ],
         ],
 

@@ -15,7 +15,7 @@ class AccountExperience
             ->selectRaw('count(distinct case when p.liked=1 then p.entity_id end) as likes, count(distinct case when p.bookmarked=1 then p.entity_id end) as bookmarks, count(distinct case when p.user_score>0 then p.entity_id end) as ratings')->first();
         $comments = DB::table('entity_discussions as d')->join('catalog_entities as e', 'e.id', '=', 'd.entity_id')
             ->where('d.user_id', $user->id)->whereColumn('d.target_type', 'e.kind')->where('e.resolution_status', 'verified')->distinct()->count('d.entity_id');
-        $total = max(0, (int) $user->active_minutes) * $rules['presence']['minute'] 
+        $total = max(0, (int) $user->active_minutes) * $rules['presence']['minute']
             + max(0, (int) $user->streak_xp)
             + max(0, (int) ($user->seeding_xp ?? 0));
         $total += $social->likes * $rules['social']['like'] + $social->bookmarks * $rules['social']['bookmark']

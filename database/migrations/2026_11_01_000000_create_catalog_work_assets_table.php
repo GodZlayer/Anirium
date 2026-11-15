@@ -12,7 +12,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('catalog_work_assets')) {
+        if (! Schema::hasTable('catalog_work_assets')) {
             Schema::create('catalog_work_assets', function (Blueprint $table) {
                 $table->uuid('work_id')->primary();
                 $table->text('image_url')->nullable();

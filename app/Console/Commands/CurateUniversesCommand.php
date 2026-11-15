@@ -28,15 +28,15 @@ class CurateUniversesCommand extends Command
         }
         $validAnimeIds = array_keys($works);
         $validAnimeSet = array_flip($validAnimeIds);
-        $this->info("Total de Animes oficiais carregados: " . count($works));
+        $this->info('Total de Animes oficiais carregados: '.count($works));
 
         // 2. Carregar relações canônicas
         $this->line('2. Carregando relações canônicas...');
         $canonicalRelations = [
             'sequel', 'prequel', 'parent', 'parent_story', 'full_story',
-            'side_story', 'spin_off', 'alternative_version', 'alternative_setting', 'compilation', 'summary'
+            'side_story', 'spin_off', 'alternative_version', 'alternative_setting', 'compilation', 'summary',
         ];
-        $inClause = "'" . implode("','", $canonicalRelations) . "'";
+        $inClause = "'".implode("','", $canonicalRelations)."'";
         $stmtRel = $pdo->query("SELECT from_work_id, to_work_id FROM catalog_work_relations WHERE from_work_id IS NOT NULL AND to_work_id IS NOT NULL AND relation_type IN ($inClause)");
 
         $adj = [];
@@ -51,7 +51,7 @@ class CurateUniversesCommand extends Command
             }
         }
         $this->info("Relações canônicas ativas entre animes: {$edgeCount}");
-        $this->info("Animes conectados a outros animes: " . count($adj));
+        $this->info('Animes conectados a outros animes: '.count($adj));
 
         // 3. Agrupamento por Grafo (BFS)
         $this->line('3. Agrupando universos conexos...');
@@ -66,12 +66,12 @@ class CurateUniversesCommand extends Command
             $queue = [$node];
             $visited[$node] = true;
 
-            while (!empty($queue)) {
+            while (! empty($queue)) {
                 $curr = array_shift($queue);
                 $cluster[] = $curr;
                 if (isset($adj[$curr])) {
                     foreach ($adj[$curr] as $neighbor) {
-                        if (!isset($visited[$neighbor])) {
+                        if (! isset($visited[$neighbor])) {
                             $visited[$neighbor] = true;
                             $queue[] = $neighbor;
                         }
@@ -85,7 +85,7 @@ class CurateUniversesCommand extends Command
         }
 
         // Ordenar universos pelo número de obras
-        usort($universes, fn($a, $b) => count($b) <=> count($a));
+        usort($universes, fn ($a, $b) => count($b) <=> count($a));
         $totalUniverses = count($universes);
         $totalClusteredWorks = array_sum(array_map('count', $universes));
 
@@ -94,6 +94,7 @@ class CurateUniversesCommand extends Command
 
         if ($dryRun) {
             $this->warn('Modo --dry-run: Nenhuma alteração foi persistida no banco.');
+
             return self::SUCCESS;
         }
 
@@ -103,22 +104,22 @@ class CurateUniversesCommand extends Command
         $pdo->beginTransaction();
         try {
             // Desativar foreign keys temporariamente para truncar universos com velocidade
-            $pdo->exec("PRAGMA foreign_keys = OFF");
+            $pdo->exec('PRAGMA foreign_keys = OFF');
 
             $this->line('   -> Limpando catalog_universe_works...');
-            $pdo->exec("DELETE FROM catalog_universe_works");
+            $pdo->exec('DELETE FROM catalog_universe_works');
 
             $this->line('   -> Limpando catalog_universes antigas...');
-            $pdo->exec("DELETE FROM catalog_universes");
+            $pdo->exec('DELETE FROM catalog_universes');
 
             $this->line('   -> Limpando entities órfãs do tipo universe...');
             $pdo->exec("DELETE FROM catalog_entities WHERE kind='universe'");
 
             $this->line('   -> Inserindo os universos canônicos consolidados...');
             $stmtInsertEntity = $pdo->prepare("INSERT INTO catalog_entities (id, kind, resolution_status, created_at, updated_at) VALUES (?, 'universe', 'verified', datetime('now'), datetime('now'))");
-            $stmtInsertUniverse = $pdo->prepare("INSERT INTO catalog_universes (id) VALUES (?)");
+            $stmtInsertUniverse = $pdo->prepare('INSERT INTO catalog_universes (id) VALUES (?)');
             $stmtInsertTitle = $pdo->prepare("INSERT OR REPLACE INTO catalog_entity_titles (entity_id, locale, title) VALUES (?, 'pt', ?)");
-            $stmtInsertWorkUniverse = $pdo->prepare("INSERT INTO catalog_universe_works (universe_id, work_id) VALUES (?, ?)");
+            $stmtInsertWorkUniverse = $pdo->prepare('INSERT INTO catalog_universe_works (universe_id, work_id) VALUES (?, ?)');
 
             $bar = $this->output->createProgressBar($totalUniverses);
             $bar->start();
@@ -135,7 +136,7 @@ class CurateUniversesCommand extends Command
                         $anchorWork = $workData;
                     }
                 }
-                if (!$anchorWork) {
+                if (! $anchorWork) {
                     $anchorWork = $works[$cluster[0]];
                 }
 
@@ -158,17 +159,18 @@ class CurateUniversesCommand extends Command
             $bar->finish();
             $this->newLine();
 
-            $pdo->exec("PRAGMA foreign_keys = ON");
+            $pdo->exec('PRAGMA foreign_keys = ON');
             $pdo->commit();
 
-            $this->info("Curadoria concluída com sucesso!");
+            $this->info('Curadoria concluída com sucesso!');
             $this->info("Banco de dados agora possui {$totalUniverses} universos canônicos puros.");
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
             $pdo->rollBack();
-            $pdo->exec("PRAGMA foreign_keys = ON");
-            $this->error("Erro durante a curadoria: " . $e->getMessage());
+            $pdo->exec('PRAGMA foreign_keys = ON');
+            $this->error('Erro durante a curadoria: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

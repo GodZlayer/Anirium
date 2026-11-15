@@ -58,8 +58,10 @@ class EntityFanTierEvaluator
         $releasedEpisodes = $episodes->filter(function ($ep) use ($work, $now) {
             if ($ep->air_date_utc !== null) {
                 $t = strtotime($ep->air_date_utc);
+
                 return $t !== false && $t <= $now;
             }
+
             return $work->status === 'FINISHED';
         });
 
@@ -114,7 +116,7 @@ class EntityFanTierEvaluator
 
         $dynamicTitle = null;
         if ($eligibleTier > 0) {
-            $dynamicTitle = self::TIER_REWARDS[$eligibleTier]['suffix'] . ' de ' . $workTitle;
+            $dynamicTitle = self::TIER_REWARDS[$eligibleTier]['suffix'].' de '.$workTitle;
         }
 
         // 4. Concessão de XP Imutável (Apenas 1 vez por marco histórico)

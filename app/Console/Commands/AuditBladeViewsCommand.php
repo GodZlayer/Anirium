@@ -9,6 +9,7 @@ use RecursiveIteratorIterator;
 class AuditBladeViewsCommand extends Command
 {
     protected $signature = 'audit:blade-views';
+
     protected $description = 'Audita todas as views Blade para detectar cores hardcoded e textos sem data-i18n';
 
     public function handle(): int
@@ -23,7 +24,7 @@ class AuditBladeViewsCommand extends Command
             }
         }
 
-        $this->info("Auditando " . count($bladeFiles) . " arquivos Blade...");
+        $this->info('Auditando '.count($bladeFiles).' arquivos Blade...');
 
         $totalColorIssues = 0;
         $totalTextIssues = 0;
@@ -49,15 +50,15 @@ class AuditBladeViewsCommand extends Command
             }
             $rawTexts = array_unique($rawTexts);
 
-            if (!empty($hardcodedColors) || !empty($rawTexts)) {
+            if (! empty($hardcodedColors) || ! empty($rawTexts)) {
                 $this->warn("\n[ARQUIVO] {$relPath}");
-                if (!empty($hardcodedColors)) {
+                if (! empty($hardcodedColors)) {
                     $totalColorIssues += count($hardcodedColors);
-                    $this->line("   🎨 Cores Tailwind fixas (" . count($hardcodedColors) . "): " . implode(', ', array_slice($hardcodedColors, 0, 8)));
+                    $this->line('   🎨 Cores Tailwind fixas ('.count($hardcodedColors).'): '.implode(', ', array_slice($hardcodedColors, 0, 8)));
                 }
-                if (!empty($rawTexts)) {
+                if (! empty($rawTexts)) {
                     $totalTextIssues += count($rawTexts);
-                    $this->line("   🔤 Textos sem data-i18n (" . count($rawTexts) . "): " . implode(' | ', array_slice($rawTexts, 0, 5)));
+                    $this->line('   🔤 Textos sem data-i18n ('.count($rawTexts).'): '.implode(' | ', array_slice($rawTexts, 0, 5)));
                 }
             }
         }

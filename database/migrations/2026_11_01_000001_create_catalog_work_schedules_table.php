@@ -12,7 +12,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('catalog_work_schedules')) {
+        if (! Schema::hasTable('catalog_work_schedules')) {
             Schema::create('catalog_work_schedules', function (Blueprint $table) {
                 $table->uuid('work_id')->primary();
                 $table->string('airing_day', 16)->index();

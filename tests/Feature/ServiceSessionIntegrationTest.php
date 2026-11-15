@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class ServiceSessionIntegrationTest extends TestCase
 {
@@ -97,7 +97,7 @@ class ServiceSessionIntegrationTest extends TestCase
         $validateResponse->assertStatus(200);
         $validateResponse->assertJson([
             'status' => 'authorized',
-            'accountId' => (string)$admin->id,
+            'accountId' => (string) $admin->id,
             'level' => 3,
             'playerSessionId' => $playerSessionId,
         ]);

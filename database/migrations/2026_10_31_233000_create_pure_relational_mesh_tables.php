@@ -19,7 +19,7 @@ return new class extends Migration
     public function up(): void
     {
         // 1. Papéis na Indústria (Roles)
-        if (!Schema::hasTable('catalog_roles')) {
+        if (! Schema::hasTable('catalog_roles')) {
             Schema::create('catalog_roles', function (Blueprint $table) {
                 $table->string('id', 64)->primary();
                 $table->string('token', 64)->unique();
@@ -27,7 +27,7 @@ return new class extends Migration
         }
 
         // 2. Criadores (Pessoas Físicas: Autores, Diretores, Músicos, Seiyuus)
-        if (!Schema::hasTable('catalog_creators')) {
+        if (! Schema::hasTable('catalog_creators')) {
             Schema::create('catalog_creators', function (Blueprint $table) {
                 $table->uuid('id')->primary();
                 $table->string('name');
@@ -38,7 +38,7 @@ return new class extends Migration
         }
 
         // 3. Estúdios de Produção / Animação
-        if (!Schema::hasTable('catalog_studios')) {
+        if (! Schema::hasTable('catalog_studios')) {
             Schema::create('catalog_studios', function (Blueprint $table) {
                 $table->uuid('id')->primary();
                 $table->string('name');
@@ -48,7 +48,7 @@ return new class extends Migration
         }
 
         // 4. Interseção Pura: Obra <-> Criador com Papel Específico
-        if (!Schema::hasTable('catalog_work_creators')) {
+        if (! Schema::hasTable('catalog_work_creators')) {
             Schema::create('catalog_work_creators', function (Blueprint $table) {
                 $table->uuid('work_id');
                 $table->uuid('creator_id');
@@ -60,7 +60,7 @@ return new class extends Migration
         }
 
         // 5. Interseção Pura: Obra <-> Estúdio
-        if (!Schema::hasTable('catalog_work_studios')) {
+        if (! Schema::hasTable('catalog_work_studios')) {
             Schema::create('catalog_work_studios', function (Blueprint $table) {
                 $table->uuid('work_id');
                 $table->uuid('studio_id');
@@ -70,7 +70,7 @@ return new class extends Migration
         }
 
         // 6. Trilhas Sonoras (BGM, Temas de Abertura / Encerramento, OST)
-        if (!Schema::hasTable('catalog_tracks')) {
+        if (! Schema::hasTable('catalog_tracks')) {
             Schema::create('catalog_tracks', function (Blueprint $table) {
                 $table->uuid('id')->primary();
                 $table->uuid('composer_id')->nullable();
@@ -83,7 +83,7 @@ return new class extends Migration
         }
 
         // 7. Interseção Pura: Obra / Episódio <-> Trilha Sonora
-        if (!Schema::hasTable('catalog_work_tracks')) {
+        if (! Schema::hasTable('catalog_work_tracks')) {
             Schema::create('catalog_work_tracks', function (Blueprint $table) {
                 $table->uuid('work_id');
                 $table->uuid('track_id');
@@ -95,7 +95,7 @@ return new class extends Migration
         }
 
         // 8. Tabela de Strings de Sistema (Zero Hardcode)
-        if (!Schema::hasTable('system_strings')) {
+        if (! Schema::hasTable('system_strings')) {
             Schema::create('system_strings', function (Blueprint $table) {
                 $table->string('token', 64)->primary();
                 $table->text('pt_br');
@@ -105,7 +105,7 @@ return new class extends Migration
         }
 
         // 9. Tabela de Temas de Sistema (Strings de Cores)
-        if (!Schema::hasTable('system_themes')) {
+        if (! Schema::hasTable('system_themes')) {
             Schema::create('system_themes', function (Blueprint $table) {
                 $table->string('token', 64)->primary();
                 $table->string('amoled', 32);
@@ -115,7 +115,7 @@ return new class extends Migration
         }
 
         // 10. Tabela de Traduções Relacionais (Títulos e Sinopses Localizadas)
-        if (!Schema::hasTable('catalog_translations')) {
+        if (! Schema::hasTable('catalog_translations')) {
             Schema::create('catalog_translations', function (Blueprint $table) {
                 $table->string('entity_id', 36);
                 $table->string('entity_kind', 32)->default('work');

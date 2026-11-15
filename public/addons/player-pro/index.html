@@ -1321,8 +1321,13 @@
             // Se ainda não aplicou o tempo de retomada e o player já começou a rodar
             if (!state.hasResumed && state.initialResumeTime > 2) {
                 state.hasResumed = true;
-                console.info('[PlayerPro] Aplicando retomada exata na inicialização do stream:', state.initialResumeTime, 's');
-                seekTo(state.initialResumeTime);
+                const durVal = (state.manifest?.episodeDuration && state.manifest.episodeDuration > 0)
+                    ? state.manifest.episodeDuration
+                    : (dom.video.duration || 0);
+                if (durVal > 0 && state.initialResumeTime < durVal - 10) {
+                    console.info('[PlayerPro] Aplicando retomada exata na inicialização do stream:', state.initialResumeTime, 's');
+                    seekTo(state.initialResumeTime);
+                }
             }
 
             dom.timeCurrent.innerText = formatTime(ct);
@@ -1969,7 +1974,13 @@
                     }
                     const ctrl = new AbortController();
                     state.windowController = ctrl;
-                    const pos = (dom.video && Number.isFinite(dom.video.currentTime) && dom.video.currentTime > 0) ? Math.floor(dom.video.currentTime) : 0;
+                    const pos = (!state.hasResumed && state.initialResumeTime > 2)
+                        ? state.initialResumeTime
+                        : ((dom.video && Number.isFinite(dom.video.currentTime) && dom.video.currentTime > 0) ? Math.floor(dom.video.currentTime) : 0);
+                    if (!state.hasResumed && state.initialResumeTime > 2) {
+                        state.hasResumed = true;
+                        console.info('[PlayerPro] Solicitando primeiro trecho de vídeo já no tempo de retomada:', pos, 's');
+                    }
 
                     const res = await fetch(`http://127.0.0.1:4004/playback/session?playbackTicket=${encodeURIComponent(state.playbackTicket)}`, {
                         method: 'POST',

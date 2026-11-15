@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
 use App\Models\User;
+use App\Support\CatalogGraphImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Tests\TestCase;
 
 class FiftyEpisodesExhaustivePlaybackTest extends TestCase
 {
@@ -31,9 +33,9 @@ class FiftyEpisodesExhaustivePlaybackTest extends TestCase
             2740 => ['title' => 'Monkey Turn', 'eps' => 10],
         ];
 
-        $importer = app(\App\Support\CatalogGraphImporter::class);
+        $importer = app(CatalogGraphImporter::class);
         foreach ($worksToSeed as $malId => $info) {
-            $workUuid = (string) \Illuminate\Support\Str::uuid();
+            $workUuid = (string) Str::uuid();
             $episodesPayload = [];
             for ($ep = 1; $ep <= $info['eps']; $ep++) {
                 $episodesPayload[] = [
@@ -122,7 +124,7 @@ class FiftyEpisodesExhaustivePlaybackTest extends TestCase
             $testEpisodes[] = ['work_id' => 2740, 'work_title' => 'Monkey Turn', 'ep_num' => $i];
         }
 
-        $this->assertCount(50, $testEpisodes, "O conjunto de testes deve conter exatamente 50 episódios distintos.");
+        $this->assertCount(50, $testEpisodes, 'O conjunto de testes deve conter exatamente 50 episódios distintos.');
 
         $deviceId = 'machine-fingerprint-santoss-rig';
         $testedCount = 0;
@@ -132,7 +134,7 @@ class FiftyEpisodesExhaustivePlaybackTest extends TestCase
             $workId = $item['work_id'];
             $epNum = $item['ep_num'];
             $targetEntityId = "episode:{$workId}:ep-{$epNum}";
-            $playerSessionId = "player-session-{$workId}-ep-{$epNum}-" . md5(uniqid('', true));
+            $playerSessionId = "player-session-{$workId}-ep-{$epNum}-".md5(uniqid('', true));
 
             // PASSO 1: Acesso à rota canônica do episódio
             $routeResponse = $this->actingAs($admin)->get("/view/episode/{$workId}:ep-{$epNum}");
@@ -159,7 +161,7 @@ class FiftyEpisodesExhaustivePlaybackTest extends TestCase
             $validateResponse->assertStatus(200);
             $validateResponse->assertJson([
                 'status' => 'authorized',
-                'accountId' => (string)$admin->id,
+                'accountId' => (string) $admin->id,
                 'level' => 3,
                 'playerSessionId' => $playerSessionId,
             ]);
@@ -219,7 +221,7 @@ class FiftyEpisodesExhaustivePlaybackTest extends TestCase
             $testedCount++;
         }
 
-        $this->assertEquals(50, $testedCount, "Todos os 50 episódios devem ter passado por todas as 7 etapas.");
+        $this->assertEquals(50, $testedCount, 'Todos os 50 episódios devem ter passado por todas as 7 etapas.');
 
         // Verificação final no banco de dados
         $completedCount = DB::table('user_entity_preferences')
@@ -227,15 +229,15 @@ class FiftyEpisodesExhaustivePlaybackTest extends TestCase
             ->where('target_type', 'episode')
             ->where('status', 'completed')
             ->count();
-        $this->assertEquals(50, $completedCount, "Exatamente 50 episódios devem estar registrados como concluídos.");
+        $this->assertEquals(50, $completedCount, 'Exatamente 50 episódios devem estar registrados como concluídos.');
 
         $commentsCount = DB::table('entity_discussions')
             ->where('user_id', $admin->id)
             ->where('target_type', 'episode')
             ->count();
-        $this->assertEquals(50, $commentsCount, "Exatamente 50 comentários devem ter sido criados.");
+        $this->assertEquals(50, $commentsCount, 'Exatamente 50 comentários devem ter sido criados.');
 
         $admin->refresh();
-        $this->assertGreaterThanOrEqual(50, (int)$admin->active_minutes, "A contagem de minutos ativos deve ter sido incrementada.");
+        $this->assertGreaterThanOrEqual(50, (int) $admin->active_minutes, 'A contagem de minutos ativos deve ter sido incrementada.');
     }
 }

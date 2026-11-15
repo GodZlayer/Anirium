@@ -2645,8 +2645,17 @@
             } catch (err) {}
 
             // Recupera o progresso salvo para retomada exata (Resume at Exact Instant)
-            const savedPref = window.userPreferences ? (window.userPreferences[resolvedEpId] || window.userPreferences[`episode:${resolvedEpId}`]) : null;
-            const resumeSeconds = savedPref && Number(savedPref.progress_seconds) > 0 ? Number(savedPref.progress_seconds) : 0;
+            // Checa por resolvedEpId (UUID ou workId:ep:N) e por chave normalizada workId:ep:N
+            const normalizedEpKey = `${workId}:ep:${cleanEpNum}`;
+            const localSavedSec = parseInt(localStorage.getItem(`anirium_resume_${normalizedEpKey}`) || (epId ? localStorage.getItem(`anirium_resume_${epId}`) : '0') || '0', 10);
+            const savedPref = window.userPreferences ? (
+                window.userPreferences[resolvedEpId] ||
+                window.userPreferences[normalizedEpKey] ||
+                window.userPreferences[`episode:${resolvedEpId}`] ||
+                (epId ? window.userPreferences[epId] : null)
+            ) : null;
+            const prefSec = savedPref && Number(savedPref.progress_seconds) > 0 ? Number(savedPref.progress_seconds) : 0;
+            const resumeSeconds = Math.max(localSavedSec, prefSec);
 
             // Prioriza servir o módulo Player Pro com a mesma origem canônica (https://anirium.com.br/addons/player-pro/)
             // para garantir conformidade imediata com o Go anirium-service (CORS/Private Network/trustedPlayerOrigin)
@@ -2745,7 +2754,19 @@
             } else if (msg.type === 'anirium:player:playback-progress') {
                 // Sincroniza posição exata de reprodução para retomada instantânea (Resume at Exact Instant)
                 const epId = msg.epId;
+                const workId = msg.workId;
+                const epNum = msg.episode;
                 const targetSec = Math.floor(Number(msg.currentTime) || 0);
+
+                if (targetSec >= 0) {
+                    if (workId && epNum) {
+                        localStorage.setItem(`anirium_resume_${workId}:ep:${epNum}`, String(targetSec));
+                    }
+                    if (epId) {
+                        localStorage.setItem(`anirium_resume_${epId}`, String(targetSec));
+                    }
+                }
+
                 if (epId && targetSec >= 0) {
                     if (!window.userPreferences) window.userPreferences = {};
                     if (!window.userPreferences[epId]) {
@@ -2753,6 +2774,14 @@
                     } else {
                         window.userPreferences[epId].progress_seconds = targetSec;
                         if (!window.userPreferences[epId].status) window.userPreferences[epId].status = 'watching';
+                    }
+                    if (workId && epNum) {
+                        const fallbackKey = `${workId}:ep:${epNum}`;
+                        if (!window.userPreferences[fallbackKey]) {
+                            window.userPreferences[fallbackKey] = { target_id: fallbackKey, target_type: 'episode', progress_seconds: targetSec, status: 'watching' };
+                        } else {
+                            window.userPreferences[fallbackKey].progress_seconds = targetSec;
+                        }
                     }
                     if (window.currentUser) {
                         try {
