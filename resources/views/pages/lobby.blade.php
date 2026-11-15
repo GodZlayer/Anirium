@@ -2596,11 +2596,11 @@
             const workFormat = stage?.getAttribute('data-work-format') || 'TV';
             const cleanTitle = String(workTitle || stage?.getAttribute('data-work-title') || 'Anime').trim();
 
-            // Detecta temporada no título (ex: "2nd Season", "Season 2", "Temporada 2", "S2")
+            // Detecta temporada no título (ex: "2nd Season", "Season 2", "Temporada 2", "S2", ou dígitos finais como "Da Wang Rao Ming 3")
             let resolvedSeason = 1;
-            const seasonMatch = cleanTitle.match(/(?:(\d+)(?:st|nd|rd|th)?\s+season)|(?:season\s+(\d+))|(?:temporada\s+(\d+))|(?:\bS(\d+)\b)/i);
+            const seasonMatch = cleanTitle.match(/(?:(\d+)(?:st|nd|rd|th)?\s+season)|(?:season\s+(\d+))|(?:temporada\s+(\d+))|(?:\bS(\d+)\b)|(?:\s+(\d+)\b$)/i);
             if (seasonMatch) {
-                resolvedSeason = parseInt(seasonMatch[1] || seasonMatch[2] || seasonMatch[3] || seasonMatch[4], 10) || 1;
+                resolvedSeason = parseInt(seasonMatch[1] || seasonMatch[2] || seasonMatch[3] || seasonMatch[4] || seasonMatch[5], 10) || 1;
             }
 
             window.currentPlayerProContext = {
