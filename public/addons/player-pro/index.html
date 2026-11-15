@@ -262,26 +262,27 @@
             right: 20px;
             display: flex;
             justify-content: center;
+            align-items: center;
             pointer-events: none;
             z-index: 35;
-            transition: bottom 0.25s ease;
+            transition: bottom 0.25s ease, top 0.25s ease;
         }
 
         #subtitle-text {
-            background: rgba(0, 0, 0, 0.82);
-            backdrop-filter: blur(8px);
+            background: transparent;
             color: #FFFFFF;
-            font-weight: 600;
+            font-weight: 700;
             text-align: center;
-            border-radius: 10px;
-            padding: 6px 18px;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            max-width: 820px;
+            border-radius: 8px;
+            padding: 4px 12px;
+            max-width: 86vw;
             white-space: pre-line;
-            line-height: 1.45;
-            font-size: 17px;
-            text-shadow: 0 2px 4px rgba(0,0,0,1), 0 0 2px rgba(0,0,0,0.8);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+            line-height: 1.35;
+            font-size: 19px;
+            font-family: var(--font-sans);
+            text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000, 0px 2px 0px #000, 0px -2px 0px #000, 2px 0px 0px #000, -2px 0px 0px #000, 0 3px 6px rgba(0,0,0,0.9);
+            box-sizing: border-box;
+            transition: all 0.15s ease;
         }
 
         /* Controles Inferiores Netflix-Style */
@@ -469,18 +470,18 @@
             position: absolute;
             bottom: calc(100% + 12px);
             right: 0;
-            background: rgba(14, 17, 24, 0.97);
+            background: rgba(14, 17, 24, 0.98);
             backdrop-filter: blur(16px);
             border: 1px solid var(--border);
             border-radius: 14px;
             padding: 8px;
-            min-width: 220px;
-            max-width: 320px;
-            max-height: 55vh;
+            min-width: 250px;
+            max-width: 360px;
+            max-height: 60vh;
             display: none;
             flex-direction: column;
             gap: 4px;
-            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85);
             z-index: 50;
             overflow: hidden;
         }
@@ -491,7 +492,7 @@
 
         .popover-scroll-area {
             overflow-y: auto;
-            max-height: calc(55vh - 45px);
+            max-height: calc(60vh - 45px);
             display: flex;
             flex-direction: column;
             gap: 2px;
@@ -664,6 +665,35 @@
             color: #6EE7B7;
         }
 
+        /* Feedback Visual Central de Toque/Atalho (Seek, Play/Pause) */
+        .action-feedback-ripple {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(22, 27, 38, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+            font-size: 13px;
+            font-weight: 800;
+            pointer-events: none;
+            z-index: 40;
+            opacity: 0;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .action-feedback-ripple.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.08);
+        }
+
         /* Auto-Hide de Controles */
         .hide-controls .player-header,
         .hide-controls .player-controls,
@@ -707,6 +737,19 @@
                 <button type="button" id="btn-next-ep" class="btn-ep-step mono" onclick="stepEpisode(1)">Próximo Ep. ❯</button>
             </div>
         </header>
+
+        <!-- Feedback Visual Central de Ações (Pause, Play, +-10s) -->
+        <div id="feedback-left" class="action-feedback-ripple" style="left: 20%;">
+            <span>❮❮</span>
+            <span>-10s</span>
+        </div>
+        <div id="feedback-center" class="action-feedback-ripple" style="left: 50%;">
+            <span id="feedback-center-icon">▶</span>
+        </div>
+        <div id="feedback-right" class="action-feedback-ripple" style="left: 80%;">
+            <span>❯❯</span>
+            <span>+10s</span>
+        </div>
 
         <!-- Overlay Central de Inicialização / Arquivo Local -->
         <div id="central-overlay">
@@ -874,9 +917,12 @@
 
         const savedSubSettings = JSON.parse(localStorage.getItem('anirium_sub_settings') || '{}');
         const subConfig = {
-            fontSize: savedSubSettings.fontSize || 'medium', // small (15px), medium (18px), large (22px)
+            fontSize: parseInt(savedSubSettings.fontSize, 10) || 19, // Tamanho em px ajustável finamente (+ / -)
             color: savedSubSettings.color || '#FFFFFF',
-            bgColor: savedSubSettings.bgColor || 'rgba(0, 0, 0, 0.82)'
+            borderStyle: savedSubSettings.borderStyle || 'outline', // 'none', 'outline', 'glow'
+            borderColor: savedSubSettings.borderColor || '#000000',
+            bgStyle: savedSubSettings.bgStyle || 'none', // 'none', 'semi', 'box', 'bar'
+            bgColor: savedSubSettings.bgColor || '#000000'
         };
 
         function saveSubConfig() {
@@ -885,20 +931,70 @@
         }
 
         function applySubStyles() {
-            const fontMap = {
-                small: '14px',
-                medium: '18px',
-                large: '23px'
-            };
-            if (dom.subtitleText) {
-                dom.subtitleText.style.fontSize = fontMap[subConfig.fontSize] || '18px';
-                dom.subtitleText.style.color = subConfig.color;
-                dom.subtitleText.style.background = subConfig.bgColor;
+            if (!dom.subtitleText) return;
+            const size = Math.max(12, Math.min(42, subConfig.fontSize));
+            dom.subtitleText.style.fontSize = `${size}px`;
+            dom.subtitleText.style.color = subConfig.color;
+
+            // Borda / Sombra de Contorno
+            const bCol = subConfig.borderColor || '#000000';
+            if (subConfig.borderStyle === 'outline') {
+                dom.subtitleText.style.textShadow = `2px 2px 0px ${bCol}, -2px -2px 0px ${bCol}, 2px -2px 0px ${bCol}, -2px 2px 0px ${bCol}, 0px 2px 0px ${bCol}, 0px -2px 0px ${bCol}, 2px 0px 0px ${bCol}, -2px 0px 0px ${bCol}, 0 3px 6px rgba(0,0,0,0.8)`;
+            } else if (subConfig.borderStyle === 'glow') {
+                dom.subtitleText.style.textShadow = `0 0 8px ${bCol}, 0 0 12px ${bCol}, 0 2px 4px rgba(0,0,0,0.9)`;
+            } else {
+                dom.subtitleText.style.textShadow = 'none';
             }
+
+            // Fundo
+            const baseBg = subConfig.bgColor || '#000000';
+            let finalBg = 'transparent';
+            let backdrop = 'none';
+            let pad = '2px 8px';
+            let rad = '6px';
+            let borderLine = 'none';
+
+            if (subConfig.bgStyle === 'semi') {
+                finalBg = hexToRgba(baseBg, 0.55);
+                backdrop = 'blur(6px)';
+                pad = '4px 14px';
+                borderLine = '1px solid rgba(255, 255, 255, 0.12)';
+            } else if (subConfig.bgStyle === 'box') {
+                finalBg = hexToRgba(baseBg, 0.92);
+                backdrop = 'none';
+                pad = '5px 16px';
+                borderLine = `1px solid ${hexToRgba(bCol, 0.4)}`;
+            } else if (subConfig.bgStyle === 'bar') {
+                finalBg = hexToRgba(baseBg, 0.85);
+                backdrop = 'none';
+                pad = '6px 22px';
+                rad = '0px';
+                borderLine = 'none';
+            }
+
+            dom.subtitleText.style.background = finalBg;
+            dom.subtitleText.style.backdropFilter = backdrop;
+            dom.subtitleText.style.webkitBackdropFilter = backdrop;
+            dom.subtitleText.style.padding = pad;
+            dom.subtitleText.style.borderRadius = rad;
+            dom.subtitleText.style.border = borderLine;
         }
 
-        function setSubFontSize(sz) {
-            subConfig.fontSize = sz;
+        function hexToRgba(hex, alpha = 1) {
+            if (!hex || hex === 'transparent') return 'transparent';
+            if (hex.startsWith('rgba') || hex.startsWith('rgb')) return hex;
+            let c = hex.replace('#', '');
+            if (c.length === 3) c = c.split('').map(x => x + x).join('');
+            const num = parseInt(c, 16);
+            if (isNaN(num)) return hex;
+            const r = (num >> 16) & 255;
+            const g = (num >> 8) & 255;
+            const b = num & 255;
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function adjustSubFontSize(delta) {
+            subConfig.fontSize = Math.max(12, Math.min(42, (subConfig.fontSize || 19) + delta));
             saveSubConfig();
             renderSubMenu();
         }
@@ -909,8 +1005,26 @@
             renderSubMenu();
         }
 
-        function setSubBgColor(bg) {
-            subConfig.bgColor = bg;
+        function setSubBorderStyle(st) {
+            subConfig.borderStyle = st;
+            saveSubConfig();
+            renderSubMenu();
+        }
+
+        function setSubBorderColor(col) {
+            subConfig.borderColor = col;
+            saveSubConfig();
+            renderSubMenu();
+        }
+
+        function setSubBgStyle(st) {
+            subConfig.bgStyle = st;
+            saveSubConfig();
+            renderSubMenu();
+        }
+
+        function setSubBgColor(col) {
+            subConfig.bgColor = col;
             saveSubConfig();
             renderSubMenu();
         }
@@ -968,8 +1082,24 @@
             cardAudio: document.getElementById('card-audio'),
             cardSub: document.getElementById('card-sub'),
             iconFsEnter: document.getElementById('icon-fs-enter'),
-            iconFsExit: document.getElementById('icon-fs-exit')
+            iconFsExit: document.getElementById('icon-fs-exit'),
+            feedbackLeft: document.getElementById('feedback-left'),
+            feedbackCenter: document.getElementById('feedback-center'),
+            feedbackCenterIcon: document.getElementById('feedback-center-icon'),
+            feedbackRight: document.getElementById('feedback-right')
         };
+
+        function showActionFeedback(target, text = '') {
+            const el = target === 'left' ? dom.feedbackLeft : (target === 'right' ? dom.feedbackRight : dom.feedbackCenter);
+            if (!el) return;
+            if (target === 'center' && text && dom.feedbackCenterIcon) {
+                dom.feedbackCenterIcon.innerText = text;
+            }
+            el.classList.add('show');
+            setTimeout(() => {
+                el.classList.remove('show');
+            }, 550);
+        }
 
         function formatTime(sec) {
             if (!Number.isFinite(sec) || sec < 0) return '0:00';
@@ -1008,12 +1138,56 @@
         }
 
         dom.wrapper.addEventListener('mousemove', resetIdleTimer);
+        // Click & Double Click no corpo do Player (Play/Pause no centro, +-10s nas bordas)
+        let clickTimeout = null;
         dom.wrapper.addEventListener('click', (e) => {
             // Fecha popovers se clicou fora deles
             if (!e.target.closest('.popover-menu')) {
                 closeAllPopovers();
             }
             resetIdleTimer();
+
+            // Ignora cliques que atingiram barras de controles, cabeçalho, modais, popovers ou botões
+            if (e.target.closest('.player-controls, .player-header, .popover-card, #central-overlay, button, input')) {
+                return;
+            }
+
+            const rect = dom.wrapper.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const width = rect.width;
+            const xPercent = x / width;
+
+            if (clickTimeout) {
+                clearTimeout(clickTimeout);
+                clickTimeout = null;
+                // Double click detectado!
+                if (xPercent < 0.35) {
+                    seekRelative(-10);
+                    showActionFeedback('left', '❮❮ 10s');
+                } else if (xPercent > 0.65) {
+                    seekRelative(10);
+                    showActionFeedback('right', '10s ❯❯');
+                } else {
+                    toggleFullscreen();
+                }
+            } else {
+                clickTimeout = setTimeout(() => {
+                    clickTimeout = null;
+                    if (xPercent < 0.22) {
+                        // Clique rápido na ponta esquerda
+                        seekRelative(-10);
+                        showActionFeedback('left', '❮❮ 10s');
+                    } else if (xPercent > 0.78) {
+                        // Clique rápido na ponta direita
+                        seekRelative(10);
+                        showActionFeedback('right', '10s ❯❯');
+                    } else {
+                        // Clique no centro ou corpo principal do vídeo: Alterna Play/Pause
+                        togglePlay();
+                        showActionFeedback('center', dom.video.paused ? '❚❚' : '▶');
+                    }
+                }, 220);
+            }
         });
 
         function closeAllPopovers() {
@@ -1243,11 +1417,25 @@
                     if (lines[i].includes('-->')) {
                         const timeParts = lines[i].split('-->');
                         if (timeParts.length >= 2) {
-                            // Pega timestamp final limpando configurações de alinhamento como "line:90% position:50%"
                             const startStr = timeParts[0].trim();
-                            const endStr = timeParts[1].trim().split(/\s+/)[0];
+                            const rawEndWithSettings = timeParts[1].trim();
+                            const endTokens = rawEndWithSettings.split(/\s+/);
+                            const endStr = endTokens[0];
                             const start = parseTimestamp(startStr);
                             const end = parseTimestamp(endStr);
+
+                            // Detecta posicionamento de alinhamento embutido (ex: line:10%, line:0, position:20%, align:start)
+                            let lineSetting = null;
+                            let alignSetting = 'center';
+                            for (let sIdx = 1; sIdx < endTokens.length; sIdx++) {
+                                const token = endTokens[sIdx];
+                                if (token.startsWith('line:')) {
+                                    lineSetting = token.replace('line:', '');
+                                } else if (token.startsWith('align:')) {
+                                    alignSetting = token.replace('align:', '');
+                                }
+                            }
+
                             const cueLines = lines.slice(i + 1).filter(l => !l.startsWith('NOTE') && !l.startsWith('STYLE') && !l.startsWith('REGION'));
                             const cleanText = cueLines
                                 .join('\n')
@@ -1255,7 +1443,7 @@
                                 .replace(/\{[^}]+\}/g, '')
                                 .trim();
                             if (cleanText && end > start) {
-                                cues.push({ start, end, text: cleanText });
+                                cues.push({ start, end, text: cleanText, line: lineSetting, align: alignSetting });
                             }
                         }
                         break;
@@ -1396,6 +1584,33 @@
                 if (dom.subtitleText.innerText !== text) {
                     dom.subtitleText.innerText = text;
                 }
+
+                // Posicionamento inteligente baseado em tags WebVTT embutidas no cue
+                const topCue = activeCues[0];
+                if (topCue && topCue.line !== null) {
+                    const lineVal = parseFloat(topCue.line);
+                    if (!isNaN(lineVal)) {
+                        if (lineVal <= 20 || topCue.line.startsWith('0') || topCue.line.startsWith('10%') || topCue.line.startsWith('15%')) {
+                            // Legenda de topo (ex: títulos/aberturas ou falas no topo)
+                            dom.subtitleOverlay.style.bottom = 'auto';
+                            dom.subtitleOverlay.style.top = `${Math.max(40, lineVal)}px`;
+                        } else {
+                            dom.subtitleOverlay.style.top = 'auto';
+                            dom.subtitleOverlay.style.bottom = `${Math.max(40, lineVal)}px`;
+                        }
+                    }
+                } else {
+                    dom.subtitleOverlay.style.top = 'auto';
+                    dom.subtitleOverlay.style.bottom = dom.wrapper.classList.contains('hide-controls') ? '30px' : '84px';
+                }
+
+                // Alinhamento do texto
+                if (topCue && topCue.align) {
+                    dom.subtitleText.style.textAlign = topCue.align === 'start' || topCue.align === 'left' ? 'left' : (topCue.align === 'end' || topCue.align === 'right' ? 'right' : 'center');
+                } else {
+                    dom.subtitleText.style.textAlign = 'center';
+                }
+
                 dom.subtitleOverlay.style.display = 'flex';
                 if (Math.floor(currentTime) !== lastLoggedCueTime) {
                     lastLoggedCueTime = Math.floor(currentTime);
@@ -1511,10 +1726,10 @@
                 <div class="sub-config-box">
                     <div class="sub-config-row">
                         <span>Tamanho da Fonte:</span>
-                        <div class="sub-config-btn-group">
-                            <button type="button" class="sub-config-btn ${subConfig.fontSize === 'small' ? 'active' : ''}" onclick="setSubFontSize('small')">A-</button>
-                            <button type="button" class="sub-config-btn ${subConfig.fontSize === 'medium' ? 'active' : ''}" onclick="setSubFontSize('medium')">A</button>
-                            <button type="button" class="sub-config-btn ${subConfig.fontSize === 'large' ? 'active' : ''}" onclick="setSubFontSize('large')">A+</button>
+                        <div class="sub-config-btn-group" style="align-items: center;">
+                            <button type="button" class="sub-config-btn" onclick="adjustSubFontSize(-2)" title="Diminuir fonte">－</button>
+                            <span style="font-size: 11px; font-weight: 800; min-width: 34px; text-align: center; color: var(--accent);">${subConfig.fontSize || 19}px</span>
+                            <button type="button" class="sub-config-btn" onclick="adjustSubFontSize(2)" title="Aumentar fonte">＋</button>
                         </div>
                     </div>
                     <div class="sub-config-row">
@@ -1524,16 +1739,44 @@
                             <span class="sub-color-pill ${subConfig.color === '#FFC766' ? 'active' : ''}" style="background: #FFC766;" title="Amarelo / Dourado" onclick="setSubColor('#FFC766')"></span>
                             <span class="sub-color-pill ${subConfig.color === '#6EE7B7' ? 'active' : ''}" style="background: #6EE7B7;" title="Verde Esmeralda" onclick="setSubColor('#6EE7B7')"></span>
                             <span class="sub-color-pill ${subConfig.color === '#67E8F9' ? 'active' : ''}" style="background: #67E8F9;" title="Ciano" onclick="setSubColor('#67E8F9')"></span>
+                            <span class="sub-color-pill ${subConfig.color === '#F43F5E' ? 'active' : ''}" style="background: #F43F5E;" title="Rosa" onclick="setSubColor('#F43F5E')"></span>
+                        </div>
+                    </div>
+                    <div class="sub-config-row">
+                        <span>Estilo de Borda / Contorno:</span>
+                        <div class="sub-config-btn-group">
+                            <button type="button" class="sub-config-btn ${subConfig.borderStyle === 'outline' ? 'active' : ''}" onclick="setSubBorderStyle('outline')">Contorno</button>
+                            <button type="button" class="sub-config-btn ${subConfig.borderStyle === 'glow' ? 'active' : ''}" onclick="setSubBorderStyle('glow')">Brilho</button>
+                            <button type="button" class="sub-config-btn ${subConfig.borderStyle === 'none' ? 'active' : ''}" onclick="setSubBorderStyle('none')">Sem Borda</button>
+                        </div>
+                    </div>
+                    <div class="sub-config-row">
+                        <span>Cor da Borda:</span>
+                        <div class="sub-config-btn-group">
+                            <span class="sub-color-pill ${subConfig.borderColor === '#000000' ? 'active' : ''}" style="background: #000000;" title="Preto" onclick="setSubBorderColor('#000000')"></span>
+                            <span class="sub-color-pill ${subConfig.borderColor === '#1E293B' ? 'active' : ''}" style="background: #1E293B;" title="Grafite" onclick="setSubBorderColor('#1E293B')"></span>
+                            <span class="sub-color-pill ${subConfig.borderColor === '#FFC766' ? 'active' : ''}" style="background: #FFC766;" title="Dourado" onclick="setSubBorderColor('#FFC766')"></span>
+                            <span class="sub-color-pill ${subConfig.borderColor === '#3B82F6' ? 'active' : ''}" style="background: #3B82F6;" title="Azul" onclick="setSubBorderColor('#3B82F6')"></span>
                         </div>
                     </div>
                     <div class="sub-config-row">
                         <span>Fundo da Caixa:</span>
                         <div class="sub-config-btn-group">
-                            <button type="button" class="sub-config-btn ${subConfig.bgColor === 'transparent' ? 'active' : ''}" onclick="setSubBgColor('transparent')">Nenhum</button>
-                            <button type="button" class="sub-config-btn ${subConfig.bgColor === 'rgba(0, 0, 0, 0.5)' ? 'active' : ''}" onclick="setSubBgColor('rgba(0, 0, 0, 0.5)')">Médio</button>
-                            <button type="button" class="sub-config-btn ${subConfig.bgColor === 'rgba(0, 0, 0, 0.88)' ? 'active' : ''}" onclick="setSubBgColor('rgba(0, 0, 0, 0.88)')">Sólido</button>
+                            <button type="button" class="sub-config-btn ${subConfig.bgStyle === 'none' ? 'active' : ''}" onclick="setSubBgStyle('none')">Sem Fundo</button>
+                            <button type="button" class="sub-config-btn ${subConfig.bgStyle === 'semi' ? 'active' : ''}" onclick="setSubBgStyle('semi')">Translúcido</button>
+                            <button type="button" class="sub-config-btn ${subConfig.bgStyle === 'box' ? 'active' : ''}" onclick="setSubBgStyle('box')">Caixa</button>
                         </div>
                     </div>
+                    ${subConfig.bgStyle !== 'none' ? `
+                    <div class="sub-config-row">
+                        <span>Cor do Fundo:</span>
+                        <div class="sub-config-btn-group">
+                            <span class="sub-color-pill ${subConfig.bgColor === '#000000' ? 'active' : ''}" style="background: #000000;" title="Preto" onclick="setSubBgColor('#000000')"></span>
+                            <span class="sub-color-pill ${subConfig.bgColor === '#0F172A' ? 'active' : ''}" style="background: #0F172A;" title="Azul Profundo" onclick="setSubBgColor('#0F172A')"></span>
+                            <span class="sub-color-pill ${subConfig.bgColor === '#1E1B4B' ? 'active' : ''}" style="background: #1E1B4B;" title="Roxo Noturno" onclick="setSubBgColor('#1E1B4B')"></span>
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
             `;
         }
@@ -1981,22 +2224,58 @@
             }
         }
 
-        // Teclado (Atalhos Globais do Player)
+        // Teclado (Atalhos Avançados do Player Pro)
         window.addEventListener('keydown', (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.isContentEditable) return;
+
+            // Pula para porcentagem do vídeo (0 a 9)
+            if (/^Digit[0-9]$/.test(e.code) || /^Numpad[0-9]$/.test(e.code)) {
+                const digit = parseInt(e.key, 10);
+                if (!isNaN(digit)) {
+                    e.preventDefault();
+                    const dur = (state.manifest?.episodeDuration && state.manifest.episodeDuration > 0)
+                        ? state.manifest.episodeDuration
+                        : (dom.video.duration || 0);
+                    if (dur > 0) {
+                        const target = (digit / 10) * dur;
+                        seekTo(target);
+                        showActionFeedback('center', `${digit * 10}%`);
+                    }
+                    return;
+                }
+            }
+
             switch (e.code) {
                 case 'Space':
                 case 'KeyK':
                     e.preventDefault();
                     togglePlay();
+                    showActionFeedback('center', dom.video.paused ? '❚❚' : '▶');
                     break;
                 case 'ArrowLeft':
+                case 'KeyJ':
                     e.preventDefault();
                     seekRelative(-10);
+                    showActionFeedback('left', '❮❮ 10s');
                     break;
                 case 'ArrowRight':
+                case 'KeyL':
                     e.preventDefault();
                     seekRelative(10);
+                    showActionFeedback('right', '10s ❯❯');
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    dom.video.volume = Math.min(1, dom.video.volume + 0.05);
+                    dom.video.muted = false;
+                    updateVolumeUI();
+                    showActionFeedback('center', `Vol: ${Math.round(dom.video.volume * 100)}%`);
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    dom.video.volume = Math.max(0, dom.video.volume - 0.05);
+                    updateVolumeUI();
+                    showActionFeedback('center', `Vol: ${Math.round(dom.video.volume * 100)}%`);
                     break;
                 case 'KeyF':
                     e.preventDefault();
@@ -2005,10 +2284,19 @@
                 case 'KeyM':
                     e.preventDefault();
                     toggleMute();
+                    showActionFeedback('center', dom.video.muted ? 'Sem Áudio' : 'Áudio On');
                     break;
                 case 'KeyC':
                     e.preventDefault();
                     toggleDropdown('card-sub');
+                    break;
+                case 'KeyN':
+                    e.preventDefault();
+                    stepEpisode(1);
+                    break;
+                case 'KeyP':
+                    e.preventDefault();
+                    stepEpisode(-1);
                     break;
             }
         });
