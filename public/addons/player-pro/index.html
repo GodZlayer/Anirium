@@ -2129,7 +2129,57 @@
                 dom.badgeStatus.innerText = '● SWARM CONECTADO';
                 dom.overlayStatus.innerText = 'Sessão unificada ativa! Sintonizando áudio, vídeo e legendas...';
 
-                // Polling do Manifesto
+                // ==========================================
+                //  WEBSOCKET NATIVO: TELEMETRIA E EVENTOS REAL-TIME
+                // ==========================================
+                let serviceWs = null;
+                const setupWebSocket = () => {
+                    try {
+                        serviceWs = new WebSocket('ws://127.0.0.1:4004/ws');
+                        serviceWs.onopen = () => {
+                            console.info('[PlayerPro WS] Conectado ao daemon local em tempo real');
+                            dom.badgeStatus.innerText = '● CONECTADO EM TEMPO REAL (WS)';
+                        };
+                        serviceWs.onmessage = (evt) => {
+                            try {
+                                const msg = JSON.parse(evt.data);
+                                if (msg.event === 'telemetry') {
+                                    const p = msg.payload || {};
+                                    if (p.activeLinks != null) dom.teleLinks.innerText = `⚡ ${p.activeLinks} Magnets`;
+                                    if (p.peers != null) dom.telePeers.innerText = `👥 ${p.peers} Peers`;
+                                    if (p.downloadRate != null) dom.teleRate.innerText = `⬇ ${p.downloadRate}`;
+                                    
+                                    // Se a telemetria indicar janela pronta e ainda não temos stream
+                                    if (p.window && p.window.status === 'ready' && p.window.playlistUrl && !state.currentStreamUrl) {
+                                        const streamUrl = `http://127.0.0.1:4004${p.window.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
+                                        playStream(streamUrl, `Anirium+ Unificado (${p.window.quality || state.selectedQuality})`);
+                                    }
+                                } else if (msg.event === 'window_ready') {
+                                    const p = msg.payload || {};
+                                    if (p.playlistUrl && !state.currentStreamUrl) {
+                                        const streamUrl = `http://127.0.0.1:4004${p.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
+                                        playStream(streamUrl, `Anirium+ Unificado (${p.quality || state.selectedQuality})`);
+                                    }
+                                } else if (msg.event === 'manifest') {
+                                    if (msg.payload) {
+                                        state.manifest = msg.payload;
+                                        syncStreamSelection(false);
+                                    }
+                                }
+                            } catch (e) {}
+                        };
+                        serviceWs.onclose = () => {
+                            // Reconexão silenciosa se cair
+                            setTimeout(setupWebSocket, 3000);
+                        };
+                        serviceWs.onerror = () => {
+                            try { serviceWs.close(); } catch (e) {}
+                        };
+                    } catch (e) {}
+                };
+                setupWebSocket();
+
+                // Polling do Manifesto (agora como fallback brando de 6s, pois o WS empurra os eventos prontos)
                 const poll = async () => {
                     if (!state.playbackTicket) return;
                     try {
@@ -2148,7 +2198,7 @@
 
                 await poll();
                 if (state.manifestTimer) clearInterval(state.manifestTimer);
-                state.manifestTimer = setInterval(poll, 4000);
+                state.manifestTimer = setInterval(poll, 6000);
 
                 // ==========================================
                 //  RENOVAÇÃO CONTÍNUA DE SESSÃO / TOKEN

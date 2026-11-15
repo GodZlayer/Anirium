@@ -1850,24 +1850,45 @@
         };
 
         window.aniriumServiceOnline = false;
-        window.checkAniriumServiceHealth = async function() {
+        window.aniriumServiceWs = null;
+
+        window.initAniriumServiceWebSocket = function() {
+            if (window.aniriumServiceWs && window.aniriumServiceWs.readyState === WebSocket.OPEN) return;
+            try {
+                const ws = new WebSocket('ws://127.0.0.1:4004/ws');
+                window.aniriumServiceWs = ws;
+                ws.onopen = () => {
+                    window.updateServiceHealthStatus(true);
+                };
+                ws.onmessage = (evt) => {
+                    try {
+                        const data = JSON.parse(evt.data);
+                        if (data.event === 'telemetry' || data.event === 'status') {
+                            window.updateServiceHealthStatus(true);
+                            if (window.onServiceTelemetry) window.onServiceTelemetry(data.payload || data);
+                        }
+                    } catch (e) {}
+                };
+                ws.onclose = () => {
+                    window.updateServiceHealthStatus(false);
+                    setTimeout(window.initAniriumServiceWebSocket, 5000);
+                };
+                ws.onerror = () => {
+                    window.updateServiceHealthStatus(false);
+                };
+            } catch (e) {
+                window.updateServiceHealthStatus(false);
+            }
+        };
+
+        window.updateServiceHealthStatus = function(online) {
+            window.aniriumServiceOnline = online;
             const pill = document.getElementById('profile-service-health-pill');
             const stageBadge = document.getElementById('addon-service-badge');
-            let online = false;
-            try {
-                const ctrl = new AbortController();
-                const timer = setTimeout(() => ctrl.abort(), 1800);
-                const res = await fetch('http://127.0.0.1:4004/health', { signal: ctrl.signal });
-                clearTimeout(timer);
-                if (res.ok) online = true;
-            } catch (e) {
-                online = false;
-            }
-            window.aniriumServiceOnline = online;
             if (pill) {
                 if (online) {
                     pill.className = "px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
-                    pill.innerText = "● Service 4004: Conectado";
+                    pill.innerText = "● Service 4004: Tempo Real (WS)";
                 } else {
                     pill.className = "px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-theme-pill text-theme-muted border-theme-default";
                     pill.innerText = "○ Service 4004: Offline";
@@ -1877,7 +1898,7 @@
                 const commCount = (window.userAddonsList || []).filter(a => a.enabled).length;
                 if (online) {
                     stageBadge.className = "px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-emerald-500/20 text-emerald-300 border-emerald-500/40";
-                    stageBadge.innerText = `● Anirium+ Service Ativo • ${commCount} Add-ons Comunidade`;
+                    stageBadge.innerText = `● Anirium+ Service Ativo (WS) • ${commCount} Add-ons`;
                 } else if (commCount > 0) {
                     stageBadge.className = "px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border bg-theme-accent/20 text-theme-accent border-theme-accent/40";
                     stageBadge.innerText = `🧩 ${commCount} Add-on(s) da Comunidade Ativo(s)`;
@@ -1886,7 +1907,11 @@
                     stageBadge.innerText = "Modo Catálogo • Slot Modular Disponível";
                 }
             }
-            return online;
+        };
+
+        window.checkAniriumServiceHealth = async function() {
+            window.initAniriumServiceWebSocket();
+            return window.aniriumServiceOnline;
         };
 
                 function formatAddonDisplayName(a) {
