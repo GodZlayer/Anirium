@@ -44,9 +44,10 @@
 
         /* Container Principal do Player */
         #player-wrapper {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             background: #000;
             display: flex;
             align-items: center;
@@ -714,6 +715,9 @@
             epId: params.get('epId') || '',
             episode: parseInt(params.get('ep') || '1', 10) || 1,
             season: parseInt(params.get('season') || '1', 10) || 1,
+            totalEpisodes: parseInt(params.get('totalEpisodes') || '0', 10) || 0,
+            initialResumeTime: Math.floor(parseFloat(params.get('resume') || '0')) || 0,
+            hasResumed: false,
             title: params.get('title') || 'Anime',
             token: params.get('token') || '',
             playerSessionId: params.get('playerSessionId') || '',
@@ -930,11 +934,53 @@
             }
         });
 
+        let lastReportedProgressSec = -1;
+        let lastReportedProgressTime = 0;
+
+        function reportPlaybackProgress(force = false) {
+            const ct = getEpisodeTime();
+            if (!Number.isFinite(ct) || ct < 0) return;
+            const now = Date.now();
+            const currentFloorSec = Math.floor(ct);
+
+            // Throttle: no máximo a cada 5 segundos ou se forçado (pause, seek, beforeunload)
+            if (!force && (now - lastReportedProgressTime < 5000 || currentFloorSec === lastReportedProgressSec)) {
+                return;
+            }
+
+            lastReportedProgressTime = now;
+            lastReportedProgressSec = currentFloorSec;
+
+            window.parent.postMessage({
+                type: 'anirium:player:playback-progress',
+                workId: state.workId,
+                epId: state.epId,
+                episode: state.episode,
+                currentTime: currentFloorSec,
+                duration: Math.floor(state.manifest?.episodeDuration || dom.video.duration || 0)
+            }, '*');
+        }
+
+        dom.video.addEventListener('loadedmetadata', () => {
+            if (!state.hasResumed && state.initialResumeTime > 2) {
+                state.hasResumed = true;
+                console.info('[PlayerPro] Retomando reprodução no instante exato salvo:', state.initialResumeTime, 's');
+                seekTo(state.initialResumeTime);
+            }
+        });
+
         dom.video.addEventListener('timeupdate', () => {
             const ct = getEpisodeTime();
             const dur = (state.manifest?.episodeDuration && state.manifest.episodeDuration > 0)
                 ? state.manifest.episodeDuration
                 : (dom.video.duration || 0);
+
+            // Se ainda não aplicou o tempo de retomada e o player já começou a rodar
+            if (!state.hasResumed && state.initialResumeTime > 2) {
+                state.hasResumed = true;
+                console.info('[PlayerPro] Aplicando retomada exata na inicialização do stream:', state.initialResumeTime, 's');
+                seekTo(state.initialResumeTime);
+            }
 
             dom.timeCurrent.innerText = formatTime(ct);
             dom.timeTotal.innerText = formatTime(dur);
@@ -958,6 +1004,13 @@
 
             // Atualiza exibição de legendas usando o relógio real do episódio
             updateSubtitleCue(ct);
+
+            // Notifica Core com a posição exata para persistência contínua
+            reportPlaybackProgress(false);
+        });
+
+        window.addEventListener('beforeunload', () => {
+            reportPlaybackProgress(true);
         });
 
         // Volume
@@ -1336,7 +1389,12 @@
         }
 
         function stepEpisode(delta) {
-            const nextEp = Math.max(1, state.episode + delta);
+            const nextEp = state.episode + delta;
+            if (nextEp < 1) return;
+            if (state.totalEpisodes > 0 && nextEp > state.totalEpisodes) {
+                console.warn('[PlayerPro] Próximo episódio ultrapassa total de episódios catalogados:', nextEp, state.totalEpisodes);
+                return;
+            }
             window.parent.postMessage({
                 type: 'anirium:player:step-episode',
                 delta: delta,
@@ -1458,10 +1516,15 @@
         }
 
         async function initPlayer() {
-            dom.badgeEp.innerText = `EPISÓDIO ${state.episode}`;
-            dom.videoTitle.innerText = `${state.title} — Episódio ${state.episode}`;
+            dom.badgeEp.innerText = `EPISÓDIO ${state.episode}${state.totalEpisodes > 0 ? ` / ${state.totalEpisodes}` : ''}`;
+            dom.videoTitle.innerText = `${state.title} — Episódio ${state.episode}${state.totalEpisodes > 0 ? ` / ${state.totalEpisodes}` : ''}`;
             dom.overlayHeading.innerText = `${state.title} — Episódio ${state.episode}`;
             dom.btnPrevEp.style.display = state.episode > 1 ? 'inline-flex' : 'none';
+            if (state.totalEpisodes > 0 && state.episode >= state.totalEpisodes) {
+                dom.btnNextEp.style.display = 'none';
+            } else {
+                dom.btnNextEp.style.display = 'inline-flex';
+            }
 
             // 1. Checa Service 4004
             let serviceOnline = false;

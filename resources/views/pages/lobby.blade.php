@@ -447,8 +447,8 @@
     </div>
 
     <!-- 7. MODAL EXTERNO DE EXECUÇÃO DE ADD-ON (VÍDEO PLAYER PRO / MANGA READER PRO / COMUNIDADE) -->
-    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-1 sm:p-2.5 md:p-3 opacity-0 pointer-events-none transition-all duration-200">
-        <div class="w-full max-w-[98vw] h-[97vh] max-h-[97vh] rounded-2xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col">
+    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-1 sm:p-2 md:p-2.5 opacity-0 pointer-events-none transition-all duration-200">
+        <div class="w-full max-w-[99vw] h-[98vh] max-h-[98vh] rounded-2xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col min-h-0">
             <div class="px-4 py-2 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0">
                 <div class="flex items-center gap-2.5 min-w-0">
                     <span id="external-addon-icon" class="text-theme-accent text-sm">⚡</span>
@@ -465,7 +465,7 @@
                     <button type="button" onclick="window.closeExternalAddonModal()" class="px-2.5 py-1 rounded-xl bg-theme-pill text-theme-muted hover:text-white hover:bg-rose-500/20 text-xs font-bold cursor-pointer transition-colors" title="Fechar / Sair do Modo Player">✕ Sair</button>
                 </div>
             </div>
-            <div id="external-addon-viewport" class="flex-1 w-full h-full bg-black flex flex-col p-0 overflow-hidden">
+            <div id="external-addon-viewport" class="flex-1 w-full h-full min-h-0 bg-black flex flex-col p-0 overflow-hidden relative">
             </div>
         </div>
     </div>
@@ -2564,7 +2564,14 @@
         window.stepPlayerProEpisode = function(delta) {
             const ctx = window.currentPlayerProContext;
             if (!ctx) return;
-            const nextNum = Math.max(1, (parseInt(ctx.epNum, 10) || 1) + delta);
+            const currentNum = parseInt(ctx.epNum, 10) || 1;
+            const totalEps = parseInt(ctx.totalEpisodes, 10) || 0;
+            const nextNum = currentNum + delta;
+            if (nextNum < 1) return;
+            if (totalEps > 0 && nextNum > totalEps) {
+                console.warn('[PlayerPro] Próximo episódio ultrapassa total catalogado:', nextNum, totalEps);
+                return;
+            }
             const nextEpId = `${ctx.workId}:ep:${nextNum}`;
             window.launchExternalVideoAddon(ctx.workId, nextEpId, String(nextNum), ctx.workTitle);
         };
@@ -2600,7 +2607,8 @@
                 workId: workId || '',
                 epId: resolvedEpId,
                 epNum: cleanEpNum,
-                workTitle: cleanTitle
+                workTitle: cleanTitle,
+                totalEpisodes: episodeCount
             };
 
             const modal = document.getElementById('modal-external-addon');
@@ -2611,7 +2619,7 @@
             if (!modal || !viewport) return;
 
             if (iconEl) iconEl.innerText = '▶';
-            if (titleEl) titleEl.innerText = `${cleanTitle} • Episódio ${cleanEpNum}`;
+            if (titleEl) titleEl.innerText = `${cleanTitle} • Episódio ${cleanEpNum}${episodeCount > 0 ? ` / ${episodeCount}` : ''}`;
             if (subEl) subEl.innerText = 'Embed Externo Soberano: github.com/GodZlayer/anirium-embeds (Player Pro)';
 
             modal.classList.remove('opacity-0', 'pointer-events-none');
@@ -2636,6 +2644,10 @@
                 }
             } catch (err) {}
 
+            // Recupera o progresso salvo para retomada exata (Resume at Exact Instant)
+            const savedPref = window.userPreferences ? (window.userPreferences[resolvedEpId] || window.userPreferences[`episode:${resolvedEpId}`]) : null;
+            const resumeSeconds = savedPref && Number(savedPref.progress_seconds) > 0 ? Number(savedPref.progress_seconds) : 0;
+
             // Prioriza servir o módulo Player Pro com a mesma origem canônica (https://anirium.com.br/addons/player-pro/)
             // para garantir conformidade imediata com o Go anirium-service (CORS/Private Network/trustedPlayerOrigin)
             const playerAddon = (window.allUserAddons || []).find(a => a.id === 'player-pro');
@@ -2652,7 +2664,9 @@
                 season: String(resolvedSeason),
                 title: cleanTitle,
                 malId: String(malId),
-                format: workFormat
+                format: workFormat,
+                totalEpisodes: String(episodeCount),
+                resume: String(resumeSeconds)
             });
 
             const embedSrc = `${externalEmbedBaseUrl}?${embedQuery.toString()}`;
@@ -2663,6 +2677,7 @@
                     src="${embedSrc}"
                     allow="fullscreen; autoplay; encrypted-media"
                     allowfullscreen
+                    style="width: 100%; height: 100%; border: none; display: block;"
                     class="w-full h-full flex-1 border-0 bg-black">
                 </iframe>
             `;
@@ -2727,6 +2742,37 @@
                 window.launchExternalMangaAddon(window.currentMangaContext.workId, nextChap, window.currentMangaContext.workTitle);
             } else if (msg.type === 'anirium:player:step-episode') {
                 window.stepPlayerProEpisode(Number(msg.delta) || 1);
+            } else if (msg.type === 'anirium:player:playback-progress') {
+                // Sincroniza posição exata de reprodução para retomada instantânea (Resume at Exact Instant)
+                const epId = msg.epId;
+                const targetSec = Math.floor(Number(msg.currentTime) || 0);
+                if (epId && targetSec >= 0) {
+                    if (!window.userPreferences) window.userPreferences = {};
+                    if (!window.userPreferences[epId]) {
+                        window.userPreferences[epId] = { target_id: epId, target_type: 'episode', progress_seconds: targetSec, status: 'watching' };
+                    } else {
+                        window.userPreferences[epId].progress_seconds = targetSec;
+                        if (!window.userPreferences[epId].status) window.userPreferences[epId].status = 'watching';
+                    }
+                    if (window.currentUser) {
+                        try {
+                            fetch('/api/entity/preference', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                },
+                                body: JSON.stringify({
+                                    target_id: epId,
+                                    target_type: 'episode',
+                                    progress_seconds: targetSec,
+                                    status: 'watching'
+                                })
+                            }).catch(() => {});
+                        } catch (e) {}
+                    }
+                }
             } else if (msg.type === 'anirium:player:request-token-renewal') {
                 const deviceId = msg.deviceId || window.getValidDeviceId();
                 const playerSessionId = window.getValidPlayerSessionId();
