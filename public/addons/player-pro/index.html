@@ -1631,6 +1631,9 @@
             }
         }
 
+        // Instância global única de WebSocket para comunicação em tempo real com Service 4004
+        let serviceWs = null;
+
         // ==========================================
         //  POPULANDO MENUS SUSPENSOS DE MÍDIA
         // ==========================================
@@ -2113,13 +2116,17 @@
                 // ==========================================
                 //  WEBSOCKET NATIVO: TELEMETRIA E EVENTOS REAL-TIME
                 // ==========================================
-                let serviceWs = null;
                 const setupWebSocket = () => {
                     try {
+                        if (serviceWs) {
+                            try { serviceWs.close(); } catch (e) {}
+                        }
                         serviceWs = new WebSocket('ws://127.0.0.1:4004/ws');
                         serviceWs.onopen = () => {
                             console.info('[PlayerPro WS] Conectado ao daemon local em tempo real');
                             dom.badgeStatus.innerText = '● CONECTADO EM TEMPO REAL (WS)';
+                            // Solicita imediatamente o manifesto e estatísticas
+                            serviceWs.send(JSON.stringify({ action: 'get_manifest' }));
                         };
                         serviceWs.onmessage = (evt) => {
                             try {
@@ -2144,8 +2151,12 @@
                                 } else if (msg.event === 'manifest') {
                                     if (msg.payload) {
                                         state.manifest = msg.payload;
-                                        syncStreamSelection(false);
+                                        // Se o manifesto tiver ao menos uma qualidade e ainda não estivermos tocando, força sync
+                                        const hasQualities = Array.isArray(msg.payload.qualities) && msg.payload.qualities.length > 0;
+                                        syncStreamSelection(hasQualities && !state.currentStreamUrl);
                                     }
+                                } else if (msg.event === 'window_requested') {
+                                    console.info('[PlayerPro WS] Janela de reprodução aceita pelo daemon:', msg.payload);
                                 } else if (msg.event === 'stats') {
                                     if (msg.payload && typeof handleP2pStatsPayload === 'function') {
                                         handleP2pStatsPayload(msg.payload);
@@ -2167,19 +2178,23 @@
                 // Dispara sincronização inicial de stream imediatamente
                 const initialSync = async () => {
                     if (!state.playbackTicket) return;
-                    try {
-                        const mRes = await fetch('http://127.0.0.1:4004/manifest', {
-                            cache: 'no-store',
-                            headers: {
-                                'Authorization': `Bearer ${state.token}`,
-                                'X-Anirium-Device': state.deviceId
+                    if (serviceWs && serviceWs.readyState === WebSocket.OPEN) {
+                        serviceWs.send(JSON.stringify({ action: 'get_manifest' }));
+                    } else {
+                        try {
+                            const mRes = await fetch('http://127.0.0.1:4004/manifest', {
+                                cache: 'no-store',
+                                headers: {
+                                    'Authorization': `Bearer ${state.token}`,
+                                    'X-Anirium-Device': state.deviceId
+                                }
+                            });
+                            if (mRes.ok) {
+                                state.manifest = await mRes.json();
+                                await syncStreamSelection(false);
                             }
-                        });
-                        if (mRes.ok) {
-                            state.manifest = await mRes.json();
-                            await syncStreamSelection(false);
-                        }
-                    } catch (e) {}
+                        } catch (e) {}
+                    }
                 };
                 await initialSync();
 
