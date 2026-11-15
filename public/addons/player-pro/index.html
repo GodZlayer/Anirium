@@ -1988,52 +1988,33 @@
                         console.info('[PlayerPro] Solicitando primeiro trecho de vídeo já no tempo de retomada:', pos, 's');
                     }
 
-                    const res = await fetch(`http://127.0.0.1:4004/playback/session?playbackTicket=${encodeURIComponent(state.playbackTicket)}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        signal: ctrl.signal,
-                        body: JSON.stringify({
+                    if (serviceWs && serviceWs.readyState === WebSocket.OPEN) {
+                        serviceWs.send(JSON.stringify({
                             action: 'seek',
                             quality: state.selectedQuality,
-                            position: pos,
-                            playing: true,
-                            audio: state.selectedAudio || '',
-                            subtitle: state.selectedSubtitleTrackId && state.selectedSubtitleTrackId !== 'off' ? state.selectedSubtitleTrackId : ''
-                        })
-                    });
-                    if (res.ok) {
-                        const data = await res.json().catch(() => ({}));
-                        if (data.window && data.window.status === 'ready' && data.window.playlistUrl) {
-                            state.currentWindow = data.window;
-                            const streamUrl = `http://127.0.0.1:4004${data.window.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
-                            playStream(streamUrl, `Anirium+ Unificado (${state.selectedQuality})`);
-                        } else if (data.window && data.window.status === 'preparing') {
-                            // Se a janela estiver sendo preparada pelo ffmpeg/service, faz polling rápido (a cada 400ms)
-                            // até que fique pronta, para entrar imediatamente no player sem esperar o timer de 4s!
-                            const pollTicket = state.playbackTicket;
-                            let fastPollAttempts = 0;
-                            const fastPollInterval = setInterval(async () => {
-                                fastPollAttempts++;
-                                if (fastPollAttempts > 25 || state.currentStreamUrl || state.playbackTicket !== pollTicket) {
-                                    clearInterval(fastPollInterval);
-                                    return;
-                                }
-                                try {
-                                    const pollRes = await fetch(`http://127.0.0.1:4004/playback/session?playbackTicket=${encodeURIComponent(pollTicket)}`, {
-                                        headers: { 'Accept': 'application/json' },
-                                        signal: ctrl.signal
-                                    });
-                                    if (pollRes.ok) {
-                                        const pData = await pollRes.json().catch(() => ({}));
-                                        if (pData.window && pData.window.status === 'ready' && pData.window.playlistUrl) {
-                                            clearInterval(fastPollInterval);
-                                            state.currentWindow = pData.window;
-                                            const streamUrl = `http://127.0.0.1:4004${pData.window.playlistUrl}?playbackTicket=${encodeURIComponent(pollTicket)}`;
-                                            playStream(streamUrl, `Anirium+ Unificado (${state.selectedQuality})`);
-                                        }
-                                    }
-                                } catch (e) {}
-                            }, 400);
+                            position: pos
+                        }));
+                    } else {
+                        const res = await fetch(`http://127.0.0.1:4004/playback/session?playbackTicket=${encodeURIComponent(state.playbackTicket)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            signal: ctrl.signal,
+                            body: JSON.stringify({
+                                action: 'seek',
+                                quality: state.selectedQuality,
+                                position: pos,
+                                playing: true,
+                                audio: state.selectedAudio || '',
+                                subtitle: state.selectedSubtitleTrackId && state.selectedSubtitleTrackId !== 'off' ? state.selectedSubtitleTrackId : ''
+                            })
+                        });
+                        if (res.ok) {
+                            const data = await res.json().catch(() => ({}));
+                            if (data.window && data.window.status === 'ready' && data.window.playlistUrl) {
+                                state.currentWindow = data.window;
+                                const streamUrl = `http://127.0.0.1:4004${data.window.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
+                                playStream(streamUrl, `Anirium+ Unificado (${state.selectedQuality})`);
+                            }
                         }
                     }
                 } else if (m.qualityOnDemand) {
@@ -2165,6 +2146,10 @@
                                         state.manifest = msg.payload;
                                         syncStreamSelection(false);
                                     }
+                                } else if (msg.event === 'stats') {
+                                    if (msg.payload && typeof handleP2pStatsPayload === 'function') {
+                                        handleP2pStatsPayload(msg.payload);
+                                    }
                                 }
                             } catch (e) {}
                         };
@@ -2265,8 +2250,42 @@
                     return Math.floor(val);
                 };
 
+                const handleP2pStatsPayload = (stData) => {
+                    if (!stData) return;
+                    const currentUp = parseFormattedBytes(stData.totalUploaded);
+                    const currentDown = parseFormattedBytes(stData.totalDownloaded);
+
+                    let deltaUp = 0;
+                    let deltaDown = 0;
+                    if (lastRawBytesUploaded > 0 && currentUp >= lastRawBytesUploaded) {
+                        deltaUp = currentUp - lastRawBytesUploaded;
+                    }
+                    if (lastRawBytesDownloaded > 0 && currentDown >= lastRawBytesDownloaded) {
+                        deltaDown = currentDown - lastRawBytesDownloaded;
+                    }
+                    lastRawBytesUploaded = currentUp;
+                    lastRawBytesDownloaded = currentDown;
+
+                    window.parent.postMessage({
+                        type: 'anirium:player:p2p-metrics',
+                        payload: {
+                            delta_uploaded_bytes: deltaUp,
+                            delta_downloaded_bytes: deltaDown,
+                            upload_rate: stData.uploadRate || '0.0 KB/s',
+                            download_rate: stData.downloadRate || '0.0 KB/s',
+                            peers: Number(stData.peers || 0),
+                            is_playing: dom.video ? !dom.video.paused : false,
+                            current_time: dom.video ? dom.video.currentTime || 0 : 0
+                        }
+                    }, '*');
+                };
+
                 const reportP2pNetworkActivity = async () => {
                     if (!state.token || !state.deviceId) return;
+                    if (serviceWs && serviceWs.readyState === WebSocket.OPEN) {
+                        serviceWs.send(JSON.stringify({ action: 'get_stats' }));
+                        return;
+                    }
                     try {
                         const stRes = await fetch('http://127.0.0.1:4004/stats', {
                             cache: 'no-store',
@@ -2277,33 +2296,7 @@
                         });
                         if (stRes.ok) {
                             const stData = await stRes.json().catch(() => ({}));
-                            const currentUp = parseFormattedBytes(stData.totalUploaded);
-                            const currentDown = parseFormattedBytes(stData.totalDownloaded);
-
-                            let deltaUp = 0;
-                            let deltaDown = 0;
-                            if (lastRawBytesUploaded > 0 && currentUp >= lastRawBytesUploaded) {
-                                deltaUp = currentUp - lastRawBytesUploaded;
-                            }
-                            if (lastRawBytesDownloaded > 0 && currentDown >= lastRawBytesDownloaded) {
-                                deltaDown = currentDown - lastRawBytesDownloaded;
-                            }
-                            lastRawBytesUploaded = currentUp;
-                            lastRawBytesDownloaded = currentDown;
-
-                            // Emite para o Core (Lobby) contabilizar XP e métricas absolutas via heartbeat
-                            window.parent.postMessage({
-                                type: 'anirium:player:p2p-metrics',
-                                payload: {
-                                    delta_uploaded_bytes: deltaUp,
-                                    delta_downloaded_bytes: deltaDown,
-                                    upload_rate: stData.uploadRate || '0.0 KB/s',
-                                    download_rate: stData.downloadRate || '0.0 KB/s',
-                                    peers: Number(stData.peers || 0),
-                                    is_playing: dom.video ? !dom.video.paused : false,
-                                    current_time: dom.video ? dom.video.currentTime || 0 : 0
-                                }
-                            }, '*');
+                            handleP2pStatsPayload(stData);
                         }
                     } catch (e) {}
                 };
