@@ -2179,8 +2179,8 @@
                 };
                 setupWebSocket();
 
-                // Polling do Manifesto (agora como fallback brando de 6s, pois o WS empurra os eventos prontos)
-                const poll = async () => {
+                // Dispara sincronização inicial de stream imediatamente
+                const initialSync = async () => {
                     if (!state.playbackTicket) return;
                     try {
                         const mRes = await fetch('http://127.0.0.1:4004/manifest', {
@@ -2190,15 +2190,13 @@
                                 'X-Anirium-Device': state.deviceId
                             }
                         });
-                        if (!mRes.ok) return;
-                        state.manifest = await mRes.json();
-                        await syncStreamSelection(false);
+                        if (mRes.ok) {
+                            state.manifest = await mRes.json();
+                            await syncStreamSelection(false);
+                        }
                     } catch (e) {}
                 };
-
-                await poll();
-                if (state.manifestTimer) clearInterval(state.manifestTimer);
-                state.manifestTimer = setInterval(poll, 6000);
+                await initialSync();
 
                 // ==========================================
                 //  RENOVAÇÃO CONTÍNUA DE SESSÃO / TOKEN
