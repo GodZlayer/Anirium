@@ -973,9 +973,15 @@ class CatalogGraphController extends Controller
                 }
             }
 
+            $nowTs = time();
             $episodes = DB::table('catalog_arc_episodes as ae')
                 ->join('catalog_episodes as e', 'ae.episode_id', '=', 'e.id')
                 ->where('ae.arc_id', $realId)
+                ->where(function ($query) use ($nowTs) {
+                    $query->whereNull('e.air_date_utc')
+                        ->orWhereRaw('unixepoch(e.air_date_utc) <= ?', [$nowTs])
+                        ->orWhereRaw('strftime("%s", e.air_date_utc) <= ?', [$nowTs]);
+                })
                 ->orderBy('e.number')
                 ->get(['e.id', 'e.number', 'e.air_date_utc']);
 
@@ -983,7 +989,12 @@ class CatalogGraphController extends Controller
             if ($episodes->isEmpty() && $work && isset($arc->start_number)) {
                 $epQuery = DB::table('catalog_episodes')
                     ->where('work_id', $work->id)
-                    ->where('number', '>=', (int) $arc->start_number);
+                    ->where('number', '>=', (int) $arc->start_number)
+                    ->where(function ($query) use ($nowTs) {
+                        $query->whereNull('air_date_utc')
+                            ->orWhereRaw('unixepoch(air_date_utc) <= ?', [$nowTs])
+                            ->orWhereRaw('strftime("%s", air_date_utc) <= ?', [$nowTs]);
+                    });
                 if (! empty($arc->end_number)) {
                     $epQuery->where('number', '<=', (int) $arc->end_number);
                 }

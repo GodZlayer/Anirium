@@ -14,7 +14,16 @@ class CatalogWorkGraph
         if (! $work || $this->visibility->works([$id], $adult) === []) {
             return null;
         }
-        $episodes = DB::table('catalog_episodes')->where('work_id', $id)->orderBy('number')->get(['id', 'work_id', 'season_id', 'number', 'numbering_scheme', 'air_date_utc', 'classification']);
+        $nowTs = time();
+        $episodes = DB::table('catalog_episodes')
+            ->where('work_id', $id)
+            ->where(function ($query) use ($nowTs) {
+                $query->whereNull('air_date_utc')
+                    ->orWhereRaw('unixepoch(air_date_utc) <= ?', [$nowTs])
+                    ->orWhereRaw('strftime("%s", air_date_utc) <= ?', [$nowTs]);
+            })
+            ->orderBy('number')
+            ->get(['id', 'work_id', 'season_id', 'number', 'numbering_scheme', 'air_date_utc', 'classification']);
         $relations = DB::table('catalog_work_relations')->where('from_work_id', $id)->get(['to_work_id', 'relation_type', 'provider']);
         $visible = $this->visibility->works($relations->pluck('to_work_id')->all(), $adult);
         $arcs = DB::table('catalog_arcs as arc')->join('catalog_arc_works as link', 'arc.id', '=', 'link.arc_id')
