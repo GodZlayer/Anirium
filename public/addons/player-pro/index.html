@@ -1919,8 +1919,9 @@
 
             state.subtitleTracks = Array.isArray(m.subtitleTracks) ? m.subtitleTracks : [];
             const activeTrackExists = state.subtitleTracks.some(t => t.id === state.selectedSubtitleTrackId);
-            // Só inicializa/busca legenda se ainda não tiver nenhuma legenda selecionada ou se não houver cues carregados
-            if (state.selectedSubtitleTrackId !== 'off' && state.subtitleTracks.length > 0) {
+            // Só inicializa/busca legenda APÓS o vídeo já estar carregado ou tocando
+            // para NUNCA concorrer por largura de banda ou travar a inicialização do vídeo
+            if (state.currentStreamUrl && state.selectedSubtitleTrackId !== 'off' && state.subtitleTracks.length > 0) {
                 if (!state.selectedSubtitleTrackId || (!activeTrackExists && state.parsedSubtitleCues.length === 0 && !isFetchingSubtitle)) {
                     const ptTrack = state.subtitleTracks.find(t => /por|pt/i.test(t.language || ''));
                     state.selectedSubtitleTrackId = (ptTrack || state.subtitleTracks[0]).id;
@@ -2006,6 +2007,33 @@
                             state.currentWindow = data.window;
                             const streamUrl = `http://127.0.0.1:4004${data.window.playlistUrl}?playbackTicket=${encodeURIComponent(state.playbackTicket)}`;
                             playStream(streamUrl, `Anirium+ Unificado (${state.selectedQuality})`);
+                        } else if (data.window && data.window.status === 'preparing') {
+                            // Se a janela estiver sendo preparada pelo ffmpeg/service, faz polling rápido (a cada 400ms)
+                            // até que fique pronta, para entrar imediatamente no player sem esperar o timer de 4s!
+                            const pollTicket = state.playbackTicket;
+                            let fastPollAttempts = 0;
+                            const fastPollInterval = setInterval(async () => {
+                                fastPollAttempts++;
+                                if (fastPollAttempts > 25 || state.currentStreamUrl || state.playbackTicket !== pollTicket) {
+                                    clearInterval(fastPollInterval);
+                                    return;
+                                }
+                                try {
+                                    const pollRes = await fetch(`http://127.0.0.1:4004/playback/session?playbackTicket=${encodeURIComponent(pollTicket)}`, {
+                                        headers: { 'Accept': 'application/json' },
+                                        signal: ctrl.signal
+                                    });
+                                    if (pollRes.ok) {
+                                        const pData = await pollRes.json().catch(() => ({}));
+                                        if (pData.window && pData.window.status === 'ready' && pData.window.playlistUrl) {
+                                            clearInterval(fastPollInterval);
+                                            state.currentWindow = pData.window;
+                                            const streamUrl = `http://127.0.0.1:4004${pData.window.playlistUrl}?playbackTicket=${encodeURIComponent(pollTicket)}`;
+                                            playStream(streamUrl, `Anirium+ Unificado (${state.selectedQuality})`);
+                                        }
+                                    }
+                                } catch (e) {}
+                            }, 400);
                         }
                     }
                 } else if (m.qualityOnDemand) {
