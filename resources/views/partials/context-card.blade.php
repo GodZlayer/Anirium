@@ -25,6 +25,11 @@
     $media = strtolower($work->media ?? 'anime');
     $format = strtoupper($work->format ?? ($media === 'manga' ? 'MANGA' : 'TV'));
     $isManga = $media === 'manga' || in_array($format, ['MANGA', 'MANHWA', 'MANHUA', 'ONE_SHOT', 'DOUJINSHI', 'NOVEL', 'LIGHT_NOVEL', 'OEL'], true);
+    $image = $work->image_url ?? '/assets/icons/actions/search.png';
+    $synopsis = strip_tags($work->synopsis ?? 'Sinopse oficial catalogada na malha ontológica relacional.');
+    $isEpisodeMode = !empty($currentEpisode);
+    $epNum = $isEpisodeMode ? ($currentEpisode->number ?? 1) : 1;
+    $episodeTitle = $isEpisodeMode ? (($isManga ? 'Capítulo ' : 'Episódio ') . $epNum) : null;
     $status = strtoupper($work->status ?? 'COMPLETED');
     $isUnreleased = in_array($status, ['NOT_YET_RELEASED', 'NOT_YET_AIRED', 'UPCOMING', 'UNRELEASED'], true);
     if ($isEpisodeMode && !empty($currentEpisode->air_date_utc)) {
@@ -33,11 +38,6 @@
             $isUnreleased = true;
         }
     }
-    $image = $work->image_url ?? '/assets/icons/actions/search.png';
-    $synopsis = strip_tags($work->synopsis ?? 'Sinopse oficial catalogada na malha ontológica relacional.');
-    $isEpisodeMode = !empty($currentEpisode);
-    $epNum = $isEpisodeMode ? ($currentEpisode->number ?? 1) : 1;
-    $episodeTitle = $isEpisodeMode ? (($isManga ? 'Capítulo ' : 'Episódio ') . $epNum) : null;
     $totalEpisodes = count($episodes) ?: ($work->episode_count ?? 0);
     if ($totalEpisodes <= 0 && count($arcs) > 0) {
         $maxArcEnd = collect($arcs)->max('end_number');
@@ -51,16 +51,26 @@
     $totalRelations = count($relations);
     $totalTracks = count($tracks);
 
-    // Se a obra possui episode_count (ex: 12 eps) ou fallback canônico, mas a tabela catalog_episodes ainda não populou as linhas individuais,
-    // gera as unidades episódicas virtuais canônicas (1..N) para que o trilho de Episódios/Capítulos sempre exiba os cards clicáveis!
-    // Para obras ainda não lançadas (ex: Demons' Crest), não gera episódios falsos vazios!
-    $displayEpisodes = collect($episodes);
-    $knownMaxEp = (int) ($displayEpisodes->max('number') ?? 0);
-    $targetMaxEp = max($knownMaxEp, (int) ($work->latest_episode_num ?? 0), (int) ($totalEpisodes ?? 0));
+    // Filtra para exibir SEMPRE apenas o que existe realmente e já foi lançado.
+    // Episódios com data de transmissão futura não são exibidos na lista.
+    $nowTs = time();
+    $displayEpisodes = collect($episodes)->filter(function ($ep) use ($nowTs) {
+        if (!empty($ep->air_date_utc)) {
+            $ts = strtotime($ep->air_date_utc);
+            if ($ts > 0 && $ts > $nowTs) {
+                return false;
+            }
+        }
+        return true;
+    })->values();
 
-    // Se a lista de episódios está vazia ou incompleta em relação aos episódios lançados/totais conhecidos,
-    // sintetiza as unidades episódicas complementares para que o trilho de Episódios/Capítulos sempre exiba os cards clicáveis!
-    if (! $isUnreleased && $targetMaxEp > $knownMaxEp) {
+    $knownMaxEp = (int) ($displayEpisodes->max('number') ?? 0);
+    $targetMaxEp = max($knownMaxEp, (int) ($work->latest_episode_num ?? 0));
+    $isFinishedWork = $status === 'FINISHED' || $status === 'COMPLETED';
+
+    // Para obras já finalizadas e completas que porventura não tenham todas as linhas em catalog_episodes,
+    // sintetiza as unidades virtuais até o total da obra. Para obras em lançamento (RELEASING), não sintetiza além do lançado!
+    if ($isFinishedWork && $targetMaxEp > $knownMaxEp) {
         $maxVirtual = min($targetMaxEp, 500);
         $virtualList = $displayEpisodes->all();
         $existingNums = $displayEpisodes->pluck('number')->flip()->all();
@@ -76,8 +86,9 @@
             }
         }
         $displayEpisodes = collect($virtualList)->sortBy('number')->values();
-        $totalEpisodes = max($totalEpisodes, $displayEpisodes->count());
     }
+
+    $totalEpisodes = $displayEpisodes->count();
 
     // Identificadores externos para resolução aberta de Add-ons (Comunidade / Stremio & Anirium+)
     $malId = collect($externalIds)->firstWhere('provider', 'mal')->external_id ?? null;

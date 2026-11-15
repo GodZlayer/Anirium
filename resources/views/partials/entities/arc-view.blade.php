@@ -33,8 +33,20 @@
     $malId = collect($externalIds)->firstWhere('provider', 'mal')->external_id ?? null;
     $imdbId = collect($externalIds)->firstWhere('provider', 'imdb')->external_id ?? null;
 
-    $displayArcEpisodes = collect($episodes);
-    if ($displayArcEpisodes->isEmpty() && $work && $totalArcEpisodes > 0) {
+    // Filtra para exibir SEMPRE apenas episódios já lançados
+    $nowTs = time();
+    $displayArcEpisodes = collect($episodes)->filter(function ($ep) use ($nowTs) {
+        if (!empty($ep->air_date_utc)) {
+            $ts = strtotime($ep->air_date_utc);
+            if ($ts > 0 && $ts > $nowTs) {
+                return false;
+            }
+        }
+        return true;
+    })->values();
+
+    $isFinishedWork = ($work->status ?? '') === 'FINISHED' || ($work->status ?? '') === 'COMPLETED';
+    if ($displayArcEpisodes->isEmpty() && $work && $totalArcEpisodes > 0 && $isFinishedWork) {
         $maxArcVirtual = min((int) ($endNum ?: ($startNum + $totalArcEpisodes - 1)), $startNum + 199);
         $vArcEps = [];
         for ($i = max(1, $startNum); $i <= $maxArcVirtual; $i++) {

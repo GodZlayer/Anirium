@@ -77,9 +77,20 @@
     $arcStart = (int) ($currentArc->start_number ?? 1);
     $arcEnd = $currentArc->end_number ?? $totalEpisodes;
 
-    // Janela de navegação rápida de episódios vizinhos (para o painel de sequência)
-    $displayEpisodes = collect($episodes);
-    if ($displayEpisodes->isEmpty() && $totalEpisodes > 0) {
+    // Janela de navegação rápida de episódios vizinhos (apenas os que realmente existem/foram lançados)
+    $nowTs = time();
+    $displayEpisodes = collect($episodes)->filter(function ($ep) use ($nowTs) {
+        if (!empty($ep->air_date_utc)) {
+            $ts = strtotime($ep->air_date_utc);
+            if ($ts > 0 && $ts > $nowTs) {
+                return false;
+            }
+        }
+        return true;
+    })->values();
+
+    $isFinishedWork = $status === 'FINISHED' || $status === 'COMPLETED';
+    if ($displayEpisodes->isEmpty() && $totalEpisodes > 0 && $isFinishedWork) {
         $maxVirtual = min((int) $totalEpisodes, 200);
         $vList = [];
         for ($i = 1; $i <= $maxVirtual; $i++) {
@@ -94,8 +105,9 @@
         $displayEpisodes = collect($vList);
     }
 
+    $totalEpisodes = $displayEpisodes->count() ?: $totalEpisodes;
     $prevEpNum = $epNum > 1 ? ($epNum - 1) : null;
-    $nextEpNum = $epNum < $totalEpisodes ? ($epNum + 1) : null;
+    $nextEpNum = ($epNum < $totalEpisodes && $displayEpisodes->contains('number', $epNum + 1)) ? ($epNum + 1) : null;
     $prevEpObj = $prevEpNum ? ($displayEpisodes->firstWhere('number', $prevEpNum) ?? (object) ['id' => ($work->id ?? 'work') . ':ep:' . $prevEpNum, 'number' => $prevEpNum]) : null;
     $nextEpObj = $nextEpNum ? ($displayEpisodes->firstWhere('number', $nextEpNum) ?? (object) ['id' => ($work->id ?? 'work') . ':ep:' . $nextEpNum, 'number' => $nextEpNum]) : null;
 @endphp
