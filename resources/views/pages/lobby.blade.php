@@ -447,9 +447,9 @@
     </div>
 
     <!-- 7. MODAL EXTERNO DE EXECUÇÃO DE ADD-ON (VÍDEO PLAYER PRO / MANGA READER PRO / COMUNIDADE) -->
-    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 sm:p-0.5 opacity-0 pointer-events-none transition-all duration-200">
-        <div class="w-full max-w-[100vw] h-full sm:h-[99.5vh] max-h-[100vh] sm:rounded-2xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col min-h-0">
-            <div class="px-3 sm:px-4 py-1.5 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0">
+    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 sm:p-0.5 opacity-0 pointer-events-none transition-all duration-200" style="box-sizing: border-box;">
+        <div style="width: 100vw; height: 100vh; max-height: 100vh; max-width: 100vw; display: flex; flex-direction: column; overflow: hidden; position: relative;" class="bg-theme-surface sm:rounded-2xl border border-theme-default shadow-2xl">
+            <div class="px-3 sm:px-4 py-1.5 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0" style="height: 42px; min-height: 42px; box-sizing: border-box;">
                 <div class="flex items-center gap-2.5 min-w-0">
                     <span id="external-addon-icon" class="text-theme-accent text-sm">⚡</span>
                     <div class="min-w-0">
@@ -465,7 +465,7 @@
                     <button type="button" onclick="window.closeExternalAddonModal()" class="px-2.5 py-1 rounded-xl bg-theme-pill text-theme-muted hover:text-white hover:bg-rose-500/20 text-xs font-bold cursor-pointer transition-colors" title="Fechar / Sair do Modo Player">✕ Sair</button>
                 </div>
             </div>
-            <div id="external-addon-viewport" class="flex-1 w-full h-full min-h-0 bg-black flex flex-col p-0 overflow-hidden relative">
+            <div id="external-addon-viewport" style="flex: 1 1 0%; width: 100%; height: calc(100vh - 42px); min-height: 0; background: #000; position: relative; overflow: hidden; display: flex; flex-direction: column; padding: 0; margin: 0;">
             </div>
         </div>
     </div>
