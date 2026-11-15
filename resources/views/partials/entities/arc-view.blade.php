@@ -9,6 +9,9 @@
     'studios' => [],
     'tracks' => [],
     'externalIds' => [],
+    'englishTitle' => '',
+    'romajiTitle' => '',
+    'nativeTitle' => '',
     'isLiked' => false,
     'isBookmarked' => false,
     'userScore' => null,
@@ -65,6 +68,9 @@
      id="arc-context-stage"
      data-work-id="{{ $work->id ?? '' }}"
      data-work-title="{{ $workTitle }}"
+     data-work-english-title="{{ $englishTitle ?? '' }}"
+     data-work-romaji-title="{{ $romajiTitle ?? '' }}"
+     data-work-native-title="{{ $nativeTitle ?? '' }}"
      data-work-media="{{ $isManga ? 'manga' : 'anime' }}"
      data-work-format="{{ $workFormat }}"
      data-episode-count="{{ $work->episode_count ?? $totalArcEpisodes }}"

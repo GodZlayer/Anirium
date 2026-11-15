@@ -2595,6 +2595,9 @@
             const episodeCount = parseInt(stage?.getAttribute('data-episode-count') || '0', 10) || 0;
             const workFormat = stage?.getAttribute('data-work-format') || 'TV';
             const cleanTitle = String(workTitle || stage?.getAttribute('data-work-title') || 'Anime').trim();
+            const englishTitle = String(stage?.getAttribute('data-work-english-title') || '').trim();
+            const romajiTitle = String(stage?.getAttribute('data-work-romaji-title') || '').trim();
+            const nativeTitle = String(stage?.getAttribute('data-work-native-title') || '').trim();
 
             // Detecta temporada no título (ex: "2nd Season", "Season 2", "Temporada 2", "S2", ou dígitos finais como "Da Wang Rao Ming 3")
             let resolvedSeason = 1;
@@ -2608,6 +2611,9 @@
                 epId: resolvedEpId,
                 epNum: cleanEpNum,
                 workTitle: cleanTitle,
+                englishTitle: englishTitle,
+                romajiTitle: romajiTitle,
+                nativeTitle: nativeTitle,
                 totalEpisodes: episodeCount
             };
 
@@ -2672,6 +2678,9 @@
                 ep: String(cleanEpNum),
                 season: String(resolvedSeason),
                 title: cleanTitle,
+                titleEnglish: englishTitle,
+                titleRomaji: romajiTitle,
+                titleNative: nativeTitle,
                 malId: String(malId),
                 format: workFormat,
                 totalEpisodes: String(episodeCount),

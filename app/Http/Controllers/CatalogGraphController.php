@@ -201,6 +201,15 @@ class CatalogGraphController extends Controller
                     ->get()
                     ->toArray();
 
+                // Títulos canônicos e internacionais para busca multi-nome nos provedores (Inglês, Rômaji, Kanji/Hanzi)
+                $titleRows = DB::table('catalog_entity_titles')
+                    ->where('entity_id', $realId)
+                    ->select('locale', 'title')
+                    ->get();
+                $englishTitle = $titleRows->firstWhere('locale', 'en')?->title ?? '';
+                $romajiTitle = $titleRows->whereIn('locale', ['und', 'romaji', 'ja-latn'])->first()?->title ?? '';
+                $nativeTitle = $titleRows->whereIn('locale', ['ja', 'zh', 'ko'])->first()?->title ?? '';
+
                 $image = DB::table('catalog_work_assets')->where('work_id', $realId)->value('image_url');
 
                 return json_decode(json_encode([
@@ -211,6 +220,9 @@ class CatalogGraphController extends Controller
                     'studios' => $studios,
                     'tracks' => $tracks,
                     'external_ids' => $externalIds,
+                    'englishTitle' => $englishTitle,
+                    'romajiTitle' => $romajiTitle,
+                    'nativeTitle' => $nativeTitle,
                     'image_url' => $image,
                 ]), true);
             });
@@ -234,6 +246,9 @@ class CatalogGraphController extends Controller
             $res['tracks'] = $meta['tracks'] ?? [];
             $res['universe'] = $meta['universe'] ?? null;
             $res['external_ids'] = $meta['external_ids'] ?? [];
+            $res['englishTitle'] = $meta['englishTitle'] ?? '';
+            $res['romajiTitle'] = $meta['romajiTitle'] ?? '';
+            $res['nativeTitle'] = $meta['nativeTitle'] ?? '';
 
             $result = json_decode(json_encode($res), true);
 
@@ -243,6 +258,9 @@ class CatalogGraphController extends Controller
             $relations = collect($result['relations'] ?? [])->map(fn ($r) => (object) $r);
             $externalIds = collect($result['external_ids'] ?? [])->map(fn ($e) => (object) $e);
             $universe = ! empty($result['universe']) ? (object) $result['universe'] : null;
+            $englishTitle = $result['englishTitle'] ?? '';
+            $romajiTitle = $result['romajiTitle'] ?? '';
+            $nativeTitle = $result['nativeTitle'] ?? '';
 
             // Se for requisição pedindo HTML/Blade ou HTMX, retorna a view compilada diretamente pelo PHP
             if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
@@ -267,6 +285,9 @@ class CatalogGraphController extends Controller
                     'tracks' => $tracks,
                     'relations' => $relations,
                     'externalIds' => $externalIds,
+                    'englishTitle' => $englishTitle,
+                    'romajiTitle' => $romajiTitle,
+                    'nativeTitle' => $nativeTitle,
                     'arcs' => $arcsObj,
                     'episodes' => $episodesObj,
                     'isLiked' => (bool) ($pref->liked ?? false),
@@ -1017,6 +1038,14 @@ class CatalogGraphController extends Controller
                     ->select('provider', 'external_id', 'namespace')
                     ->get()
                     ->toArray();
+
+                $titleRows = DB::table('catalog_entity_titles')
+                    ->where('entity_id', $work->id)
+                    ->select('locale', 'title')
+                    ->get();
+                $englishTitle = $titleRows->firstWhere('locale', 'en')?->title ?? '';
+                $romajiTitle = $titleRows->whereIn('locale', ['und', 'romaji', 'ja-latn'])->first()?->title ?? '';
+                $nativeTitle = $titleRows->whereIn('locale', ['ja', 'zh', 'ko'])->first()?->title ?? '';
             }
 
             return json_decode(json_encode([
@@ -1030,6 +1059,9 @@ class CatalogGraphController extends Controller
                 'studios' => $studios,
                 'tracks' => $tracks,
                 'externalIds' => $externalIds,
+                'englishTitle' => $englishTitle ?? '',
+                'romajiTitle' => $romajiTitle ?? '',
+                'nativeTitle' => $nativeTitle ?? '',
             ]), true);
         });
 
@@ -1047,6 +1079,9 @@ class CatalogGraphController extends Controller
         $studios = collect($data['studios'] ?? [])->map(fn ($s) => (object) $s);
         $tracks = collect($data['tracks'] ?? [])->map(fn ($t) => (object) $t);
         $externalIds = collect($data['externalIds'] ?? [])->map(fn ($e) => (object) $e);
+        $englishTitle = $data['englishTitle'] ?? '';
+        $romajiTitle = $data['romajiTitle'] ?? '';
+        $nativeTitle = $data['nativeTitle'] ?? '';
 
         if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             $user = $request->user();
@@ -1069,6 +1104,9 @@ class CatalogGraphController extends Controller
                 'studios' => $studios,
                 'tracks' => $tracks,
                 'externalIds' => $externalIds,
+                'englishTitle' => $englishTitle,
+                'romajiTitle' => $romajiTitle,
+                'nativeTitle' => $nativeTitle,
                 'isLiked' => (bool) ($pref->liked ?? false),
                 'isBookmarked' => (bool) ($pref->bookmarked ?? false),
                 'userScore' => $pref->user_score ?? null,

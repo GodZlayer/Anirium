@@ -8,6 +8,9 @@
     'tracks' => [],
     'relations' => [],
     'externalIds' => [],
+    'englishTitle' => '',
+    'romajiTitle' => '',
+    'nativeTitle' => '',
     'arcs' => [],
     'episodes' => [],
     'isLiked' => false,
@@ -99,6 +102,9 @@
      id="episode-context-stage"
      data-work-id="{{ $work->id ?? '' }}"
      data-work-title="{{ $workTitle }}"
+     data-work-english-title="{{ $englishTitle ?? '' }}"
+     data-work-romaji-title="{{ $romajiTitle ?? '' }}"
+     data-work-native-title="{{ $nativeTitle ?? '' }}"
      data-work-media="{{ $isManga ? 'manga' : 'anime' }}"
      data-work-format="{{ $format }}"
      data-episode-count="{{ $totalEpisodes }}"
