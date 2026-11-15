@@ -34,6 +34,8 @@
     $classification = strtolower($currentEpisode->classification ?? ($currentArc->classification ?? 'canon'));
     $isFiller = $classification === 'filler';
     $airDate = $currentEpisode->air_date_utc ?? ($status === 'RELEASING' ? 'Em exibição' : 'Catalogado');
+    $epAirTs = !empty($currentEpisode->air_date_utc) ? strtotime($currentEpisode->air_date_utc) : 0;
+    $isEpUnreleased = ($epAirTs > 0 && $epAirTs > time()) || in_array($status, ['NOT_YET_RELEASED', 'NOT_YET_AIRED', 'UPCOMING', 'UNRELEASED'], true);
     $isVirtualEp = !empty($currentEpisode->is_virtual);
 
     $totalEpisodes = count($episodes) ?: ($work->episode_count ?? 0);
@@ -184,7 +186,11 @@
 
                     <!-- Botão Central de Ação no Frame Widescreen -->
                     <div class="relative z-10 flex items-center justify-center my-auto">
-                        @if(!$isManga)
+                        @if($isEpUnreleased)
+                            <div class="px-3.5 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold flex items-center gap-1.5 shadow-sm">
+                                <span>⏳</span> <span>Lançamento em {{ $epAirTs > 0 ? date('d/m/Y', $epAirTs) : 'Breve' }}</span>
+                            </div>
+                        @elseif(!$isManga)
                             <button type="button"
                                     data-requires-addon-capability="video"
                                     onclick="window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $currentEpisode->id ?? '' }}', '{{ $epNum }}', '{{ addslashes($workTitle) }}')"
@@ -264,7 +270,11 @@
                     <!-- Barra de Ações do Episódio: Oficial vs Add-ons + Anterior/Próximo -->
                     <div class="flex items-center justify-between gap-2 pt-2 border-t border-white/10 flex-wrap">
                         <div class="flex items-center gap-2 flex-wrap">
-                            @if(!$isManga)
+                            @if($isEpUnreleased)
+                                <span class="px-3.5 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold flex items-center gap-1.5 shadow-sm">
+                                    <span>⏳</span> <span>Transmissão Futura (Não Lançado)</span>
+                                </span>
+                            @elseif(!$isManga)
                                 <button type="button"
                                         data-requires-addon-capability="video"
                                         onclick="window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $currentEpisode->id ?? '' }}', '{{ $epNum }}', '{{ addslashes($workTitle) }}')"
@@ -547,6 +557,8 @@
                             @foreach($displayEpisodes as $ep)
                                 @php
                                     $isCurrent = ($ep->number ?? 0) == $epNum;
+                                    $railAirTs = !empty($ep->air_date_utc) ? strtotime($ep->air_date_utc) : 0;
+                                    $isRailUnreleased = $railAirTs > 0 && $railAirTs > time();
                                 @endphp
                                 <div class="flex-none w-48 h-[210px] rounded-2xl border {{ $isCurrent ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-500/10' : 'border-theme-default bg-theme-raised/80 hover:border-theme-highlight' }} overflow-hidden cursor-pointer hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
                                      onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($workTitle) }} • {{ $unitShort }} {{ $ep->number }}')">
@@ -574,7 +586,11 @@
                                             <span class="text-[9px] font-mono {{ $isCurrent ? 'text-emerald-400 font-bold' : 'text-theme-muted' }}">
                                                 {{ $isCurrent ? '● Selecionado' : 'Ir para ' . $unitShort . ' ' . $ep->number . ' ❯' }}
                                             </span>
-                                            @if(!$isManga)
+                                            @if($isRailUnreleased)
+                                                <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[8px] font-mono font-bold" title="Lançamento em {{ date('d/m/Y', $railAirTs) }}">
+                                                    ⏳ Breve
+                                                </span>
+                                            @elseif(!$isManga)
                                                 <button type="button"
                                                         data-requires-addon-capability="video"
                                                         onclick="event.stopPropagation(); window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $ep->id }}', '{{ $ep->number }}', '{{ addslashes($workTitle) }}')"

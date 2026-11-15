@@ -246,6 +246,10 @@
 
                         <div id="arc-episodes-rail" data-draggable-rail="true" class="flex-1 overflow-x-auto no-scrollbar flex items-center gap-4 py-1 px-1 scroll-smooth cursor-grab active:cursor-grabbing">
                             @forelse($displayArcEpisodes as $ep)
+                                @php
+                                    $arcEpAirTs = !empty($ep->air_date_utc) ? strtotime($ep->air_date_utc) : 0;
+                                    $isArcEpUnreleased = $arcEpAirTs > 0 && $arcEpAirTs > time();
+                                @endphp
                                 <div class="flex-none w-48 h-[210px] rounded-2xl border border-theme-default bg-theme-raised overflow-hidden cursor-pointer hover:border-theme-highlight hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
                                      onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($workTitle) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')">
                                     <div class="relative w-full h-28 overflow-hidden bg-black shrink-0">
@@ -265,7 +269,11 @@
                                         </div>
                                         <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
                                             <span class="text-[9px] font-mono text-theme-muted group-hover:text-theme-accent transition-colors">{{ $isManga ? 'Abrir Capítulo ❯' : 'Abrir Episódio ❯' }}</span>
-                                            @if($work)
+                                            @if($isArcEpUnreleased)
+                                                <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-mono font-bold" title="Lançamento em {{ date('d/m/Y', $arcEpAirTs) }}">
+                                                    ⏳ Em Breve
+                                                </span>
+                                            @elseif($work)
                                                 <button type="button"
                                                         data-requires-addon-capability="video"
                                                         onclick="event.stopPropagation(); window.launchExternalVideoAddon('{{ $work->id }}', '{{ $ep->id }}', '{{ $ep->number }}', '{{ addslashes($workTitle) }}')"

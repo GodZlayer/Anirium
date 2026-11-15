@@ -27,6 +27,12 @@
     $isManga = $media === 'manga' || in_array($format, ['MANGA', 'MANHWA', 'MANHUA', 'ONE_SHOT', 'DOUJINSHI', 'NOVEL', 'LIGHT_NOVEL', 'OEL'], true);
     $status = strtoupper($work->status ?? 'COMPLETED');
     $isUnreleased = in_array($status, ['NOT_YET_RELEASED', 'NOT_YET_AIRED', 'UPCOMING', 'UNRELEASED'], true);
+    if ($isEpisodeMode && !empty($currentEpisode->air_date_utc)) {
+        $curAirTs = strtotime($currentEpisode->air_date_utc);
+        if ($curAirTs > 0 && $curAirTs > time()) {
+            $isUnreleased = true;
+        }
+    }
     $image = $work->image_url ?? '/assets/icons/actions/search.png';
     $synopsis = strip_tags($work->synopsis ?? 'Sinopse oficial catalogada na malha ontológica relacional.');
     $isEpisodeMode = !empty($currentEpisode);
@@ -320,6 +326,8 @@
                                 @php
                                     $isCurrentEp = $isEpisodeMode && (($currentEpisode->id ?? '') === $ep->id || ($currentEpisode->number ?? 0) == $ep->number);
                                     $isVirtualEp = !empty($ep->is_virtual);
+                                    $epAirTs = !empty($ep->air_date_utc) ? strtotime($ep->air_date_utc) : 0;
+                                    $isEpUnreleased = $epAirTs > 0 && $epAirTs > time();
                                 @endphp
                                 <div class="flex-none w-52 h-[210px] rounded-2xl border {{ $isCurrentEp ? 'border-theme-accent ring-2 ring-theme-accent/30 bg-theme-raised' : 'border-theme-default bg-theme-raised/80 hover:border-theme-highlight' }} overflow-hidden cursor-pointer hover:scale-[1.03] transition-all shadow-lg group flex flex-col justify-between"
                                      onclick="window.pushNavigation('episode', '{{ $ep->id }}', '{{ addslashes($title) }} • {{ $isManga ? 'Cap.' : 'Ep.' }} {{ $ep->number }}')">
@@ -345,7 +353,11 @@
                                         </div>
                                         <div class="flex items-center justify-between pt-1.5 border-t border-theme-default/40">
                                             <span class="text-[9px] font-mono text-theme-muted group-hover:text-theme-accent transition-colors">{{ $isManga ? 'Abrir Capítulo ❯' : 'Abrir Episódio ❯' }}</span>
-                                            @if(!$isManga)
+                                            @if($isEpUnreleased)
+                                                <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-mono font-bold" title="Lançamento em {{ date('d/m/Y', $epAirTs) }}">
+                                                    ⏳ Em Breve
+                                                </span>
+                                            @elseif(!$isManga)
                                                 <button type="button"
                                                         data-requires-addon-capability="video"
                                                         onclick="event.stopPropagation(); window.launchExternalVideoAddon('{{ $work->id ?? '' }}', '{{ $ep->id }}', '{{ $ep->number }}', '{{ addslashes($title) }}')"
