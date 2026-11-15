@@ -887,9 +887,14 @@
             episode: parseInt(params.get('ep') || '1', 10) || 1,
             season: parseInt(params.get('season') || '1', 10) || 1,
             totalEpisodes: parseInt(params.get('totalEpisodes') || '0', 10) || 0,
+            malId: parseInt(params.get('malId') || '0', 10) || 0,
+            format: params.get('format') || 'TV',
             initialResumeTime: Math.floor(parseFloat(params.get('resume') || '0')) || 0,
             hasResumed: false,
             title: params.get('title') || 'Anime',
+            titleEnglish: params.get('titleEnglish') || '',
+            titleRomaji: params.get('titleRomaji') || '',
+            titleNative: params.get('titleNative') || '',
             token: params.get('token') || '',
             playerSessionId: params.get('playerSessionId') || '',
             deviceId: params.get('deviceId') || '',
@@ -2059,10 +2064,13 @@
                 token: state.token,
                 deviceId: state.deviceId,
                 title: state.title,
-                titleEnglish: state.title,
-                titleRomaji: state.title,
+                titleEnglish: state.titleEnglish || state.title,
+                titleRomaji: state.titleRomaji || state.title,
                 season: state.season || 1,
-                episode: state.episode || 1
+                episode: state.episode || 1,
+                malId: state.malId || 0,
+                format: state.format || 'TV',
+                episodeCount: state.totalEpisodes || 0
             };
 
             try {
