@@ -447,9 +447,9 @@
     </div>
 
     <!-- 7. MODAL EXTERNO DE EXECUÇÃO DE ADD-ON (VÍDEO PLAYER PRO / MANGA READER PRO / COMUNIDADE) -->
-    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-1 sm:p-2 md:p-2.5 opacity-0 pointer-events-none transition-all duration-200">
-        <div class="w-full max-w-[99vw] h-[98vh] max-h-[98vh] rounded-2xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col min-h-0">
-            <div class="px-4 py-2 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0">
+    <div id="modal-external-addon" class="fixed inset-0 z-[75] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 sm:p-0.5 opacity-0 pointer-events-none transition-all duration-200">
+        <div class="w-full max-w-[100vw] h-full sm:h-[99.5vh] max-h-[100vh] sm:rounded-2xl bg-theme-surface border border-theme-default shadow-2xl overflow-hidden flex flex-col min-h-0">
+            <div class="px-3 sm:px-4 py-1.5 border-b border-theme-default flex items-center justify-between bg-theme-header shrink-0">
                 <div class="flex items-center gap-2.5 min-w-0">
                     <span id="external-addon-icon" class="text-theme-accent text-sm">⚡</span>
                     <div class="min-w-0">

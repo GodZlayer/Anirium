@@ -469,21 +469,79 @@
             position: absolute;
             bottom: calc(100% + 12px);
             right: 0;
-            background: rgba(14, 17, 24, 0.96);
-            backdrop-filter: blur(14px);
+            background: rgba(14, 17, 24, 0.97);
+            backdrop-filter: blur(16px);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 6px;
-            min-width: 180px;
+            border-radius: 14px;
+            padding: 8px;
+            min-width: 220px;
+            max-width: 320px;
+            max-height: 55vh;
             display: none;
             flex-direction: column;
-            gap: 2px;
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+            gap: 4px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8);
             z-index: 50;
+            overflow: hidden;
         }
 
         .popover-card.open {
             display: flex;
+        }
+
+        .popover-scroll-area {
+            overflow-y: auto;
+            max-height: calc(55vh - 45px);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding-right: 4px;
+        }
+
+        .popover-scroll-area::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .popover-scroll-area::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        .popover-scroll-area::-webkit-scrollbar-thumb {
+            background: rgba(255, 199, 102, 0.4);
+            border-radius: 4px;
+        }
+
+        .popover-header {
+            padding: 6px 10px;
+            font-size: 10px;
+            color: var(--muted);
+            border-bottom: 1px solid var(--border);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+        }
+
+        .popover-group-title {
+            padding: 6px 8px 3px 8px;
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .popover-group-title:first-child {
+            border-top: none;
+            margin-top: 0;
         }
 
         .popover-item {
@@ -491,7 +549,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 8px;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 8px;
             font-size: 11px;
             font-weight: 600;
@@ -499,8 +557,9 @@
             background: transparent;
             border: none;
             cursor: pointer;
-            transition: background 0.15s ease;
+            transition: background 0.15s ease, color 0.15s ease;
             text-align: left;
+            width: 100%;
         }
 
         .popover-item:hover {
@@ -512,6 +571,75 @@
             background: rgba(255, 199, 102, 0.2);
             color: var(--accent);
             font-weight: 800;
+        }
+
+        /* Configurações Customizadas de Legenda (Tamanho, Cor, Fundo) */
+        .sub-config-box {
+            padding: 8px;
+            background: rgba(22, 27, 38, 0.85);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            margin-top: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .sub-config-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            font-size: 10px;
+            color: var(--muted);
+        }
+
+        .sub-config-btn-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sub-config-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 2px 7px;
+            border-radius: 6px;
+            font-size: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.15s ease;
+        }
+
+        .sub-config-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .sub-config-btn.active {
+            background: var(--accent);
+            color: #07080C;
+            border-color: var(--accent);
+        }
+
+        .sub-color-pill {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .sub-color-pill:hover {
+            transform: scale(1.15);
+        }
+
+        .sub-color-pill.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent);
         }
 
         /* Barra de Telemetria Integrada no Player */
@@ -744,7 +872,48 @@
             currentWindow: null
         };
 
-        const episodeEpoch = Date.UTC(2000, 0, 1);
+        const savedSubSettings = JSON.parse(localStorage.getItem('anirium_sub_settings') || '{}');
+        const subConfig = {
+            fontSize: savedSubSettings.fontSize || 'medium', // small (15px), medium (18px), large (22px)
+            color: savedSubSettings.color || '#FFFFFF',
+            bgColor: savedSubSettings.bgColor || 'rgba(0, 0, 0, 0.82)'
+        };
+
+        function saveSubConfig() {
+            localStorage.setItem('anirium_sub_settings', JSON.stringify(subConfig));
+            applySubStyles();
+        }
+
+        function applySubStyles() {
+            const fontMap = {
+                small: '14px',
+                medium: '18px',
+                large: '23px'
+            };
+            if (dom.subtitleText) {
+                dom.subtitleText.style.fontSize = fontMap[subConfig.fontSize] || '18px';
+                dom.subtitleText.style.color = subConfig.color;
+                dom.subtitleText.style.background = subConfig.bgColor;
+            }
+        }
+
+        function setSubFontSize(sz) {
+            subConfig.fontSize = sz;
+            saveSubConfig();
+            renderSubMenu();
+        }
+
+        function setSubColor(col) {
+            subConfig.color = col;
+            saveSubConfig();
+            renderSubMenu();
+        }
+
+        function setSubBgColor(bg) {
+            subConfig.bgColor = bg;
+            saveSubConfig();
+            renderSubMenu();
+        }
         function episodeTimeFromProgramDate(date) {
             if (!date) return null;
             const pos = (date.getTime() - episodeEpoch) / 1000;
@@ -1242,57 +1411,130 @@
         // ==========================================
         function renderQualityMenu() {
             const m = state.manifest || {};
-            const qualities = Array.isArray(m.qualities) ? m.qualities : [];
+            const rawQualities = Array.isArray(m.qualities) ? m.qualities : [];
+            const qualityOrder = ['1080p', '720p', '480p', '360p'];
+            const qualities = [...rawQualities].sort((a, b) => {
+                const idxA = qualityOrder.indexOf(a);
+                const idxB = qualityOrder.indexOf(b);
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
             dom.btnQuality.innerText = state.selectedQuality || 'HD';
 
             dom.cardQuality.innerHTML = `
-                <div style="padding: 6px 10px; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;">
-                    QUALIDADES DISPONÍVEIS
+                <div class="popover-header">
+                    <span>QUALIDADE DE VÍDEO</span>
+                    <span style="font-size: 9px; opacity: 0.7;">${qualities.length} opções</span>
                 </div>
-                ${qualities.map(q => `
-                    <button type="button" class="popover-item ${state.selectedQuality === q ? 'active' : ''}" onclick="selectQuality('${q}')">
-                        <span>${q}</span>
-                        ${state.selectedQuality === q ? '<span>✓</span>' : ''}
-                    </button>
-                `).join('')}
+                <div class="popover-scroll-area">
+                    ${qualities.map(q => `
+                        <button type="button" class="popover-item ${state.selectedQuality === q ? 'active' : ''}" onclick="selectQuality('${q}')">
+                            <span>${q}</span>
+                            ${state.selectedQuality === q ? '<span>✓</span>' : ''}
+                        </button>
+                    `).join('')}
+                </div>
             `;
         }
 
         function renderAudioMenu() {
             const m = state.manifest || {};
-            const audios = Array.isArray(m.audioChoices) && m.audioChoices.length > 0
+            const rawAudios = Array.isArray(m.audioChoices) && m.audioChoices.length > 0
                 ? m.audioChoices
                 : (Array.isArray(m.audios) ? m.audios : []);
 
+            const audios = [...rawAudios].sort((a, b) => langLabel(a).localeCompare(langLabel(b)));
+
             dom.cardAudio.innerHTML = `
-                <div style="padding: 6px 10px; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;">
-                    FAIXAS DE ÁUDIO
+                <div class="popover-header">
+                    <span>FAIXAS DE ÁUDIO</span>
+                    <span style="font-size: 9px; opacity: 0.7;">${audios.length} faixas</span>
                 </div>
-                ${audios.map(a => `
-                    <button type="button" class="popover-item ${state.selectedAudio === a ? 'active' : ''}" onclick="selectAudio('${a}')">
-                        <span>${langLabel(a)}</span>
-                        ${state.selectedAudio === a ? '<span>✓</span>' : ''}
-                    </button>
-                `).join('')}
+                <div class="popover-scroll-area">
+                    ${audios.map(a => `
+                        <button type="button" class="popover-item ${state.selectedAudio === a ? 'active' : ''}" onclick="selectAudio('${a}')">
+                            <span>${langLabel(a)}</span>
+                            ${state.selectedAudio === a ? '<span>✓</span>' : ''}
+                        </button>
+                    `).join('')}
+                </div>
             `;
         }
 
         function renderSubMenu() {
-            const subTracks = Array.isArray(state.subtitleTracks) ? state.subtitleTracks : [];
-            dom.cardSub.innerHTML = `
-                <div style="padding: 6px 10px; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 700;">
-                    LEGENDAS SINCRONIZADAS
-                </div>
+            const rawTracks = Array.isArray(state.subtitleTracks) ? state.subtitleTracks : [];
+
+            // Agrupa e ordena faixas por idioma em ordem alfabética
+            const groups = {};
+            rawTracks.forEach((st, idx) => {
+                const lang = langLabel(st.language || 'und');
+                if (!groups[lang]) groups[lang] = [];
+                groups[lang].push({ ...st, originalIndex: idx });
+            });
+
+            const sortedLanguages = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+
+            // Configuração visual de legenda ativa
+            applySubStyles();
+
+            let tracksHtml = `
                 <button type="button" class="popover-item ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? 'active' : ''}" onclick="fetchSubtitleTrack('off', true); closeAllPopovers();">
-                    <span>Desativada</span>
+                    <span>🚫 Desativada</span>
                     ${(!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off') ? '<span>✓</span>' : ''}
                 </button>
-                ${subTracks.map((st, i) => `
-                    <button type="button" class="popover-item ${state.selectedSubtitleTrackId === st.id ? 'active' : ''}" onclick="fetchSubtitleTrack('${st.id}', true); closeAllPopovers();">
-                        <span>${st.title || langLabel(st.language)} #${i + 1}</span>
-                        ${state.selectedSubtitleTrackId === st.id ? '<span>✓</span>' : ''}
-                    </button>
-                `).join('')}
+            `;
+
+            sortedLanguages.forEach(lang => {
+                tracksHtml += `<div class="popover-group-title"><span>${lang}</span><span style="font-size: 8px; opacity: 0.6;">${groups[lang].length}</span></div>`;
+                groups[lang].forEach(st => {
+                    const label = st.title ? st.title : `Opção ${st.originalIndex + 1}`;
+                    tracksHtml += `
+                        <button type="button" class="popover-item ${state.selectedSubtitleTrackId === st.id ? 'active' : ''}" onclick="fetchSubtitleTrack('${st.id}', true); closeAllPopovers();" style="padding-left: 14px;">
+                            <span class="truncate">${label}</span>
+                            ${state.selectedSubtitleTrackId === st.id ? '<span>✓</span>' : ''}
+                        </button>
+                    `;
+                });
+            });
+
+            dom.cardSub.innerHTML = `
+                <div class="popover-header">
+                    <span>LEGENDAS SINCRONIZADAS</span>
+                    <span style="font-size: 9px; opacity: 0.7;">${rawTracks.length} faixas</span>
+                </div>
+                <div class="popover-scroll-area">
+                    ${tracksHtml}
+                </div>
+                <div class="sub-config-box">
+                    <div class="sub-config-row">
+                        <span>Tamanho da Fonte:</span>
+                        <div class="sub-config-btn-group">
+                            <button type="button" class="sub-config-btn ${subConfig.fontSize === 'small' ? 'active' : ''}" onclick="setSubFontSize('small')">A-</button>
+                            <button type="button" class="sub-config-btn ${subConfig.fontSize === 'medium' ? 'active' : ''}" onclick="setSubFontSize('medium')">A</button>
+                            <button type="button" class="sub-config-btn ${subConfig.fontSize === 'large' ? 'active' : ''}" onclick="setSubFontSize('large')">A+</button>
+                        </div>
+                    </div>
+                    <div class="sub-config-row">
+                        <span>Cor do Texto:</span>
+                        <div class="sub-config-btn-group">
+                            <span class="sub-color-pill ${subConfig.color === '#FFFFFF' ? 'active' : ''}" style="background: #FFFFFF;" title="Branco" onclick="setSubColor('#FFFFFF')"></span>
+                            <span class="sub-color-pill ${subConfig.color === '#FFC766' ? 'active' : ''}" style="background: #FFC766;" title="Amarelo / Dourado" onclick="setSubColor('#FFC766')"></span>
+                            <span class="sub-color-pill ${subConfig.color === '#6EE7B7' ? 'active' : ''}" style="background: #6EE7B7;" title="Verde Esmeralda" onclick="setSubColor('#6EE7B7')"></span>
+                            <span class="sub-color-pill ${subConfig.color === '#67E8F9' ? 'active' : ''}" style="background: #67E8F9;" title="Ciano" onclick="setSubColor('#67E8F9')"></span>
+                        </div>
+                    </div>
+                    <div class="sub-config-row">
+                        <span>Fundo da Caixa:</span>
+                        <div class="sub-config-btn-group">
+                            <button type="button" class="sub-config-btn ${subConfig.bgColor === 'transparent' ? 'active' : ''}" onclick="setSubBgColor('transparent')">Nenhum</button>
+                            <button type="button" class="sub-config-btn ${subConfig.bgColor === 'rgba(0, 0, 0, 0.5)' ? 'active' : ''}" onclick="setSubBgColor('rgba(0, 0, 0, 0.5)')">Médio</button>
+                            <button type="button" class="sub-config-btn ${subConfig.bgColor === 'rgba(0, 0, 0, 0.88)' ? 'active' : ''}" onclick="setSubBgColor('rgba(0, 0, 0, 0.88)')">Sólido</button>
+                        </div>
+                    </div>
+                </div>
             `;
         }
 
