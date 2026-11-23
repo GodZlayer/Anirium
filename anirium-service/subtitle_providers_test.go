@@ -7,7 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestAccountSubtitleCapabilitiesReachRemoteManifest(t *testing.T) {
@@ -84,5 +87,36 @@ func TestAuthorizedSubtitleProviderDiscoveryAndConversion(t *testing.T) {
 	content, err := externalSubtitleVTT(context.Background(), results[0])
 	if err != nil || !strings.HasPrefix(content, "WEBVTT") || !strings.Contains(content, "00:01.000") || !strings.Contains(content, "Legenda do provider") {
 		t.Fatalf("subtitle conversion: %s %v", content, err)
+	}
+}
+
+func TestProviderSnapshotStoreDeduplicatesEpisodeIdentityLookup(t *testing.T) {
+	store := newProviderSnapshotStore()
+	var calls atomic.Int32
+	store.resolveIdentity = func(_ context.Context, query PlaybackPrepareRequest) PlaybackPrepareRequest {
+		calls.Add(1)
+		time.Sleep(20 * time.Millisecond)
+		query.VideoID = "tt999:1:2"
+		query.MediaType = "series"
+		query.Season = 1
+		return query
+	}
+	var wg sync.WaitGroup
+	results := make([]PlaybackPrepareRequest, 5)
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			results[idx] = store.episodeIdentity(context.Background(), PlaybackPrepareRequest{MALID: 123, Episode: 2, EpisodeCount: 12})
+		}(i)
+	}
+	wg.Wait()
+	if calls.Load() != 1 {
+		t.Fatalf("expected single identity lookup, got %d", calls.Load())
+	}
+	for i, res := range results {
+		if res.VideoID != "tt999:1:2" || res.MediaType != "series" || res.Season != 1 {
+			t.Fatalf("caller %d got wrong identity: %+v", i, res)
+		}
 	}
 }

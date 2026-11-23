@@ -32,11 +32,45 @@ class CatalogPlaybackContext
         }
 
         $titleRows = DB::table('catalog_entity_titles')->where('entity_id', $workId)->get(['locale', 'title']);
-        $titleEnglish = $titleRows->firstWhere('locale', 'en')?->title ?? '';
-        $titleRomaji = $titleRows->whereIn('locale', ['und', 'romaji', 'ja-latn'])->first()?->title ?? $work->title;
+        $byLocale = [];
+        foreach ($titleRows as $row) {
+            $loc = strtolower((string) $row->locale);
+            $val = trim((string) $row->title);
+            if ($val !== '' && ! isset($byLocale[$loc])) {
+                $byLocale[$loc] = $val;
+            }
+        }
+
+        $titleEnglish = $byLocale['en'] ?? '';
+        $titleRomaji = '';
+        foreach (['x-jat', 'ja-latn', 'zh-latn', 'ko-latn', 'romaji', 'und'] as $loc) {
+            if (! empty($byLocale[$loc])) {
+                $titleRomaji = $byLocale[$loc];
+                break;
+            }
+        }
+        $titleNative = '';
+        foreach (['ja', 'zh', 'zh-hans', 'zh-hant', 'ko'] as $loc) {
+            if (! empty($byLocale[$loc])) {
+                $titleNative = $byLocale[$loc];
+                break;
+            }
+        }
+
+        $aliases = [];
+        foreach ($titleRows as $row) {
+            $val = trim((string) $row->title);
+            if ($val !== '' && ! in_array($val, $aliases, true)) {
+                $aliases[] = $val;
+            }
+            if (count($aliases) >= 24) {
+                break;
+            }
+        }
 
         return ['schema' => 1, 'workId' => $workId, 'episodeId' => $episode?->id, 'seasonId' => $season?->id,
             'title' => $work->title, 'titleEnglish' => $titleEnglish ?: $work->title, 'titleRomaji' => $titleRomaji ?: $work->title,
+            'titleNative' => $titleNative, 'aliases' => $aliases,
             'episode' => $episode?->number ?? 1, 'season' => $seasonNum, 'format' => $work->format ?? '', 'episodeCount' => $work->episode_count,
             'references' => $references->map(fn (object $reference) => ['provider' => $reference->provider, 'namespace' => $reference->namespace, 'id' => $reference->external_id])->all()];
     }

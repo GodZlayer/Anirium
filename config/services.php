@@ -6,6 +6,11 @@ return [
         'service_secret' => env('ANIRIUM_SERVICE_SECRET', 'development-only-anirium-service-secret'),
     ],
 
+    'ollama' => [
+        'url' => env('OLLAMA_URL', 'http://host.docker.internal:11434'),
+        'model' => env('OLLAMA_TRANSLATE_MODEL', 'gemma4:e2b-it-qat'),
+    ],
+
     'myanimelist' => [
         'client_id' => env('MAL_CLIENT_ID'),
         'detail_budget' => env('MAL_DETAIL_BUDGET', 1000),

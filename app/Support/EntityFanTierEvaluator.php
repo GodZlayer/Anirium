@@ -54,8 +54,12 @@ class EntityFanTierEvaluator
             ->where('numbering_scheme', 'original')
             ->get();
 
+        $scheduleLatestEp = (int) (DB::table('catalog_work_schedules')->where('work_id', $workId)->value('latest_episode_num') ?? 0);
         $now = now()->timestamp;
-        $releasedEpisodes = $episodes->filter(function ($ep) use ($work, $now) {
+        $releasedEpisodes = $episodes->filter(function ($ep) use ($work, $scheduleLatestEp, $now) {
+            if ($scheduleLatestEp > 0 && (int) $ep->number <= $scheduleLatestEp) {
+                return true;
+            }
             if ($ep->air_date_utc !== null) {
                 $t = strtotime($ep->air_date_utc);
 

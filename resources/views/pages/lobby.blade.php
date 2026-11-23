@@ -216,36 +216,38 @@
                 </div>
             </div>
 
-            @if(!$user)
-                <!-- DESLOGADO: BOTÃO OFICIAL LIMPO "ENTRAR COM GOOGLE" (Apenas o Ícone Oficial SVG) -->
-                <a href="/auth/google"
-                   title="Entrar com o Google" data-i18n-title="auth.google"
-                   class="w-8 h-8 rounded-full border border-theme-default bg-theme-surface hover:border-theme-highlight flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-md cursor-pointer shrink-0">
-                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                    </svg>
-                </a>
-            @else
-                <!-- LOGADO: MOLDURA LOLPROFILEBADGE COM ANEL DE XP E NÍVEL -->
-                <div class="relative flex items-center gap-3 px-3 py-1 rounded-full border border-white/10 bg-[#0E1118]/80 cursor-pointer hover:border-theme-accent/50 transition-all"
-                     onclick="window.openProfileModal()">
-                    <div class="relative w-9 h-9 flex items-center justify-center">
-                        <img src="{{ $user->avatar ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80' }}"
-                             alt="{{ $user->name }}"
-                             class="w-8 h-8 rounded-full object-cover">
-                        <span class="absolute -bottom-1 -right-1 px-1.5 py-0.2 text-[9px] font-black rounded-full bg-theme-accent text-theme-inverse font-mono shadow-md">
-                            {{ $user->tier ?? 1 }}
-                        </span>
+            <div id="header-auth-slot" class="shrink-0">
+                @if(!$user)
+                    <!-- DESLOGADO: BOTÃO OFICIAL LIMPO "ENTRAR COM GOOGLE" (Apenas o Ícone Oficial SVG) -->
+                    <a href="/auth/google"
+                       title="Entrar com o Google" data-i18n-title="auth.google"
+                       class="w-8 h-8 rounded-full border border-theme-default bg-theme-surface hover:border-theme-highlight flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-md cursor-pointer shrink-0">
+                        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                        </svg>
+                    </a>
+                @else
+                    <!-- LOGADO: MOLDURA LOLPROFILEBADGE COM ANEL DE XP E NÍVEL -->
+                    <div class="relative flex items-center gap-3 px-3 py-1 rounded-full border border-white/10 bg-[#0E1118]/80 cursor-pointer hover:border-theme-accent/50 transition-all"
+                         onclick="window.openProfileModal()">
+                        <div class="relative w-9 h-9 flex items-center justify-center">
+                            <img src="{{ $user->avatar ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80' }}"
+                                 alt="{{ $user->name }}"
+                                 class="w-8 h-8 rounded-full object-cover">
+                            <span class="absolute -bottom-1 -right-1 px-1.5 py-0.2 text-[9px] font-black rounded-full bg-theme-accent text-theme-inverse font-mono shadow-md">
+                                {{ $user->tier ?? 1 }}
+                            </span>
+                        </div>
+                        <div class="flex flex-col text-left">
+                            <span class="text-xs font-bold text-white leading-tight max-w-[120px] truncate">{{ $user->name }}</span>
+                            <span class="text-[9px] font-mono text-theme-accent leading-none mt-0.5">🔥 {{ $user->current_streak ?? 1 }}d • {{ $user->streak_xp ?? 0 }} XP</span>
+                        </div>
                     </div>
-                    <div class="flex flex-col text-left">
-                        <span class="text-xs font-bold text-white leading-tight max-w-[120px] truncate">{{ $user->name }}</span>
-                        <span class="text-[9px] font-mono text-theme-accent leading-none mt-0.5">🔥 {{ $user->current_streak ?? 1 }}d • {{ $user->streak_xp ?? 0 }} XP</span>
-                    </div>
-                </div>
-            @endif
+                @endif
+            </div>
         </div>
     </header>
 
@@ -472,16 +474,98 @@
 
     @push('scripts')
     <script>
-        // PROCESSAMENTO DE AUTENTICACAO GOOGLE OAUTH (#id_token=...)
+        // PROCESSAMENTO DE AUTENTICACAO GOOGLE OAUTH (#id_token=...) E VERIFICACAO DE IDADE (+18)
         (function handleGoogleOAuthHash() {
             if (typeof window === 'undefined') return;
+
+            function decodeJwtPayload(token) {
+                try {
+                    const parts = String(token || '').split('.');
+                    if (parts.length < 2) return null;
+                    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+                    while (base64.length % 4 !== 0) {
+                        base64 += '=';
+                    }
+                    const binary = window.atob(base64);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i += 1) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    const json = typeof TextDecoder !== 'undefined'
+                        ? new TextDecoder('utf-8').decode(bytes)
+                        : decodeURIComponent(escape(binary));
+                    const parsed = JSON.parse(json);
+                    return parsed && typeof parsed === 'object' ? parsed : null;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function escapeHtml(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function safeAvatarUrl(rawUrl, fallbackName) {
+                const candidate = String(rawUrl || '').trim();
+                if (/^https?:\/\//i.test(candidate)) {
+                    return candidate;
+                }
+                return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(fallbackName || 'User') + '&background=ef4444&color=fff&bold=true';
+            }
+
             const hash = window.location.hash;
-            if (hash && (hash.includes('id_token=') || hash.includes('access_token='))) {
+            if (hash && (hash.includes('id_token=') || hash.includes('access_token=') || hash.includes('state=age_verify'))) {
                 const params = new URLSearchParams(hash.substring(1));
+                const state = params.get('state') || '';
                 const idToken = params.get('id_token');
+                const accessToken = params.get('access_token');
+                const oauthError = params.get('error');
                 window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
+                if (state.startsWith('age_verify:')) {
+                    window.__pendingGoogleAgeVerify = {
+                        state: state,
+                        idToken: idToken || '',
+                        accessToken: accessToken || '',
+                        error: oauthError || ''
+                    };
+                    return;
+                }
+
                 if (idToken) {
+                    const authSlot = document.getElementById('header-auth-slot');
+                    const previousSlotHtml = authSlot ? authSlot.innerHTML : null;
+                    const jwtClaims = decodeJwtPayload(idToken);
+                    if (authSlot) {
+                        const fallbackEmail = String(jwtClaims?.email || '').trim();
+                        const optimisticName = String(jwtClaims?.name || (fallbackEmail ? fallbackEmail.split('@')[0] : 'Conectando...')).trim() || 'Conectando...';
+                        const optimisticAvatar = safeAvatarUrl(jwtClaims?.picture, optimisticName);
+                        authSlot.innerHTML = `
+                            <div class="relative flex items-center gap-3 px-3 py-1 rounded-full border border-white/10 bg-[#0E1118]/80 animate-pulse">
+                                <div class="relative w-9 h-9 flex items-center justify-center">
+                                    <img src="${escapeHtml(optimisticAvatar)}"
+                                         alt="${escapeHtml(optimisticName)}"
+                                         class="w-8 h-8 rounded-full object-cover">
+                                </div>
+                                <div class="flex flex-col text-left">
+                                    <span class="text-xs font-bold text-white leading-tight max-w-[120px] truncate">${escapeHtml(optimisticName)}</span>
+                                    <span class="text-[9px] font-mono text-theme-accent leading-none mt-0.5">Conectando...</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const restoreSlot = () => {
+                        if (authSlot && previousSlotHtml !== null) {
+                            authSlot.innerHTML = previousSlotHtml;
+                        }
+                    };
+
                     fetch('/api/auth/google', {
                         method: 'POST',
                         headers: {
@@ -497,10 +581,12 @@
                         if (data && data.success) {
                             window.location.reload();
                         } else {
+                            restoreSlot();
                             console.error('[Anirium Auth] Falha na validacao do token Google:', data);
                         }
                     })
                     .catch(err => {
+                        restoreSlot();
                         console.error('[Anirium Auth] Erro de rede ao autenticar com o Google:', err);
                     });
                 }
@@ -511,7 +597,7 @@
         // ESTADO GLOBAL REATIVO DO ANIRIUM
         window.heroRoll = @json($featuredRoll);
         window.heroIndex = 0;
-        window.currentUser = @json($user);
+        window.currentUser = @json($frontendUser);
         window.userPreferences = @json($userPreferences ?? []);
         
         // Catálogo e Calendário na máquina do cliente
@@ -721,9 +807,49 @@
 };
 
         // 2. DERIVAÇÃO DETERMINÍSTICA DO HERO ROLL PELO CALENDÁRIO E HORÁRIO ATUAL (Playhead Contínuo)
-                // FILTRO GLOBAL DETERMINÍSTICO DE PORNOGRAFIA / ADULTO (Forçado por Padrão em Todo o Sistema)
+        // FILTRO GLOBAL DETERMINÍSTICO DE PORNOGRAFIA / ADULTO (+18 Verificado por Padrão)
         window.isAdultContentAllowed = function() {
-            return Boolean(window.currentUser && window.currentUser.adult_content_enabled);
+            return Boolean(
+                window.currentUser
+                && window.currentUser.age_verified === true
+                && window.currentUser.adult_content_enabled === true
+            );
+        };
+
+        window.adultShardsCache = window.adultShardsCache || {};
+        window.adultShardsPromises = window.adultShardsPromises || {};
+        window.syncAdultShardsIfAllowed = async function(kind) {
+            if (!window.isAdultContentAllowed()) {
+                window.adultShardsCache = {};
+                return;
+            }
+            const targetKinds = (kind === 'manga') ? ['manga'] : (kind === 'work' ? ['work'] : ['work', 'manga']);
+            await Promise.all(targetKinds.map(async (k) => {
+                if (Array.isArray(window.adultShardsCache[k])) return;
+                if (window.adultShardsPromises[k]) return window.adultShardsPromises[k];
+                window.adultShardsPromises[k] = (async () => {
+                    try {
+                        const res = await fetch(`/api/catalog/adult-shard/${k}`, {
+                            cache: 'no-store',
+                            headers: { 'Accept': 'application/json' }
+                        });
+                        if (res.ok) {
+                            const items = await res.json();
+                            if (Array.isArray(items) && window.isAdultContentAllowed()) {
+                                window.adultShardsCache[k] = items;
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('[Anirium Adult Shards] Falha ao carregar acervo autenticado:', k, err);
+                    } finally {
+                        delete window.adultShardsPromises[k];
+                    }
+                })();
+                await window.adultShardsPromises[k];
+            }));
+            if (window.currentTab === 'explore') {
+                window.runClientSideCatalogFilter();
+            }
         };
 
         window.isAdultEntity = function(item) {
@@ -887,6 +1013,9 @@
             window.explorePage = 1;
 
             // Carregamento dinâmico otimizado do shard específico da entidade se ainda não estiver em cache
+            if (kind === 'work' || kind === 'manga') {
+                window.syncAdultShardsIfAllowed(kind);
+            }
             if (kind === 'work' && !window.fullCatalogSynced && typeof window.ensureFullCatalogSynced === 'function') {
                 window.ensureFullCatalogSynced();
                 return;
@@ -935,10 +1064,29 @@
 
         window.runClientSideCatalogFilter = function() {
             const query = (document.getElementById('topbar-search-input')?.value || document.getElementById('mobile-search-input')?.value || '').toLowerCase().trim();
-            // Trava +24 Anos é estritamente baseada no perfil da conta logada (sem botão no catálogo público)
+            // Trava +18 Anos é estritamente baseada na verificação + preferência da conta logada
             const allowAdult = window.isAdultContentAllowed();
 
-            let filtered = (window.clientCatalog || []).filter(item => {
+            let catalogSource = window.clientCatalog || [];
+            if (allowAdult && (window.exploreKindFilter === 'work' || window.exploreKindFilter === 'manga')) {
+                const extraAdult = window.adultShardsCache?.[window.exploreKindFilter];
+                if (Array.isArray(extraAdult) && extraAdult.length > 0) {
+                    const seenIds = new Set(catalogSource.map(entry => String(entry.id)));
+                    const merged = [...catalogSource];
+                    for (let i = 0; i < extraAdult.length; i++) {
+                        const adultItem = extraAdult[i];
+                        if (!seenIds.has(String(adultItem.id))) {
+                            seenIds.add(String(adultItem.id));
+                            merged.push(adultItem);
+                        }
+                    }
+                    catalogSource = merged;
+                } else {
+                    window.syncAdultShardsIfAllowed(window.exploreKindFilter);
+                }
+            }
+
+            let filtered = catalogSource.filter(item => {
                 // FILTRO GLOBAL DE PORNOGRAFIA (Forçado por padrão em todo o sistema)
                 if (!allowAdult && window.isAdultEntity(item)) return false;
 
@@ -1105,6 +1253,11 @@
                         <span class="absolute top-2 left-2 text-[10px] font-black font-mono px-2 py-0.5 rounded-full bg-black/75 text-theme-accent border border-white/10 uppercase">
                             ${badgeLabel}
                         </span>
+                        ${item.is_adult ? `
+                        <span class="absolute bottom-2 left-2 text-[9px] font-black font-mono px-2 py-0.5 rounded-md bg-red-600/90 text-white border border-red-400/50 uppercase shadow-sm">
+                            +18
+                        </span>
+                        ` : ''}
                         ${isArc ? `
                         <span class="absolute bottom-2 right-2 text-[9px] font-black font-mono px-2 py-0.5 rounded-md uppercase backdrop-blur-md border ${item.status === 'FILLER' || item.classification === 'filler' ? 'bg-[var(--color-state-filler,#F43F5E)]/25 text-[var(--color-state-filler,#F43F5E)] border-[var(--color-state-filler,#F43F5E)]/40' : (item.status === 'MISTO' || item.classification === 'mixed' ? 'bg-[var(--color-state-mixed,#A855F7)]/25 text-[var(--color-state-mixed,#A855F7)] border-[var(--color-state-mixed,#A855F7)]/40' : 'bg-[var(--color-state-canon,#10B981)]/20 text-[var(--color-state-canon,#10B981)] border-[var(--color-state-canon,#10B981)]/40')} shadow-sm">
                             ${statusMeta}
@@ -1447,7 +1600,7 @@
             contextLayer.classList.remove('opacity-0', 'pointer-events-none');
             
             const container = document.getElementById('context-blade-container');
-            const isAdultAllowed = (window.currentUser && window.currentUser.adult_content_enabled) ? '1' : '0';
+            const isAdultAllowed = window.isAdultContentAllowed() ? '1' : '0';
             const cacheKey = `${ENTITY_VIEW_SCHEMA_V}:${current.type}:${current.id}:${isAdultAllowed}`;
 
             // LOCAL-FIRST: Renderização instantânea se já estiver no cache local da sessão
@@ -1576,10 +1729,295 @@
             }
         };
 
-        // 7. PREFERÊNCIA ADULTA (+24 ANOS) PERSISTIDA NA CONTA
-        window.toggleAdultPreference = async function(enabled) {
+        // 7. VERIFICAÇÃO DE IDADE (+18) & PREFERÊNCIA ADULTA PERSISTIDA NA CONTA
+        window.escapeAgeHtml = function(val) {
+            return String(val ?? '').replace(/[&<>"']/g, (ch) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[ch]));
+        };
+
+        window.setAgeVerifyFeedback = function(message, tone = 'info') {
+            const box = document.getElementById('age-verify-feedback');
+            if (!box) return;
+            if (!message) {
+                box.className = 'hidden p-2.5 rounded-xl text-[11px] font-mono border';
+                box.innerText = '';
+                return;
+            }
+            const toneClass = tone === 'success'
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                : (tone === 'error'
+                    ? 'bg-red-500/15 border-red-500/30 text-red-300'
+                    : 'bg-amber-500/15 border-amber-500/30 text-amber-200');
+            box.className = `p-2.5 rounded-xl text-[11px] font-mono border ${toneClass}`;
+            box.innerText = message;
+        };
+
+        window.toggleManualAgeBox = function(forceShow) {
+            const box = document.getElementById('age-verify-manual-box');
+            if (!box) return;
+            const show = typeof forceShow === 'boolean' ? forceShow : box.classList.contains('hidden');
+            if (show) {
+                box.classList.remove('hidden');
+                box.classList.add('flex');
+            } else {
+                box.classList.add('hidden');
+                box.classList.remove('flex');
+            }
+        };
+
+        window.applyAgeVerificationStatusUI = function(payload) {
+            if (!payload || !window.currentUser) return;
+            const status = payload.age_verification_status || window.currentUser.age_verification_status || 'unverified';
+            const ageVerified = Boolean(payload.age_verified);
+            const adultEnabled = Boolean(payload.adult_content_enabled) && ageVerified;
+
+            window.currentUser.age_verification_status = status;
+            window.currentUser.age_verified = ageVerified;
+            window.currentUser.age_verification_method = payload.age_verification_method || window.currentUser.age_verification_method || null;
+            window.currentUser.adult_content_enabled = adultEnabled;
+
+            const badge = document.getElementById('age-verify-status-badge');
+            const badgeMeta = {
+                verified: { label: 'Verificado (+18)', cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+                pending: { label: 'Aguardando Aprovação', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+                rejected: { label: 'Recusado', cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
+                underage: { label: 'Bloqueado (-18)', cls: 'bg-red-500/20 text-red-300 border-red-500/40' },
+                unverified: { label: 'Não Verificado', cls: 'bg-theme-pill text-theme-muted border-theme-default' }
+            }[status] || { label: 'Não Verificado', cls: 'bg-theme-pill text-theme-muted border-theme-default' };
+
+            if (badge) {
+                badge.innerText = badgeMeta.label;
+                badge.className = `px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${badgeMeta.cls}`;
+            }
+
+            const checkbox = document.getElementById('modal-toggle-adult');
+            if (checkbox) {
+                checkbox.disabled = !ageVerified;
+                checkbox.checked = adultEnabled;
+            }
+
+            const controls = document.getElementById('age-verify-controls');
+            if (controls) {
+                controls.classList.toggle('hidden', ageVerified);
+                controls.classList.toggle('flex', !ageVerified);
+            }
+
+            const underageMsg = document.getElementById('age-verify-underage-msg');
+            const actionRow = document.getElementById('age-verify-action-row');
+            const manualBox = document.getElementById('age-verify-manual-box');
+            const pendingBanner = document.getElementById('age-verify-pending-banner');
+            const manualFields = document.getElementById('age-verify-manual-fields');
+
+            if (underageMsg) underageMsg.classList.toggle('hidden', status !== 'underage');
+            if (actionRow) {
+                actionRow.classList.toggle('hidden', status === 'underage');
+                actionRow.classList.toggle('flex', status !== 'underage');
+            }
+            if (pendingBanner) pendingBanner.classList.toggle('hidden', status !== 'pending');
+            if (manualFields) {
+                const hideFields = (ageVerified || status === 'underage');
+                manualFields.classList.toggle('hidden', hideFields);
+                manualFields.classList.toggle('flex', !hideFields);
+            }
+            if (manualBox) {
+                const hideBox = (ageVerified || status === 'underage');
+                manualBox.classList.toggle('hidden', hideBox);
+                manualBox.classList.toggle('flex', !hideBox);
+            }
+
+            if (status === 'rejected' && payload.last_rejection_note) {
+                window.setAgeVerifyFeedback(`Solicitação recusada: ${payload.last_rejection_note}`, 'error');
+            }
+        };
+
+        window.refreshAgeVerificationStatus = async function() {
+            if (!window.currentUser) return;
             try {
-                await fetch('/api/account/settings', {
+                const res = await fetch('/api/account/age-verification/status', {
+                    cache: 'no-store',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                window.applyAgeVerificationStatusUI(data);
+            } catch (err) {
+                console.warn('[Anirium Age] Falha ao atualizar status de idade:', err);
+            }
+        };
+
+        window.submitManualAgeVerification = async function() {
+            if (!window.currentUser) {
+                window.openProfileModal();
+                return;
+            }
+            const birthDate = (document.getElementById('age-verify-birth-date')?.value || '').trim();
+            const declaration = Boolean(document.getElementById('age-verify-declaration')?.checked);
+
+            if (!birthDate) {
+                window.setAgeVerifyFeedback('Informe sua data de nascimento real.', 'error');
+                return;
+            }
+            if (!declaration) {
+                window.setAgeVerifyFeedback('Confirme a declaração de maioridade (+18) para continuar.', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/account/age-verification/request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        birth_date: birthDate,
+                        declaration_accepted: declaration
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    window.applyAgeVerificationStatusUI(data);
+                    window.setAgeVerifyFeedback('Data de nascimento salva permanentemente! Maioridade (+18) verificada — você já pode ativar o filtro acima.', 'success');
+                } else if (res.status === 409 || data.error === 'birth_date_locked') {
+                    window.setAgeVerifyFeedback('Sua data de nascimento já foi registrada e não pode ser alterada.', 'error');
+                } else if (data.status === 'underage' || data.error === 'underage_blocked' || data.error === 'minimum_age_not_met') {
+                    window.applyAgeVerificationStatusUI({
+                        age_verification_status: 'underage',
+                        age_verified: false,
+                        adult_content_enabled: false
+                    });
+                    window.setAgeVerifyFeedback('Idade inferior a 18 anos. Conteúdo adulto bloqueado nesta conta.', 'error');
+                } else {
+                    window.setAgeVerifyFeedback('Não foi possível salvar a data de nascimento. Verifique os dados informados.', 'error');
+                }
+            } catch (err) {
+                console.error('Falha ao salvar verificação manual:', err);
+                window.setAgeVerifyFeedback('Erro de conexão ao salvar verificação.', 'error');
+            }
+        };
+
+        window.loadAdminAgeVerifications = async function() {
+            const list = document.getElementById('admin-age-verifications-list');
+            if (!list || !window.currentUser || !window.currentUser.is_admin) return;
+            try {
+                const res = await fetch('/api/admin/age-verifications', {
+                    cache: 'no-store',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!res.ok) {
+                    list.innerHTML = '<span class="text-red-400">Não autorizado a carregar a fila.</span>';
+                    return;
+                }
+                const data = await res.json();
+                const pending = Array.isArray(data.pending) ? data.pending : [];
+                const recent = Array.isArray(data.recent) ? data.recent : [];
+                let html = '';
+
+                if (pending.length === 0) {
+                    html += '<p class="text-[11px] text-theme-muted">Nenhuma solicitação pendente.</p>';
+                } else {
+                    html += pending.map((item) => {
+                        const esc = window.escapeAgeHtml;
+                        return `
+                            <div class="p-3 rounded-xl bg-black/25 border border-theme-default flex flex-col gap-2">
+                                <div class="flex items-center justify-between gap-2 flex-wrap">
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-bold text-theme-primary truncate">${esc(item.user_name || 'Usuário')} <span class="text-theme-muted font-normal">(${esc(item.user_email || '')})</span></p>
+                                        <p class="text-[10px] text-amber-300 mt-0.5">Nascimento: ${esc(item.declared_birth_date || '-')} • Idade calculada: ${esc(item.declared_age ?? '?')} anos</p>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <button type="button" onclick="window.reviewAdminAgeVerification(${Number(item.id)}, 'approve')" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold hover:bg-emerald-500/30 cursor-pointer">
+                                            Aprovar (+18)
+                                        </button>
+                                        <button type="button" onclick="window.reviewAdminAgeVerification(${Number(item.id)}, 'reject')" class="px-2.5 py-1 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 text-[10px] font-bold hover:bg-red-500/30 cursor-pointer">
+                                            Rejeitar
+                                        </button>
+                                    </div>
+                                </div>
+                                ${item.evidence_note ? `<p class="text-[10px] text-theme-secondary">Observação: ${esc(item.evidence_note)}</p>` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                if (recent.length > 0) {
+                    html += '<div class="pt-2 border-t border-theme-default flex flex-col gap-1.5">';
+                    html += '<span class="text-[10px] uppercase text-theme-muted">Histórico Recente</span>';
+                    html += recent.slice(0, 6).map((item) => {
+                        const esc = window.escapeAgeHtml;
+                        const canRevoke = item.status === 'approved' && item.user_age_status === 'verified';
+                        return `
+                            <div class="p-2 rounded-lg bg-black/15 border border-theme-default flex items-center justify-between gap-2 text-[10px]">
+                                <span class="truncate">${esc(item.user_email || '')} • ${esc(item.status)}</span>
+                                ${canRevoke ? `<button type="button" onclick="window.revokeAdminAgeVerification(${Number(item.user_id)})" class="px-2 py-0.5 rounded bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 cursor-pointer shrink-0">Revogar</button>` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                    html += '</div>';
+                }
+
+                list.innerHTML = html;
+            } catch (err) {
+                console.warn('[Anirium Admin Age] Erro ao listar verificações:', err);
+            }
+        };
+
+        window.reviewAdminAgeVerification = async function(requestId, decision) {
+            const action = decision === 'approve' ? 'approve' : 'reject';
+            let note = null;
+            if (action === 'reject') {
+                note = prompt('Motivo da recusa (opcional):', '') || null;
+            }
+            try {
+                const res = await fetch(`/api/admin/age-verifications/${Number(requestId)}/${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ review_note: note })
+                });
+                if (res.ok) {
+                    await window.loadAdminAgeVerifications();
+                    await window.refreshAgeVerificationStatus();
+                }
+            } catch (err) {
+                console.error('Erro ao revisar verificação:', err);
+            }
+        };
+
+        window.revokeAdminAgeVerification = async function(userId) {
+            if (!confirm('Revogar a verificação +18 e desativar conteúdo adulto desta conta?')) return;
+            try {
+                const res = await fetch(`/api/admin/age-verifications/users/${Number(userId)}/revoke`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({})
+                });
+                if (res.ok) {
+                    await window.loadAdminAgeVerifications();
+                    await window.refreshAgeVerificationStatus();
+                }
+            } catch (err) {
+                console.error('Erro ao revogar verificação:', err);
+            }
+        };
+
+        window.toggleAdultPreference = async function(enabled) {
+            const checkbox = document.getElementById('modal-toggle-adult');
+            try {
+                const res = await fetch('/api/account/settings', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1588,12 +2026,61 @@
                     },
                     body: JSON.stringify({ adult_content_enabled: enabled })
                 });
-                if (window.currentUser) window.currentUser.adult_content_enabled = enabled;
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                    if (checkbox) checkbox.checked = false;
+                    if (window.currentUser) {
+                        window.currentUser.adult_content_enabled = false;
+                        window.currentUser.age_verified = Boolean(data.age_verified);
+                        window.currentUser.age_verification_status = data.age_verification_status || window.currentUser.age_verification_status;
+                    }
+                    window.applyAgeVerificationStatusUI(data);
+                    if (data.error === 'underage_blocked') {
+                        window.setAgeVerifyFeedback('Esta conta foi bloqueada para conteúdo adulto (-18 anos).', 'error');
+                    } else {
+                        window.setAgeVerifyFeedback('Verifique sua maioridade (+18 anos) antes de ativar o filtro adulto.', 'error');
+                    }
+                    return;
+                }
+
+                const resolvedEnabled = Boolean(data.adult_content_enabled);
+                if (window.currentUser) {
+                    window.currentUser.adult_content_enabled = resolvedEnabled;
+                    window.currentUser.age_verified = Boolean(data.age_verified ?? window.currentUser.age_verified);
+                }
+                if (checkbox) checkbox.checked = resolvedEnabled;
+                window.entityHtmlCache?.clear?.();
+
+                if (resolvedEnabled) {
+                    await window.syncAdultShardsIfAllowed(window.exploreKindFilter === 'manga' ? 'manga' : 'work');
+                } else {
+                    window.adultShardsCache = {};
+                }
+
+                try {
+                    const feedRes = await fetch('/?feed=init', {
+                        cache: 'no-store',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (feedRes.ok) {
+                        const feedData = await feedRes.json();
+                        if (Array.isArray(feedData.featuredRoll)) window.heroRoll = feedData.featuredRoll;
+                        if (feedData.calendar) window.calendarData = feedData.calendar;
+                    }
+                } catch (feedErr) {
+                    console.warn('[Anirium Feed] Falha ao atualizar Hero/Calendário:', feedErr);
+                }
+
                 window.deriveHeroRollFromCalendar();
                 window.runClientSideCatalogFilter();
                 window.renderCalendarPage();
+                if (Array.isArray(window.navStack) && window.navStack.length > 0) {
+                    window.renderCurrentState();
+                }
             } catch (err) {
-                console.error("Falha ao salvar preferência +24:", err);
+                if (checkbox) checkbox.checked = Boolean(window.currentUser?.adult_content_enabled);
+                console.error("Falha ao salvar preferência +18:", err);
             }
         };
 
@@ -1656,6 +2143,12 @@
             if (tab === 'library') window.renderProfileLibrary();
             if (tab === 'history') window.renderProfileHistory();
             if (tab === 'addons') window.loadAccountAddons();
+            if (tab === 'settings') {
+                window.refreshAgeVerificationStatus();
+                if (window.currentUser && window.currentUser.is_admin) {
+                    window.loadAdminAgeVerifications();
+                }
+            }
         };
 
         window.loadUserProfileData = async function() {
@@ -1690,15 +2183,26 @@
             window.renderProfileLibrary();
         };
 
+        window.formatProfileSeconds = function(sec) {
+            const total = Math.max(0, Math.floor(Number(sec) || 0));
+            const h = Math.floor(total / 3600);
+            const m = Math.floor((total % 3600) / 60);
+            const s = total % 60;
+            if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            return `${m}:${String(s).padStart(2, '0')}`;
+        };
+
         window.renderProfileLibrary = function() {
             const container = document.getElementById('profile-library-container');
             if (!container) return;
 
-            const filtered = (window.userLibraryList || []).filter(item => {
-                if (!item.bookmarked && !item.user_score && !item.status) return false;
-                if (window.activeLibEntityFilter === 'all') return true;
-                return (item.target_type === window.activeLibEntityFilter);
-            });
+            const filtered = (window.userLibraryList || [])
+                .filter(item => {
+                    if (!item.bookmarked && !item.user_score) return false;
+                    if (window.activeLibEntityFilter === 'all') return true;
+                    return (item.target_type === window.activeLibEntityFilter);
+                })
+                .sort((a, b) => String(b.last_interacted_at || '').localeCompare(String(a.last_interacted_at || '')));
 
             if (filtered.length === 0) {
                 container.innerHTML = `<div class="p-8 text-center text-xs font-mono text-theme-muted" data-i18n="profile.empty_library">${window.i18n ? window.i18n.t('profile.empty_library') : 'Nenhum item adicionado aos favoritos ainda.'}</div>`;
@@ -1706,24 +2210,34 @@
             }
 
             container.innerHTML = filtered.map(item => {
-                const title = item.title || item.target_id || '';
+                const title = item.title || item.work_title || item.target_id || '';
+                const navType = item.target_type || (item.work_id ? 'work' : 'work');
+                const navId = item.entity_id || item.target_id;
                 const safeTitle = encodeURIComponent(title);
-                const statusBadge = item.status ? `<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-theme-accent/20 text-theme-accent border border-theme-accent/30">${item.status}</span>` : '';
+                const thumbHtml = item.image
+                    ? `<img src="${item.image}" alt="" class="w-10 h-14 rounded-lg object-cover shrink-0 border border-theme-default bg-black/30" loading="lazy">`
+                    : `<div class="w-10 h-10 rounded-xl bg-theme-pill border border-theme-default flex items-center justify-center text-sm shrink-0">★</div>`;
+                const subtitleText = item.target_type === 'episode' && item.episode_number
+                    ? `Episódio ${item.episode_number}${item.format ? ` • ${item.format}` : ''}`
+                    : (item.format || item.target_type || 'work');
+                const favBadge = item.bookmarked ? `<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-theme-accent/20 text-theme-accent border border-theme-accent/30">Favorito</span>` : '';
+                const statusBadge = item.status ? `<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-theme-pill text-theme-muted border border-theme-default">${item.status}</span>` : '';
                 const scoreBadge = item.user_score ? `<span class="text-xs font-mono font-bold text-theme-accent">★ ${item.user_score}/10</span>` : '';
                 return `
-                    <div class="p-3.5 rounded-2xl bg-theme-raised border border-theme-default flex items-center justify-between hover:border-theme-highlight transition-all cursor-pointer group"
-                         data-nav-type="${item.target_type || 'work'}"
-                         data-nav-id="${item.target_id}"
+                    <div class="p-3.5 rounded-2xl bg-theme-raised border border-theme-default flex items-center justify-between gap-3 hover:border-theme-highlight transition-all cursor-pointer group"
+                         data-nav-type="${navType}"
+                         data-nav-id="${navId}"
                          data-nav-label="${safeTitle}"
                          onclick="window.closeProfileModal(); window.handleCardNavClick(this)">
                         <div class="flex items-center gap-3 min-w-0">
-                            <span class="w-2 h-2 rounded-full bg-theme-accent"></span>
+                            ${thumbHtml}
                             <div class="min-w-0">
                                 <h5 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors truncate">${title}</h5>
-                                <p class="text-[10px] font-mono text-theme-muted uppercase">${item.target_type || 'work'}</p>
+                                <p class="text-[10px] font-mono text-theme-muted uppercase mt-0.5">${subtitleText}</p>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 shrink-0">
+                            ${favBadge}
                             ${statusBadge}
                             ${scoreBadge}
                         </div>
@@ -1736,16 +2250,20 @@
             const container = document.getElementById('profile-history-container');
             if (!container) return;
 
-            const universeMap = new Map();
-            (window.userLibraryList || []).forEach(item => {
-                if (!item.last_interacted_at && !item.progress_seconds && !item.status) return;
-                const key = item.universe_id || item.target_id;
-                if (!universeMap.has(key)) {
-                    universeMap.set(key, item);
+            const sortedList = [...(window.userLibraryList || [])]
+                .filter(item => item.last_interacted_at || item.progress_seconds || item.status)
+                .sort((a, b) => String(b.last_interacted_at || '').localeCompare(String(a.last_interacted_at || '')));
+
+            const workMap = new Map();
+            sortedList.forEach(item => {
+                const key = item.work_id || item.entity_id || item.target_id;
+                if (!key) return;
+                if (!workMap.has(key)) {
+                    workMap.set(key, item);
                 }
             });
 
-            const condensedList = Array.from(universeMap.values());
+            const condensedList = Array.from(workMap.values());
 
             if (condensedList.length === 0) {
                 container.innerHTML = `<div class="p-8 text-center text-xs font-mono text-theme-muted" data-i18n="profile.empty_history">${window.i18n ? window.i18n.t('profile.empty_history') : 'Nenhum histórico registrado ainda.'}</div>`;
@@ -1753,27 +2271,38 @@
             }
 
             container.innerHTML = condensedList.map(item => {
-                const uTitle = item.universe_name || item.title || 'Universo Conectado';
-                const safeUTitle = encodeURIComponent(uTitle);
+                const navType = item.target_type === 'episode'
+                    ? 'episode'
+                    : (item.work_id ? 'work' : (item.target_type || 'work'));
+                const navId = item.entity_id || item.target_id;
+                const displayTitle = item.work_title || item.title || item.target_id || 'Obra';
+                const safeTitle = encodeURIComponent(displayTitle);
+                const epLabel = item.episode_number
+                    ? `Episódio ${item.episode_number}`
+                    : (item.title || 'Continuar');
+                const progLabel = item.progress_seconds > 0
+                    ? ` • ${window.formatProfileSeconds(item.progress_seconds)}`
+                    : '';
+                const thumbHtml = item.image
+                    ? `<img src="${item.image}" alt="" class="w-10 h-14 rounded-lg object-cover shrink-0 border border-theme-default bg-black/30" loading="lazy">`
+                    : `<div class="w-10 h-10 rounded-xl bg-theme-pill border border-theme-default flex items-center justify-center text-base shrink-0">🎬</div>`;
                 return `
-                    <div class="p-4 rounded-2xl bg-theme-raised border border-theme-default flex items-center justify-between hover:border-theme-accent transition-all cursor-pointer group"
-                         data-nav-type="universe"
-                         data-nav-id="${item.universe_id || item.target_id}"
-                         data-nav-label="${safeUTitle}"
+                    <div class="p-3.5 rounded-2xl bg-theme-raised border border-theme-default flex items-center justify-between gap-3 hover:border-theme-accent transition-all cursor-pointer group"
+                         data-nav-type="${navType}"
+                         data-nav-id="${navId}"
+                         data-nav-label="${safeTitle}"
                          onclick="window.closeProfileModal(); window.handleCardNavClick(this)">
                         <div class="flex items-center gap-3 min-w-0">
-                            <div class="w-10 h-10 rounded-xl bg-theme-pill border border-theme-default flex items-center justify-center text-base shrink-0">
-                                🌌
-                            </div>
+                            ${thumbHtml}
                             <div class="min-w-0">
-                                <h5 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors truncate">${uTitle}</h5>
-                                <p class="text-[10px] font-mono text-theme-muted mt-0.5">
-                                    <span data-i18n="profile.last_progress">Último Progresso:</span> ${item.title || item.target_id}
+                                <h5 class="text-xs font-bold text-theme-primary group-hover:text-theme-accent transition-colors truncate">${displayTitle}</h5>
+                                <p class="text-[10px] font-mono text-theme-muted mt-0.5 truncate">
+                                    <span data-i18n="profile.last_progress">Último Progresso:</span> ${epLabel}${progLabel}
                                 </p>
                             </div>
                         </div>
                         <span class="text-xs font-mono font-bold text-theme-accent shrink-0 group-hover:translate-x-1 transition-transform">
-                            Continuar â¯
+                            Continuar ❯
                         </span>
                     </div>
                 `;
@@ -1800,6 +2329,9 @@
                         }
                         window.userAddonsList = data.addons.filter(a => !['player-pro', 'manga-reader-pro'].includes(a.id));
                         if (listContainer) window.renderAddonsList();
+                        if (typeof window.inspectInstalledAccountAddons === 'function') {
+                            window.inspectInstalledAccountAddons(window.userAddonsList);
+                        }
                         window.syncAddonCapabilityButtons();
                     }
                 }
@@ -1932,6 +2464,9 @@
         }
 
         window.renderAddonsList = function() {
+            if (window.AniriumAddonsManager && typeof window.AniriumAddonsManager.renderAddonsList === 'function') {
+                return window.AniriumAddonsManager.renderAddonsList();
+            }
             const container = document.getElementById('profile-addons-list');
             if (!container) return;
 
@@ -1963,6 +2498,9 @@
         };
 
         window.toggleInstallAddonForm = function() {
+            if (window.AniriumAddonsManager && typeof window.AniriumAddonsManager.openExploreAddonModal === 'function') {
+                return window.AniriumAddonsManager.openExploreAddonModal();
+            }
             const form = document.getElementById('addon-install-form');
             if (form) form.classList.toggle('hidden');
         };
@@ -2623,6 +3161,14 @@
             const englishTitle = String(stage?.getAttribute('data-work-english-title') || '').trim();
             const romajiTitle = String(stage?.getAttribute('data-work-romaji-title') || '').trim();
             const nativeTitle = String(stage?.getAttribute('data-work-native-title') || '').trim();
+            let titleAliasesJson = '[]';
+            try {
+                const rawAliases = stage?.getAttribute('data-work-aliases') || '[]';
+                const parsedAliases = JSON.parse(rawAliases);
+                if (Array.isArray(parsedAliases) && parsedAliases.length > 0) {
+                    titleAliasesJson = JSON.stringify(parsedAliases.map(a => String(a || '').trim()).filter(Boolean).slice(0, 24));
+                }
+            } catch (e) {}
 
             // Detecta temporada no título (ex: "2nd Season", "Season 2", "Temporada 2", "S2", ou dígitos finais como "Da Wang Rao Ming 3")
             let resolvedSeason = 1;
@@ -2706,10 +3252,12 @@
                 titleEnglish: englishTitle,
                 titleRomaji: romajiTitle,
                 titleNative: nativeTitle,
+                aliases: titleAliasesJson,
                 malId: String(malId),
                 format: workFormat,
                 totalEpisodes: String(episodeCount),
-                resume: String(resumeSeconds)
+                resume: String(resumeSeconds),
+                _v: String(Date.now())
             });
 
             const embedSrc = `${externalEmbedBaseUrl}?${embedQuery.toString()}`;
@@ -2719,7 +3267,6 @@
                     id="anirium-player-pro-iframe"
                     src="${embedSrc}"
                     allow="fullscreen; autoplay; encrypted-media"
-                    allowfullscreen
                     style="width: 100%; height: 100%; border: none; display: block;"
                     class="w-full h-full flex-1 border-0 bg-black">
                 </iframe>
@@ -2771,7 +3318,6 @@
                 <iframe
                     src="${embedSrc}"
                     allow="fullscreen"
-                    allowfullscreen
                     class="w-full h-[65vh] rounded-2xl border border-theme-default bg-black shadow-2xl">
                 </iframe>
             `;
@@ -3140,7 +3686,7 @@ window.toggleEntityBookmark = async function(type, id) {
         };
 
         // Inicializa estado ao carregar
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
             const initialTab = urlParams.get('tab');
             if (initialTab && ['home', 'explore', 'calendar'].includes(initialTab)) {
@@ -3152,7 +3698,73 @@ window.toggleEntityBookmark = async function(type, id) {
             window.deriveHeroRollFromCalendar();
             if (window.currentUser) {
                 window.loadAccountAddons();
+                if (window.isAdultContentAllowed()) {
+                    window.syncAdultShardsIfAllowed('work');
+                }
             }
+
+            if (urlParams.get('age_verify') === 'underage') {
+                window.openProfileModal();
+                window.switchProfileTab('settings');
+                window.setAgeVerifyFeedback('Esta conta está bloqueada para conteúdo adulto (-18 anos).', 'error');
+            }
+
+            if (window.__pendingGoogleAgeVerify) {
+                const pending = window.__pendingGoogleAgeVerify;
+                delete window.__pendingGoogleAgeVerify;
+                window.openProfileModal();
+                window.switchProfileTab('settings');
+
+                if (pending.error || !pending.idToken || !pending.accessToken) {
+                    window.toggleManualAgeBox(true);
+                    window.setAgeVerifyFeedback('Não foi possível obter sua data de nascimento pelo Google. Você pode enviar uma solicitação manual ao Administrador.', 'info');
+                } else {
+                    window.setAgeVerifyFeedback('Validando sua data de nascimento junto ao Google...', 'info');
+                    try {
+                        const res = await fetch('/api/account/age-verification/google', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                state: pending.state,
+                                id_token: pending.idToken,
+                                access_token: pending.accessToken
+                            })
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (res.ok) {
+                            window.applyAgeVerificationStatusUI(data);
+                            window.setAgeVerifyFeedback('Idade +18 verificada via Google! Você já pode ativar o filtro de Conteúdo Adulto.', 'success');
+                        } else if (data.error === 'minimum_age_not_met' || data.status === 'underage') {
+                            window.applyAgeVerificationStatusUI({
+                                age_verification_status: 'underage',
+                                age_verified: false,
+                                adult_content_enabled: false
+                            });
+                            window.setAgeVerifyFeedback('Sua conta Google indica idade inferior a 18 anos. Conteúdo adulto bloqueado.', 'error');
+                        } else if (data.error === 'google_people_unavailable') {
+                            window.toggleManualAgeBox(true);
+                            window.setAgeVerifyFeedback('Não foi possível consultar a Google People API (verifique se a People API está ativada no Google Cloud Console). Você pode enviar a solicitação manual abaixo.', 'error');
+                        } else if (data.error === 'birthday_unavailable') {
+                            window.toggleManualAgeBox(true);
+                            window.setAgeVerifyFeedback('Sua conta Google não retornou o ano de nascimento completo. Use a solicitação manual abaixo para revisão do Administrador.', 'info');
+                        } else if (data.error === 'google_account_mismatch') {
+                            window.setAgeVerifyFeedback('Use exatamente a mesma conta Google que está conectada nesta sessão.', 'error');
+                        } else {
+                            window.setAgeVerifyFeedback('Falha na verificação via Google. Tente novamente ou use a solicitação manual.', 'error');
+                        }
+                    } catch (err) {
+                        console.error('[Anirium Age] Erro na verificação Google:', err);
+                        window.toggleManualAgeBox(true);
+                        window.setAgeVerifyFeedback('Erro de conexão ao verificar com Google. Você pode enviar uma solicitação manual.', 'error');
+                    }
+                }
+            }
+
             if (window.currentTab === 'explore') window.runClientSideCatalogFilter();
             if (window.currentTab === 'calendar') window.renderCalendarPage();
         });

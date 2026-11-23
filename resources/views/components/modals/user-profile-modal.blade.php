@@ -12,6 +12,18 @@
     $roleI18n = $isAdmin ? 'profile.role_admin' : ($isPlus ? 'profile.role_plus' : ($isMember ? 'profile.role_member' : 'profile.role_guest'));
     $roleLabel = $isAdmin ? 'Administrador' : ($isPlus ? 'Anirium+' : ($isMember ? 'Membro' : 'Visitante'));
     $roleBadgeClass = $isAdmin ? 'bg-[var(--color-state-filler,#F43F5E)]/20 text-[var(--color-state-filler,#F43F5E)] border-[var(--color-state-filler,#F43F5E)]/40' : ($isPlus ? 'bg-theme-accent/20 text-theme-accent border-theme-accent/40' : 'bg-theme-pill text-theme-muted border-theme-default');
+
+    $ageStatus = $user ? (string) ($user->age_verification_status ?? 'unverified') : 'unverified';
+    $isAgeVerified = $user && method_exists($user, 'isAgeVerified') ? $user->isAgeVerified() : false;
+    $canAccessAdult = $user && method_exists($user, 'canAccessAdultContent') ? $user->canAccessAdultContent() : false;
+    $ageBadgeMap = [
+        'verified' => ['label' => 'Verificado (+18)', 'class' => 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'],
+        'pending' => ['label' => 'Aguardando Aprovação', 'class' => 'bg-amber-500/15 text-amber-300 border-amber-500/30'],
+        'rejected' => ['label' => 'Recusado', 'class' => 'bg-red-500/15 text-red-400 border-red-500/30'],
+        'underage' => ['label' => 'Bloqueado (-18)', 'class' => 'bg-red-500/20 text-red-300 border-red-500/40'],
+        'unverified' => ['label' => 'Não Verificado', 'class' => 'bg-theme-pill text-theme-muted border-theme-default'],
+    ];
+    $ageBadge = $ageBadgeMap[$ageStatus] ?? $ageBadgeMap['unverified'];
 @endphp
 
 <div id="modal-profile"
@@ -41,7 +53,7 @@
                         </span>
                     </div>
                     <p class="text-xs text-theme-muted font-mono truncate mt-0.5">
-                        @if($user) {{ $user->email }} @else <span data-i18n="profile.login_hint">Faça login com o Google para salvar favoritos e desbloquear +24 anos</span> @endif
+                        @if($user) {{ $user->email }} @else <span data-i18n="profile.login_hint">Faça login com o Google para salvar favoritos e desbloquear +18 anos</span> @endif
                     </p>
                 </div>
             </div>
@@ -178,7 +190,7 @@
             </div>
 
             <!-- ABA 4: ADD-ONS & ARQUITETURA MODULAR ABERTA -->
-            <div id="profile-panel-addons" class="profile-panel hidden flex flex-col gap-5">
+            <div id="profile-panel-addons" data-csrf="{{ csrf_token() }}" class="profile-panel hidden flex flex-col gap-5">
                 <!-- Aviso Arquitetural Claro -->
                 <div class="p-3.5 rounded-2xl bg-theme-raised/60 border border-theme-default text-[11px] font-mono text-theme-muted leading-relaxed">
                     🧩 <strong class="text-theme-primary">Sistema Aberto de Extensões:</strong> O Anirium opera exclusivamente como catálogo ontológico. O slot de reprodução é modular e aberto: qualquer membro pode instalar e criar add-ons da comunidade (protocolo Stremio/JSON), enquanto assinantes <strong class="text-theme-accent">Anirium+</strong> contam também com o add-on oficial <strong>Anirium Player Pro + Anirium+ Service</strong>.
@@ -273,40 +285,21 @@
 
                 <!-- Seção 2: Add-ons da Comunidade (Stremio & Manifests Abertos para Todos) -->
                 <div class="flex flex-col gap-2">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
                         <div>
-                            <h4 class="text-xs font-mono uppercase font-bold text-emerald-400 tracking-wider" data-i18n="profile.community_addons">
-                                Add-ons da Comunidade (Aberto para Todos os Usuários)
-                            </h4>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h4 class="text-xs font-mono uppercase font-bold text-emerald-400 tracking-wider" data-i18n="profile.community_addons">
+                                    Add-ons da Comunidade (Aberto para Todos os Usuários)
+                                </h4>
+                                <span id="profile-addons-inspect-status" class="hidden text-[10px] font-mono text-theme-muted"></span>
+                            </div>
                             <p class="text-[10px] font-mono text-theme-muted">Compatível com manifestos Stremio e extensões criadas pela comunidade</p>
                         </div>
                         <button type="button"
-                                onclick="window.toggleInstallAddonForm()"
+                                onclick="window.openExploreAddonModal ? window.openExploreAddonModal() : window.toggleInstallAddonForm()"
                                 class="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500 hover:text-black text-emerald-300 text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0">
-                            + <span data-i18n="profile.install_addon">Instalar Add-on</span>
+                            + <span data-i18n="profile.install_addon">Explorar / Instalar Add-on</span>
                         </button>
-                    </div>
-
-                    <!-- Formulário Expansível de Instalação Stremio / Comunidade -->
-                    <div id="addon-install-form" class="hidden p-4 rounded-2xl bg-theme-card border border-theme-default flex flex-col gap-3">
-                        <input type="text"
-                               id="addon-manifest-url"
-                               placeholder="Cole a URL stremio://, https://.../manifest.json ou JSON de manifesto da comunidade"
-                               data-i18n-placeholder="profile.addon_manifest_placeholder"
-                               class="w-full px-3 py-2 rounded-xl bg-theme-surface border border-theme-default text-xs font-mono text-theme-primary placeholder-theme-muted outline-none focus:border-theme-accent">
-                        <div class="flex justify-end gap-2">
-                            <button type="button"
-                                    onclick="window.toggleInstallAddonForm()"
-                                    class="px-3 py-1.5 rounded-xl border border-theme-default text-xs font-mono text-theme-muted hover:text-white cursor-pointer"
-                                    data-i18n="modal.close">
-                                Cancelar
-                            </button>
-                            <button type="button"
-                                    onclick="window.submitInstallAddon()"
-                                    class="px-4 py-1.5 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer">
-                                <span data-i18n="profile.addon_btn_install">Instalar</span>
-                            </button>
-                        </div>
                     </div>
 
                     <!-- Container de Lista de Addons Comunitários -->
@@ -320,22 +313,87 @@
 
             <!-- ABA 5: CONFIGURAÇÕES & SESSÃO -->
             <div id="profile-panel-settings" class="profile-panel hidden flex flex-col gap-4">
-                <!-- Switcher de Conteúdo Adulto (+24 Anos) -->
-                <div class="flex items-center justify-between p-4 rounded-2xl bg-theme-raised border border-theme-default">
-                    <div class="flex items-center gap-3">
-                        <span class="text-xl">🔞</span>
-                        <div class="flex flex-col">
-                            <span class="text-xs font-bold text-theme-primary" data-i18n="profile.adult_title">Conteúdo Adulto (+24 Anos)</span>
-                            <span class="text-[10px] text-theme-muted font-mono" data-i18n="profile.adult_desc">Exibir obras com classificação hentai/erotica</span>
+                <!-- Switcher & Verificação de Idade (+18 Anos) -->
+                <div class="flex flex-col gap-3 p-4 rounded-2xl bg-theme-raised border border-theme-default">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <span class="text-xl shrink-0">🔞</span>
+                            <div class="flex flex-col min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-xs font-bold text-theme-primary" data-i18n="profile.adult_title">Conteúdo Adulto (+18 Anos)</span>
+                                    <span id="age-verify-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border {{ $ageBadge['class'] }}">
+                                        {{ $ageBadge['label'] }}
+                                    </span>
+                                </div>
+                                <span class="text-[10px] text-theme-muted font-mono mt-0.5" data-i18n="profile.adult_desc">Exibir obras com classificação hentai/erotica</span>
+                            </div>
+                        </div>
+                        <input type="checkbox"
+                               id="modal-toggle-adult"
+                               {{ $canAccessAdult ? 'checked' : '' }}
+                               {{ !$isAgeVerified ? 'disabled' : '' }}
+                               onchange="window.toggleAdultPreference(this.checked)"
+                               class="w-5 h-5 accent-amber-400 rounded cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                    </div>
+
+                    <div id="age-verify-feedback" class="hidden p-2.5 rounded-xl text-[11px] font-mono border"></div>
+
+                    @if($user)
+                        <div id="age-verify-controls" class="{{ $isAgeVerified ? 'hidden' : 'flex' }} flex-col gap-3 pt-3 border-t border-theme-default">
+                            <p id="age-verify-underage-msg" class="{{ $ageStatus === 'underage' ? '' : 'hidden' }} p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-[11px] font-mono text-red-300">
+                                Esta conta está bloqueada para conteúdo adulto (+18 anos não atingidos).
+                            </p>
+
+                            <div id="age-verify-manual-box" class="{{ $ageStatus === 'underage' ? 'hidden' : 'flex' }} flex-col gap-3 p-3.5 rounded-xl bg-black/25 border border-theme-default">
+                                <p class="text-[11px] text-theme-muted font-mono leading-relaxed">
+                                    Informe sua data de nascimento real. Esta informação é salva apenas uma vez e nunca mais poderá ser alterada.
+                                </p>
+                                <div id="age-verify-manual-fields" class="{{ $ageStatus === 'underage' ? 'hidden' : 'flex' }} flex-col gap-3">
+                                    <div class="flex flex-col gap-1">
+                                        <label for="age-verify-birth-date" class="text-[10px] font-mono uppercase text-theme-muted">Data de Nascimento Real</label>
+                                        <input type="date"
+                                               id="age-verify-birth-date"
+                                               min="1900-01-01"
+                                               max="{{ now()->toDateString() }}"
+                                               class="w-full px-3 py-2 rounded-xl bg-theme-base border border-theme-default text-xs font-mono text-theme-primary focus:outline-none focus:border-theme-accent">
+                                    </div>
+                                    <label class="flex items-start gap-2 text-[11px] font-mono text-theme-secondary cursor-pointer select-none">
+                                        <input type="checkbox"
+                                               id="age-verify-declaration"
+                                               class="mt-0.5 w-4 h-4 accent-amber-400 rounded shrink-0">
+                                        <span>Declaro sob minha responsabilidade ter 18 anos ou mais</span>
+                                    </label>
+                                    <div class="flex justify-end">
+                                        <button type="button"
+                                                id="btn-submit-manual-age"
+                                                onclick="window.submitManualAgeVerification()"
+                                                class="px-4 py-2 rounded-xl bg-theme-accent text-theme-inverse text-xs font-mono font-bold hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">
+                                            Salvar Data de Nascimento
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                @if($isAdmin)
+                    <div id="admin-age-verifications-panel" class="flex flex-col gap-3 p-4 rounded-2xl bg-theme-raised border border-[var(--color-state-filler,#F43F5E)]/30">
+                        <div class="flex items-center justify-between gap-2">
+                            <h4 class="text-xs font-bold font-mono uppercase tracking-wider text-theme-primary">
+                                Painel Admin • Verificações de Maioridade (+18)
+                            </h4>
+                            <button type="button"
+                                    onclick="window.loadAdminAgeVerifications()"
+                                    class="px-3 py-1 rounded-lg bg-theme-pill border border-theme-default text-[10px] font-mono font-bold text-theme-primary hover:border-theme-highlight cursor-pointer">
+                                Atualizar
+                            </button>
+                        </div>
+                        <div id="admin-age-verifications-list" class="flex flex-col gap-2 text-xs font-mono text-theme-muted">
+                            Carregando solicitações...
                         </div>
                     </div>
-                    <input type="checkbox"
-                           id="modal-toggle-adult"
-                           {{ $user && $user->adult_content_enabled ? 'checked' : '' }}
-                           {{ !$user ? 'disabled' : '' }}
-                           onchange="window.toggleAdultPreference(this.checked)"
-                           class="w-5 h-5 accent-amber-400 rounded cursor-pointer disabled:opacity-40">
-                </div>
+                @endif
 
                 @if($user)
                     <!-- Logout Seguro -->
@@ -357,3 +415,4 @@
         </div>
     </div>
 </div>
+<script src="/js/anirium-addons-manager.js?v=3"></script>

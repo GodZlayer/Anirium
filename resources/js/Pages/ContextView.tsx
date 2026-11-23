@@ -29,6 +29,8 @@ import { DribbbleVerticalActionDock } from "../Components/DribbbleVerticalAction
 import { EpisodeDiscussionFeed } from "../Components/EpisodeDiscussionFeed";
 import { ArcSourceCredit } from "../Components/ArcSourceCredit";
 import { WorkArcCard } from "../Components/WorkArcCard";
+import { WatchStatusBadge } from "../Components/WatchStatusBadge";
+import { getArcWatchStatus, getWorkWatchStatus } from "../lib/watchCompletion";
 import { ContextNavigationCard } from "../Components/ContextNavigationCard";
 import { WorkSeasonSelector } from "../Components/WorkSeasonSelector";
 import { catalogLandingUrl } from "../lib/catalogLocation.mjs";
@@ -638,7 +640,7 @@ export default function ContextView({ initialType, initialId, initialState, auth
     );
   }
 
-  // Trava Estrita de Conteúdo Sensível (+24 Anos): exige conta autenticada E o switcher explícito da conta ativado
+  // Trava Estrita de Conteúdo Sensível (+18 Anos): exige conta autenticada verificada E o switcher explícito da conta ativado
   if (isHentaiOrAdultAnime(currentAnime) && (!isAuthenticated || !adultContentEnabled)) {
     return (
       <div
@@ -653,14 +655,14 @@ export default function ContextView({ initialType, initialId, initialState, auth
           }}
         >
           <span className="px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-widest bg-[color:var(--wc-bgSurface)]/5 text-[color:var(--wc-textSecondary)] border border-[color:var(--wc-borderDefault)]/10">
-            Preferência da Conta • +24 Anos
+            Preferência da Conta • +18 Anos
           </span>
           <h2 className="text-lg font-black tracking-wide text-[color:var(--wc-textPrimary)]">
             Conteúdo Oculto por Padrão
           </h2>
           <p className="text-xs text-[color:var(--wc-textMuted)] leading-relaxed">
             {isAuthenticated
-              ? "Esta obra exige a ativação explícita do filtro de Conteúdo Sensível (+24 Anos) no menu de Preferências da sua Conta (canto superior direito)."
+              ? "Esta obra exige verificação de maioridade (+18 Anos) e ativação explícita do filtro de Conteúdo Sensível no menu de Preferências da sua Conta (canto superior direito)."
               : "Esta obra não está disponível no modo visitante sem conta."}
           </p>
           <div className="flex items-center gap-3 pt-2">
@@ -1048,6 +1050,7 @@ export default function ContextView({ initialType, initialId, initialState, auth
                                   alt={arc.title}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 />
+                                <div className="absolute top-2 right-2 z-10"><WatchStatusBadge status={getArcWatchStatus({ id: arc.work_reference }, arc.startEp || 1, arc.endEp || arc.startEp || 1, completedEpisodesMap)} compact /></div>
                                 <div
                                   className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full border text-[10px] font-mono font-bold backdrop-blur-md"
                                   style={{
@@ -1127,7 +1130,8 @@ export default function ContextView({ initialType, initialId, initialState, auth
                                     src={work.cover_image}
                                     alt={work.title}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                  />
+                                />
+                                  <div className="absolute top-2 right-2 z-10"><WatchStatusBadge status={getWorkWatchStatus(work, completedEpisodesMap)} compact /></div>
                                   <div
                                     className="absolute top-2 left-2 px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold backdrop-blur-md"
                                     style={{
@@ -1334,7 +1338,7 @@ export default function ContextView({ initialType, initialId, initialState, auth
                         <div className="flex-1 flex flex-col gap-3 py-2 min-h-0 overflow-y-auto pr-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
                           {canonicalArcs.map((arc, idx) => (
                             <WorkArcCard key={arc.arcId} arc={arc} image={bannerImage} accent={tokens.colors.accentGold}
-                              selected={selectedArcIndex === idx && activeType === "arc"}
+                              selected={selectedArcIndex === idx && activeType === "arc"} watchStatus={currentAnime ? getArcWatchStatus(currentAnime, arc.startEp || 1, arc.endEp || arc.startEp || 1, completedEpisodesMap) : undefined}
                               onSelect={() => handleNavigate("arc", workReference(currentAnime), arc.startEp, idx)}
                               labels={{
                                 title: `${classificationLabels.arc} ${idx + 1}: ${arc.name}`,

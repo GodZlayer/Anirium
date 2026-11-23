@@ -3,7 +3,8 @@ import { usePresentation as __usePresentation } from "../../lib/usePresentation"
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Hls from "hls.js";
-import { preferredAudio, preferredSubtitle, nextKnownEpisode, shouldSkipIntro, finalEpisodeEnd } from "./playbackPreferences";
+import { preferredAudio, preferredSubtitle, nextKnownEpisode, shouldSkipIntro, shouldSkipInterval, isEndingAtEpisodeEnd, finalEpisodeEnd } from "./playbackPreferences";
+import { usePlayerProPrefs } from "../../lib/playerProPreferences";
 import { episodeTimeFromProgramDate } from "./episodeClock";
 import { fetchPreparedSubtitle } from "./subtitleDelivery";
 import { bufferedAhead } from "./bufferAhead";
@@ -40,6 +41,7 @@ import {
   Volume2,
   Volume1,
   VolumeX,
+  Settings,
 } from "lucide-react";
 import { AniriumPlayerProps } from "../../lib/addonTypes";
 import { playbackPreparationRequest, playbackIdentityMatches, adjacentCatalogEpisode } from "./playbackIdentity";
@@ -191,6 +193,25 @@ export default function PlayerProComponent({
   const [showQualityMenu, setShowQualityMenu] = useState<boolean>(false);
   const [showAudioMenu, setShowAudioMenu] = useState<boolean>(false);
   const [showSubMenu, setShowSubMenu] = useState<boolean>(false);
+  const [showAutomationMenu, setShowAutomationMenu] = useState<boolean>(false);
+  const [automationToast, setAutomationToast] = useState<string>("");
+  const [playerProPrefs, updatePlayerProPrefs] = usePlayerProPrefs();
+  const endingEvaluatedRef = useRef(false);
+  const cacheWatchedNotifiedRef = useRef(false);
+  const automationToastTimerRef = useRef<number | null>(null);
+  const triggerAutomationToast = useCallback((message: string) => {
+    setAutomationToast(message);
+    if (automationToastTimerRef.current) window.clearTimeout(automationToastTimerRef.current);
+    automationToastTimerRef.current = window.setTimeout(() => setAutomationToast(""), 3000);
+  }, []);
+  useEffect(() => {
+    preferenceSnapshotRef.current = {
+      ...preferenceSnapshotRef.current,
+      autoSkipIntro: playerProPrefs.autoSkipIntro || preferences?.autoSkipIntro,
+      autoSkipEnding: playerProPrefs.autoSkipEnding || preferences?.autoSkipEnding,
+      autoNextEpisode: playerProPrefs.autoNextEpisode || preferences?.autoNextEpisode,
+    };
+  }, [playerProPrefs, preferences]);
 
   // Estados de Reprodução
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -431,6 +452,8 @@ export default function PlayerProComponent({
     preferenceSnapshotRef.current = preferences;
     manualAudioRef.current = false; manualSubtitleRef.current = false;
     introEvaluatedRef.current = false;
+    endingEvaluatedRef.current = false;
+    cacheWatchedNotifiedRef.current = false;
     advancedEpisodeRef.current = null;
     setSelectedAudio(""); setSelectedSubtitle(""); setSelectedSubtitleId(""); setSubtitleOption(0);
     setCustomMediaSrc("");
@@ -1001,7 +1024,8 @@ export default function PlayerProComponent({
   useEffect(() => {
     const subtitleTime = currentTime - subtitleDelay;
     const active = (bundledSubtitles ? localSubtitle.cues : parsedCues).filter(cue => selectedSubtitle !== "Desativado" && subtitleTime >= cue.start && subtitleTime < cue.end);
-    setCurrentCueText(active.map(cue => cue.text).join("\n"));
+    const nextText = active.map(cue => cue.text).join("\n");
+    setCurrentCueText(prev => prev === nextText ? prev : nextText);
   }, [bundledSubtitles, localSubtitle.cues, selectedSubtitle, parsedCues, currentTime, subtitleDelay]);
 
 	useEffect(() => {
@@ -1109,7 +1133,44 @@ export default function PlayerProComponent({
 	if (target && !windowRequestRef.current && !videoRef.current.seeking && Math.abs(mediaTime - target.position) < 0.2) windowTargetRef.current = null;
 	const curr = serviceWindow && !customMediaSrc && !serviceManifest?.continuousBuffer ? Math.min(serviceWindow.start + serviceWindow.deliveredDuration, Math.max(serviceWindow.start, mediaTime)) : mediaTime;
     const dur = customMediaSrc ? videoRef.current.duration || 0 : serviceManifest?.episodeDuration || duration || videoRef.current.duration || 0;
-    if (!introEvaluatedRef.current && preferenceSnapshotRef.current?.autoSkipIntro && !customMediaSrc) {
+    const seekPending = Boolean(windowRequestRef.current || windowTargetRef.current || videoRef.current.seeking);
+    const skipOp = serviceManifest?.skipTimes?.op;
+    const skipEd = serviceManifest?.skipTimes?.ed;
+    if (!introEvaluatedRef.current && preferenceSnapshotRef.current?.autoSkipIntro && !customMediaSrc && playbackIntentRef.current) {
+      if (skipOp) {
+        if (shouldSkipInterval(true, skipOp, curr, seekPending)) {
+          introEvaluatedRef.current = true;
+          seekTo(Math.min(skipOp.end, dur > 1 ? dur - 1 : skipOp.end));
+          triggerAutomationToast("Abertura pulada");
+          return;
+        }
+      } else if (curr >= 5) {
+        introEvaluatedRef.current = true;
+      } else if (shouldSkipIntro(true, curr, dur, seekPending)) {
+        introEvaluatedRef.current = true;
+        seekTo(85);
+        triggerAutomationToast("Abertura pulada");
+        return;
+      }
+    }
+    if (!endingEvaluatedRef.current && preferenceSnapshotRef.current?.autoSkipEnding && !customMediaSrc && playbackIntentRef.current && skipEd) {
+      if (shouldSkipInterval(true, skipEd, curr, seekPending)) {
+        endingEvaluatedRef.current = true;
+        const next = catalogIdentity ? (nextCatalogEpisode ? { episode: nextCatalogEpisode.number, season: currentSeasonIdx } : null) : nextKnownEpisode(seasonsList.map(season => season.episodes), currentSeasonIdx, currentEp);
+        if (isEndingAtEpisodeEnd(skipEd, dur) && preferenceSnapshotRef.current?.autoNextEpisode && next && advancedEpisodeRef.current !== playbackEntityKey) {
+          advancedEpisodeRef.current = playbackEntityKey;
+          playbackIntentRef.current = true;
+          triggerAutomationToast("Avançando para o próximo episódio...");
+          if (!catalogIdentity) { setCurrentSeasonIdx(next.season); setCurrentEp(next.episode); }
+          onChangeEpisode?.(next.episode, next.season);
+          return;
+        }
+        seekTo(Math.min(skipEd.end, dur > 1 ? dur - 1 : skipEd.end));
+        triggerAutomationToast("Ending pulado");
+        return;
+      }
+    }
+    if (false && !introEvaluatedRef.current && preferenceSnapshotRef.current?.autoSkipIntro && !customMediaSrc) {
       if (curr >= 5) introEvaluatedRef.current = true; // A resume/manual seek is not an opening.
       else if (playbackIntentRef.current && shouldSkipIntro(true, curr, dur, Boolean(windowRequestRef.current || windowTargetRef.current || videoRef.current.seeking))) {
         introEvaluatedRef.current = true;
@@ -1118,6 +1179,15 @@ export default function PlayerProComponent({
       }
     }
     setCurrentTime(curr);
+    if (!customMediaSrc && !cacheWatchedNotifiedRef.current && dur > 300 && curr >= dur - 300) {
+      cacheWatchedNotifiedRef.current = true;
+      const retentionKey = catalogIdentity?.episodeId || (anime.mal_id > 0 ? `mal:${anime.mal_id}:ep:${currentEp}` : playbackEntityKey);
+      fetch("http://127.0.0.1:4004/api/cache/episode-watched", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ episodeKey: retentionKey }),
+      }).catch(() => {});
+    }
     handleProgress();
 
     // Subtitle rendering follows currentTime through its own reactive effect.
@@ -1408,6 +1478,11 @@ export default function PlayerProComponent({
               playsInline
             >
             </video>
+            {automationToast && (
+              <div role="status" className="absolute right-4 top-4 z-30 rounded-full bg-[#1A1A1F]/90 border border-[#FFC766]/50 px-3.5 py-1.5 text-xs font-medium text-[#FFC766] shadow-lg backdrop-blur">
+                {automationToast}
+              </div>
+            )}
             {serviceManifest?.continuousBuffer && !customMediaSrc && !windowPending && !playbackEnded && (!jointBuffer.state || !canStartBufferedPlayback(jointBuffer.state, bufferAheadSeconds, subtitleAhead, currentTime, decoderPlaying)) && (
               <div role="status" className="absolute inset-x-4 top-4 rounded-lg bg-[color:var(--wc-bgBase)]/90 p-3 text-sm text-[color:var(--wc-stateWarning)]">
                 {jointBuffer.error || "Preparando buffer de vídeo, áudio e legendas…"}
@@ -1821,6 +1896,74 @@ export default function PlayerProComponent({
                       ))}
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Configurações de Automação do Player Pro */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAutomationMenu(!showAutomationMenu);
+                  setShowQualityMenu(false);
+                  setShowAudioMenu(false);
+                  setShowSubMenu(false);
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#1A1A1F] border transition text-xs font-medium ${
+                  playerProPrefs.autoSkipIntro || playerProPrefs.autoSkipEnding || playerProPrefs.autoNextEpisode
+                    ? "border-[#FFC766]/70 text-[#FFC766]"
+                    : "border-[#3A3A43] hover:border-[#FFC766]/50 text-[#EADCC8]"
+                }`}
+                title="Configurações de Automação do Player Pro"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+
+              {showAutomationMenu && (
+                <div className="absolute bottom-full right-0 mb-2 w-64 bg-[#1A1A1F] border border-[#3A3A43] rounded-2xl shadow-2xl p-3 space-y-2.5 z-40">
+                  <div className="text-[10px] font-mono text-[#FFC766] uppercase tracking-wider">
+                    Automação do Player Pro
+                  </div>
+                  {([
+                    { key: "autoSkipIntro", label: "Pular aberturas (OP)" },
+                    { key: "autoSkipEnding", label: "Pular endings (ED)" },
+                    { key: "autoNextEpisode", label: "Próximo episódio automático" },
+                  ] as const).map((item) => {
+                    const enabled = playerProPrefs[item.key];
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        role="switch"
+                        aria-checked={enabled}
+                        onClick={() => updatePlayerProPrefs({ [item.key]: !enabled })}
+                        className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl bg-[#23232A] hover:bg-[#2b2b34] transition text-left"
+                      >
+                        <span className="text-xs text-[#FFF9F0]">{item.label}</span>
+                        <span
+                          className={`w-8 h-4 rounded-full transition-colors relative shrink-0 ${
+                            enabled ? "bg-[#FFC766]" : "bg-[#3A3A43]"
+                          }`}
+                        >
+                          <span
+                            className="block w-3 h-3 rounded-full bg-[#0B0B0D] transition-transform mt-0.5"
+                            style={{ transform: enabled ? "translateX(17px)" : "translateX(2px)" }}
+                          />
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {(serviceManifest?.skipTimes?.op || serviceManifest?.skipTimes?.ed) && (
+                    <div className="pt-1.5 border-t border-[#3A3A43]/60 text-[10px] font-mono text-[#EADCC8]/70 space-y-0.5">
+                      {serviceManifest.skipTimes.op && (
+                        <div>OP detectado: {formatTime(serviceManifest.skipTimes.op.start)}–{formatTime(serviceManifest.skipTimes.op.end)}</div>
+                      )}
+                      {serviceManifest.skipTimes.ed && (
+                        <div>ED detectado: {formatTime(serviceManifest.skipTimes.ed.start)}–{formatTime(serviceManifest.skipTimes.ed.end)}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

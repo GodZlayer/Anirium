@@ -56,6 +56,8 @@ func TestCoreAuthorizationTraceRealTLSProtocolsAndReuse(t *testing.T) {
 			if !ok {
 				transport = http.DefaultTransport.(*http.Transport).Clone()
 			}
+			// Exercise the trace's reuse observer explicitly; production auth uses fresh HTTP/1 connections.
+			transport.DisableKeepAlives = false
 			roots := x509.NewCertPool()
 			roots.AddCert(server.Certificate())
 			transport.TLSClientConfig = &tls.Config{RootCAs: roots}

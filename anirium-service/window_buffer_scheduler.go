@@ -6,6 +6,14 @@ import (
 )
 
 var sessionPreparationStarted bool // protected by swarmMu
+var sessionReplenishWake = make(chan struct{}, 1)
+
+func wakeSessionPreparation() {
+	select {
+	case sessionReplenishWake <- struct{}{}:
+	default:
+	}
+}
 
 // Caller holds swarmMu. Ownership ends with this playback generation, including
 // while waiting for cache space or after EOF; a later seek can restart media.
@@ -14,29 +22,35 @@ func startSessionPreparationLocked() {
 		return
 	}
 	sessionPreparationStarted = true
+	wakeSessionPreparation()
 	ctx, generation, workers := playbackContext, playbackGeneration, playbackWorkers
 	workers.Add(1)
 	go func() {
 		defer workers.Done()
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
+		runStep := func() {
+			// Shutdown may wait for workers while holding preparation's lock.
+			if !preparePlaybackMu.TryLock() {
+				return
+			}
+			swarmMu.RLock()
+			active := playbackGeneration == generation && ctx.Err() == nil
+			position := currentPlaybackSession.Position
+			swarmMu.RUnlock()
+			if active && !playbackShuttingDown {
+				replenishPlaybackWindowBuffer(position)
+			}
+			preparePlaybackMu.Unlock()
+		}
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				// Shutdown may wait for workers while holding preparation's lock.
-				if !preparePlaybackMu.TryLock() {
-					continue
-				}
-				swarmMu.RLock()
-				active := playbackGeneration == generation && ctx.Err() == nil
-				position := currentPlaybackSession.Position
-				swarmMu.RUnlock()
-				if active && !playbackShuttingDown {
-					replenishPlaybackWindowBuffer(position)
-				}
-				preparePlaybackMu.Unlock()
+				runStep()
+			case <-sessionReplenishWake:
+				runStep()
 			}
 		}
 	}()

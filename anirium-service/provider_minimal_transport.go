@@ -17,12 +17,13 @@ import (
 )
 
 func sourceTitleTokens(title string) string {
+	folded := foldLatinDiacritics(title)
 	return strings.Join(strings.Fields(strings.Map(func(r rune) rune {
 		if unicode.IsLetter(r) || unicode.IsNumber(r) {
 			return unicode.ToLower(r)
 		}
 		return ' '
-	}, title)), " ")
+	}, folded)), " ")
 }
 
 var compactSourceEpisode = regexp.MustCompile(`(?i)\bS(\d+)E(\d+)(?:v\d+)?\b`)
@@ -33,37 +34,18 @@ var sourceEpisodeRange = regexp.MustCompile(`(?:\[|\(|\s-\s)(\d{1,4})\s*[-~–]\
 func minimalSourceMatches(title string, query PlaybackPrepareRequest) bool {
 	normalized := " " + sourceTitleTokens(title) + " "
 	identity := false
-	rawAliases := []string{query.Title, query.TitleEnglish, query.TitleRomaji}
-	seasonSuffixFilter := regexp.MustCompile(`(?i)\b(?:\d+(?:st|nd|rd|th)\s+season|season\s*\d+|s\d+)\b`)
-	for _, raw := range rawAliases {
-		a := sourceTitleTokens(raw)
-		if a != "" && strings.Contains(normalized, " "+a+" ") {
+	for _, variant := range expandGlobalTitleVariants(query) {
+		tokens := sourceTitleTokens(variant)
+		if tokens == "" {
+			continue
+		}
+		if strings.Contains(normalized, " "+tokens+" ") {
 			identity = true
 			break
 		}
-		// Try without season suffix
-		stripped := sourceTitleTokens(seasonSuffixFilter.ReplaceAllString(raw, ""))
-		if stripped != "" && strings.Contains(normalized, " "+stripped+" ") {
+		if containsCJKOrHangul(tokens) && len([]rune(tokens)) >= 2 && strings.Contains(normalized, tokens) {
 			identity = true
 			break
-		}
-		if start := strings.Index(raw, "("); start != -1 {
-			if end := strings.Index(raw[start:], ")"); end != -1 {
-				inside := sourceTitleTokens(raw[start+1 : start+end])
-				outside := sourceTitleTokens(raw[:start] + raw[start+end+1:])
-				if (inside != "" && strings.Contains(normalized, " "+inside+" ")) ||
-					(outside != "" && strings.Contains(normalized, " "+outside+" ")) {
-					identity = true
-					break
-				}
-				insideStripped := sourceTitleTokens(seasonSuffixFilter.ReplaceAllString(inside, ""))
-				outsideStripped := sourceTitleTokens(seasonSuffixFilter.ReplaceAllString(outside, ""))
-				if (insideStripped != "" && strings.Contains(normalized, " "+insideStripped+" ")) ||
-					(outsideStripped != "" && strings.Contains(normalized, " "+outsideStripped+" ")) {
-					identity = true
-					break
-				}
-			}
 		}
 	}
 	if !identity || query.Season < 1 || query.Episode < 1 {
@@ -142,7 +124,7 @@ func providerLinkMagnet(ctx context.Context, link string) (string, string, error
 func searchMinimalProvider(ctx context.Context, endpoint string, id string, query PlaybackPrepareRequest) []ProviderSearchResult {
 	texts := providerTextQueries(query)
 	parts := make([][]MinimalProviderResult, len(texts))
-	slots := make(chan struct{}, 4)
+	slots := make(chan struct{}, 8)
 	var workers sync.WaitGroup
 	for index, text := range texts {
 		workers.Add(1)
@@ -181,32 +163,57 @@ func searchMinimalProvider(ctx context.Context, endpoint string, id string, quer
 		}(index, text)
 	}
 	workers.Wait()
-	results := []ProviderSearchResult{}
+	candidates := []MinimalProviderResult{}
 	seenLinks := map[string]bool{}
-	seenHashes := map[string]bool{}
 	for _, part := range parts {
 		for _, raw := range part {
-			if ctx.Err() != nil {
-				return results
-			}
 			if seenLinks[raw.Link] || !minimalSourceMatches(raw.Title, query) {
 				continue
 			}
 			seenLinks[raw.Link] = true
-			magnet, hash, err := providerLinkMagnet(ctx, raw.Link)
-			if err != nil || seenHashes[hash] {
-				continue
-			}
-			seenHashes[hash] = true
-			result := ProviderSearchResult{Provider: id, Title: raw.Title, Magnet: magnet, InfoHash: hash}
-			if raw.Seeders != nil && *raw.Seeders >= 0 {
-				result.Seeders = *raw.Seeders
-			}
-			if raw.Leechers != nil && *raw.Leechers >= 0 {
-				result.Leechers = *raw.Leechers
-			}
-			results = append(results, result)
+			candidates = append(candidates, raw)
 		}
+	}
+	type resolvedCandidate struct {
+		magnet string
+		hash   string
+		err    error
+	}
+	resolved := make([]resolvedCandidate, len(candidates))
+	resolveSlots := make(chan struct{}, 8)
+	var resolveWg sync.WaitGroup
+	for index, raw := range candidates {
+		resolveWg.Add(1)
+		go func(index int, link string) {
+			defer resolveWg.Done()
+			select {
+			case resolveSlots <- struct{}{}:
+			case <-ctx.Done():
+				resolved[index] = resolvedCandidate{err: ctx.Err()}
+				return
+			}
+			defer func() { <-resolveSlots }()
+			magnet, hash, err := providerLinkMagnet(ctx, link)
+			resolved[index] = resolvedCandidate{magnet: magnet, hash: hash, err: err}
+		}(index, raw.Link)
+	}
+	resolveWg.Wait()
+	results := []ProviderSearchResult{}
+	seenHashes := map[string]bool{}
+	for index, raw := range candidates {
+		res := resolved[index]
+		if res.err != nil || res.magnet == "" || seenHashes[res.hash] {
+			continue
+		}
+		seenHashes[res.hash] = true
+		result := ProviderSearchResult{Provider: id, Title: raw.Title, Magnet: res.magnet, InfoHash: res.hash}
+		if raw.Seeders != nil && *raw.Seeders >= 0 {
+			result.Seeders = *raw.Seeders
+		}
+		if raw.Leechers != nil && *raw.Leechers >= 0 {
+			result.Leechers = *raw.Leechers
+		}
+		results = append(results, result)
 	}
 	return results
 }

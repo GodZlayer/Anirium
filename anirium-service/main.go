@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/png"
@@ -20,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
 	"syscall"
 	"time"
 	"unsafe"
@@ -40,13 +42,14 @@ var serviceVersion = "2.2.0"
 var logoData []byte
 
 type HealthResponse struct {
-	Status      string `json:"status"`
-	Service     string `json:"service"`
-	Version     string `json:"version"`
-	Port        int    `json:"port"`
-	IsNative    bool   `json:"isNative"`
-	Engine      string `json:"engine"`
-	LogFailures uint64 `json:"logFailures"`
+	PlaybackIdentityVersion int    `json:"playbackIdentityVersion"`
+	Status                  string `json:"status"`
+	Service                 string `json:"service"`
+	Version                 string `json:"version"`
+	Port                    int    `json:"port"`
+	IsNative                bool   `json:"isNative"`
+	Engine                  string `json:"engine"`
+	LogFailures             uint64 `json:"logFailures"`
 }
 
 type StreamSession struct {
@@ -80,40 +83,46 @@ type StatsResponse struct {
 // Manifesto autoritativo consumido pelo Player Pro. As opções exibidas devem
 // sempre ser produzidas pelo serviço, nunca inventadas pelo frontend.
 type MixManifest struct {
-	ContinuousBuffer bool            `json:"continuousBuffer"`
-	WindowOnDemand   bool            `json:"windowOnDemand"`
-	EpisodeDuration  float64         `json:"episodeDuration"`
-	QualityOnDemand  bool            `json:"qualityOnDemand"`
-	AudioTracks      []AudioTrack    `json:"audioTracks"`
-	SubtitleTracks   []SubtitleTrack `json:"subtitleTracks"`
-	Version          int             `json:"version"`
-	Status           string          `json:"status"`
-	ActiveLinks      int             `json:"activeLinks"`
-	Peers            int             `json:"peers"`
-	Qualities        []string        `json:"qualities"`
-	Audios           []string        `json:"audios"`
-	AudioChoices     []string        `json:"audioChoices"`
-	Subtitles        []string        `json:"subtitles"`
-	Variants         []MixVariant    `json:"variants"`
-	BufferPercent    float64         `json:"bufferPercent"`
-	DownloadRate     string          `json:"downloadRate"`
+	CatalogIdentity       *catalogPlaybackIdentity `json:"catalogIdentity,omitempty"`
+	SkipTimes             *SkipTimes               `json:"skipTimes,omitempty"`
+	ContinuousBuffer      bool                     `json:"continuousBuffer"`
+	SubtitleBundleVersion int                      `json:"subtitleBundleVersion"`
+	InventoryScanning     bool                     `json:"inventoryScanning"`
+	WindowOnDemand        bool                     `json:"windowOnDemand"`
+	EpisodeDuration       float64                  `json:"episodeDuration"`
+	QualityOnDemand       bool                     `json:"qualityOnDemand"`
+	AudioTracks           []AudioTrack             `json:"audioTracks"`
+	SubtitleTracks        []SubtitleTrack          `json:"subtitleTracks"`
+	Version               int                      `json:"version"`
+	Status                string                   `json:"status"`
+	ActiveLinks           int                      `json:"activeLinks"`
+	Peers                 int                      `json:"peers"`
+	Qualities             []string                 `json:"qualities"`
+	Audios                []string                 `json:"audios"`
+	AudioChoices          []string                 `json:"audioChoices"`
+	Subtitles             []string                 `json:"subtitles"`
+	Variants              []MixVariant             `json:"variants"`
+	BufferPercent         float64                  `json:"bufferPercent"`
+	DownloadRate          string                   `json:"downloadRate"`
 }
 
 type MixVariant struct {
-	Bandwidth          int64    `json:"bandwidth,omitempty"`
-	ID                 string   `json:"id"`
-	Quality            string   `json:"quality"`
-	VideoCodec         string   `json:"videoCodec"`
-	AudioLanguages     []string `json:"audioLanguages"`
-	SubtitleCount      int      `json:"subtitleCount"`
-	PlaylistURL        string   `json:"playlistUrl,omitempty"`
-	Status             string   `json:"status"`
-	BufferPercent      float64  `json:"bufferPercent"`
-	BufferedSeconds    float64  `json:"bufferedSeconds"`
-	ProcessingComplete bool     `json:"processingComplete"`
-	ProcessingFailed   bool     `json:"processingFailed"`
-	PeerCount          int      `json:"peerCount"`
-	SourceCount        int      `json:"sourceCount"`
+	Bandwidth             int64    `json:"bandwidth,omitempty"`
+	ID                    string   `json:"id"`
+	Quality               string   `json:"quality"`
+	VideoCodec            string   `json:"videoCodec"`
+	AudioLanguages        []string `json:"audioLanguages"`
+	SubtitleCount         int      `json:"subtitleCount"`
+	PlaylistURL           string   `json:"playlistUrl,omitempty"`
+	ContinuousPlaylistURL string   `json:"continuousPlaylistUrl,omitempty"`
+	TimelineStart         float64  `json:"timelineStart,omitempty"`
+	Status                string   `json:"status"`
+	BufferPercent         float64  `json:"bufferPercent"`
+	BufferedSeconds       float64  `json:"bufferedSeconds"`
+	ProcessingComplete    bool     `json:"processingComplete"`
+	ProcessingFailed      bool     `json:"processingFailed"`
+	PeerCount             int      `json:"peerCount"`
+	SourceCount           int      `json:"sourceCount"`
 }
 
 type variantRuntime struct {
@@ -147,8 +156,9 @@ type ffprobeStream struct {
 }
 
 type ffprobeOutput struct {
-	Streams []ffprobeStream `json:"streams"`
-	Format  struct {
+	Streams  []ffprobeStream  `json:"streams"`
+	Chapters []ffprobeChapter `json:"chapters"`
+	Format   struct {
 		StartTime string `json:"start_time"`
 		Duration  string `json:"duration"`
 	} `json:"format"`
@@ -164,17 +174,89 @@ type ProviderServer struct {
 	TimeoutMS    int      `json:"timeoutMs,omitempty"`
 }
 
+type StremioBehaviorHints struct {
+	Configurable          bool `json:"configurable,omitempty"`
+	ConfigurationRequired bool `json:"configurationRequired,omitempty"`
+}
+
+// FlexString accepts JSON string, boolean, number, or null values and normalizes them to string
+// so Stremio addon manifests with boolean/numeric config defaults decode reliably.
+type FlexString string
+
+func (f *FlexString) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*f = ""
+		return nil
+	}
+	var s string
+	if json.Unmarshal(data, &s) == nil {
+		*f = FlexString(s)
+		return nil
+	}
+	var b bool
+	if json.Unmarshal(data, &b) == nil {
+		if b {
+			*f = "true"
+		} else {
+			*f = "false"
+		}
+		return nil
+	}
+	*f = FlexString(trimmed)
+	return nil
+}
+
+// FlexBool accepts JSON booleans or string/numeric truthy forms ("true", "1")
+// used by third-party Stremio manifests while serializing cleanly as a boolean.
+type FlexBool bool
+
+func (f *FlexBool) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*f = false
+		return nil
+	}
+	var b bool
+	if json.Unmarshal(data, &b) == nil {
+		*f = FlexBool(b)
+		return nil
+	}
+	var s string
+	if json.Unmarshal(data, &s) == nil {
+		lower := strings.ToLower(strings.TrimSpace(s))
+		*f = FlexBool(lower == "true" || lower == "1" || lower == "yes" || lower == "on")
+		return nil
+	}
+	*f = FlexBool(trimmed == "1")
+	return nil
+}
+
+type StremioConfigField struct {
+	Key      string     `json:"key"`
+	Type     string     `json:"type"`
+	Title    string     `json:"title,omitempty"`
+	Default  FlexString `json:"default,omitempty"`
+	Options  []string   `json:"options,omitempty"`
+	Required FlexBool   `json:"required,omitempty"`
+}
+
 type ProviderManifest struct {
-	Resources    []json.RawMessage     `json:"resources,omitempty"`
-	Types        []string              `json:"types,omitempty"`
-	IDPrefixes   []string              `json:"idPrefixes,omitempty"`
-	Search       MinimalProviderSearch `json:"search"`
-	ID           string                `json:"id"`
-	Name         string                `json:"name"`
-	Version      string                `json:"version"`
-	Type         string                `json:"type"`
-	Capabilities []string              `json:"capabilities"`
-	Endpoints    map[string]string     `json:"endpoints"`
+	Resources     []json.RawMessage     `json:"resources,omitempty"`
+	Types         []string              `json:"types,omitempty"`
+	IDPrefixes    []string              `json:"idPrefixes,omitempty"`
+	Search        MinimalProviderSearch `json:"search"`
+	ID            string                `json:"id"`
+	Name          string                `json:"name"`
+	Version       string                `json:"version"`
+	Description   string                `json:"description,omitempty"`
+	Logo          string                `json:"logo,omitempty"`
+	Background    string                `json:"background,omitempty"`
+	BehaviorHints StremioBehaviorHints  `json:"behaviorHints,omitempty"`
+	Config        []StremioConfigField  `json:"config,omitempty"`
+	Type          string                `json:"type"`
+	Capabilities  []string              `json:"capabilities"`
+	Endpoints     map[string]string     `json:"endpoints"`
 }
 
 type ProviderSearchResult struct {
@@ -191,21 +273,30 @@ type ProviderSearchResult struct {
 }
 
 type PlaybackPrepareRequest struct {
-	MALID                  int                    `json:"malId,omitempty"`
-	EpisodeCount           int                    `json:"episodeCount,omitempty"`
-	Format                 string                 `json:"format,omitempty"`
-	VideoID                string                 `json:"videoId,omitempty"`
-	MediaType              string                 `json:"mediaType,omitempty"`
-	AccountProviderServers []ProviderServer       `json:"-"`
-	AuthorizedAddonIDs     []string               `json:"-"`
-	ManifestSnapshots      *providerSnapshotStore `json:"-"`
-	Token                  string                 `json:"token"`
-	DeviceID               string                 `json:"deviceId"`
-	Title                  string                 `json:"title"`
-	TitleEnglish           string                 `json:"titleEnglish"`
-	TitleRomaji            string                 `json:"titleRomaji"`
-	Season                 int                    `json:"season"`
-	Episode                int                    `json:"episode"`
+	WorkID                 string                  `json:"workId,omitempty"`
+	EpisodeID              string                  `json:"episodeId,omitempty"`
+	CatalogIdentity        catalogPlaybackIdentity `json:"-"`
+	KitsuID                int                     `json:"-"`
+	MALID                  int                     `json:"malId,omitempty"`
+	VideoHash              string                  `json:"videoHash,omitempty"`
+	VideoSize              int64                   `json:"videoSize,omitempty"`
+	Filename               string                  `json:"filename,omitempty"`
+	EpisodeCount           int                     `json:"episodeCount,omitempty"`
+	Format                 string                  `json:"format,omitempty"`
+	VideoID                string                  `json:"videoId,omitempty"`
+	MediaType              string                  `json:"mediaType,omitempty"`
+	AccountProviderServers []ProviderServer        `json:"-"`
+	AuthorizedAddonIDs     []string                `json:"-"`
+	ManifestSnapshots      *providerSnapshotStore  `json:"-"`
+	Token                  string                  `json:"token"`
+	DeviceID               string                  `json:"deviceId"`
+	Title                  string                  `json:"title"`
+	TitleEnglish           string                  `json:"titleEnglish"`
+	TitleRomaji            string                  `json:"titleRomaji"`
+	TitleNative            string                  `json:"titleNative,omitempty"`
+	Aliases                []string                `json:"aliases,omitempty"`
+	Season                 int                     `json:"season"`
+	Episode                int                     `json:"episode"`
 }
 
 // Telemetria do Swarm P2P e Mix de Conteúdo do Player Pro Multi-Usuário Local
@@ -256,7 +347,7 @@ var (
 func enableCORS(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
 	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Anirium-Device, Range")
-	w.Header().Set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges, X-Anirium-Subtitle-Offset, X-Anirium-Subtitle-Alignment")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges, X-Anirium-Subtitle-Offset, X-Anirium-Subtitle-Alignment, X-Anirium-Subtitle-Partial, X-Anirium-Subtitle-Coverage-End, X-Anirium-Subtitle-Complete")
 }
 
 var (
@@ -307,8 +398,15 @@ var (
 	procAppendMenuW              = moduser32.NewProc("AppendMenuW")
 	procTrackPopupMenuEx         = moduser32.NewProc("TrackPopupMenuEx")
 	procDestroyMenu              = moduser32.NewProc("DestroyMenu")
+	procRegisterWindowMessageW   = moduser32.NewProc("RegisterWindowMessageW")
+	procIsWindowVisible          = moduser32.NewProc("IsWindowVisible")
 
 	procShellNotifyIconW = modshell32.NewProc("Shell_NotifyIconW")
+)
+
+var (
+	msgTaskbarCreated uintptr
+	activeTrayIcon    uintptr
 )
 
 const (
@@ -606,6 +704,13 @@ func wndProc(hwnd uintptr, msg uintptr, wParam uintptr, lParam uintptr) uintptr 
 			appendLog("Native window callback failed")
 		}
 	}()
+	// Se a barra de tarefas do Windows reiniciar (ex: explorer.exe crash/refresh), recria o ícone da bandeja
+	if msgTaskbarCreated != 0 && msg == msgTaskbarCreated {
+		if activeTrayIcon != 0 {
+			addTrayIcon(hwnd, activeTrayIcon, fmt.Sprintf("Anirium Player Pro • Serviço Ativo (Porta %d)", globalPort))
+		}
+		return 0
+	}
 	switch msg {
 	case WM_TRAYICON:
 		switch lParam {
@@ -923,6 +1028,9 @@ func initNativeWindow(port int) {
 	runtime.LockOSThread()
 	globalPort = port
 
+	tbMsg, _, _ := procRegisterWindowMessageW.Call(uintptr(unsafe.Pointer(utf16Ptr("TaskbarCreated"))))
+	msgTaskbarCreated = tbMsg
+
 	prepareLogoBitmap()
 
 	// GDI Brushes
@@ -1090,6 +1198,7 @@ func initNativeWindow(port int) {
 	if trayIconHandle == 0 {
 		trayIconHandle = hIconBig
 	}
+	activeTrayIcon = trayIconHandle
 	appendLog("Adding tray icon")
 	addTrayIcon(uintptr(globalHwnd), trayIconHandle, fmt.Sprintf("Anirium Player Pro • Serviço Ativo (Porta %d)", globalPort))
 
@@ -1099,12 +1208,15 @@ func initNativeWindow(port int) {
 	procSetForeground.Call(uintptr(globalHwnd))
 	appendLog("Window shown and brought to foreground")
 
-	// Loop de atualização periódica do repaint da janela nativa (a cada 1 segundo)
+	// Loop de atualização periódica do repaint da janela nativa (apenas quando visível)
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		for range ticker.C {
 			if globalHwnd != 0 {
-				procInvalidateRect.Call(uintptr(globalHwnd), 0, 0)
+				vis, _, _ := procIsWindowVisible.Call(uintptr(globalHwnd))
+				if vis != 0 {
+					procInvalidateRect.Call(uintptr(globalHwnd), 0, 0)
+				}
 			}
 		}
 	}()
@@ -1150,10 +1262,15 @@ func initTorrentClientWithOptions(options serviceStartupOptions) (*torrent.Clien
 	var cleanupRuntimeCache func() error
 	if !options.Headless {
 		var cacheErr error
-		cfg.DataDir, cleanupRuntimeCache, cacheErr = newRuntimeTorrentCache()
+		if !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
+			cfg.DataDir, cleanupRuntimeCache, cacheErr = newPersistentTorrentCache()
+		} else {
+			cfg.DataDir, cleanupRuntimeCache, cacheErr = newRuntimeTorrentCache()
+		}
 		if cacheErr != nil {
 			return nil, cacheErr
 		}
+		globalEpisodeRetention.initDir(cfg.DataDir)
 	}
 	cfg.Seed = true
 	cfg.NoUpload = false
@@ -1295,7 +1412,7 @@ var coreAuthorizationClient = newCoreAuthorizationClient()
 // the authorization verdict: transport errors, timeouts, invalid configuration
 // or unusable responses map to 503 core_unavailable, while authoritative Core
 // 401/403 denials keep their allowlisted reason and status.
-func validateServiceTokenDetailed(token, deviceID string) (serviceAuthorization, *serviceAuthRejection) {
+func validateServiceTokenUnshared(token, deviceID string) (serviceAuthorization, *serviceAuthRejection) {
 	var authorization serviceAuthorization
 	if token == "" || deviceID == "" {
 		return authorization, &serviceAuthRejection{status: http.StatusUnauthorized, reason: "token_invalid"}
@@ -1304,7 +1421,7 @@ func validateServiceTokenDetailed(token, deviceID string) (serviceAuthorization,
 	if coreURL == "" {
 		return authorization, serviceAuthUnavailable()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, coreURL+"/api/service/session/validate", nil)
 	if err != nil {
@@ -1322,7 +1439,7 @@ func validateServiceTokenDetailed(token, deviceID string) (serviceAuthorization,
 		if ctx.Err() == context.DeadlineExceeded {
 			category = "deadline"
 		}
-		appendLog(fmt.Sprintf("Core authorization unavailable pid=%d err=%v stage=request category=%s %s", os.Getpid(), err, category, trace.diagnostic()))
+		appendLog(fmt.Sprintf("Core authorization unavailable pid=%d stage=request category=%s %s", os.Getpid(), category, trace.diagnostic()))
 		return authorization, serviceAuthUnavailable()
 	}
 	defer resp.Body.Close()
@@ -1401,6 +1518,14 @@ func searchProviderServersSubset(query PlaybackPrepareRequest, parent context.Co
 		}
 		minimalContract = manifest.Search.supported()
 		providerID := providerLabelForServer(server, manifest)
+		if isRSSProviderURL(server.ManifestURL) || containsString(manifest.Capabilities, "rss-search") {
+			results = append(results, searchRSSProvider(parent, server, query)...)
+			continue
+		}
+		if hasStremioStreams(manifest) {
+			results = append(results, searchStremioStreams(parent, server, manifest, query)...)
+			continue
+		}
 		manifestValid := false
 		for _, capability := range manifest.Capabilities {
 			if capability == "magnet.search" {
@@ -1469,9 +1594,16 @@ func searchProviderServersSubset(query PlaybackPrepareRequest, parent context.Co
 // probeMixFile lê as tracks do contêiner real. O resultado alimenta o
 // manifesto; o frontend não consegue declarar uma faixa que não exista.
 func probeMixFile(magnet string, generation ...uint64) {
+	probeMixFileContext(nil, magnet, generation...)
+}
+
+func probeMixFileContext(discovery context.Context, magnet string, generation ...uint64) {
 	swarmMu.RLock()
 	cl := torrentClient
 	parent := playbackContext
+	if discovery != nil {
+		parent = discovery
+	}
 	probeCache := playbackInputs
 	if len(generation) > 0 && generation[0] != playbackGeneration {
 		swarmMu.RUnlock()
@@ -1943,7 +2075,7 @@ func restrictLegacyPlayback(next http.Handler) http.Handler {
 				return
 			}
 		}
-		if strings.HasPrefix(r.URL.Path, "/hls/") || r.URL.Path == "/subtitles" || r.URL.Path == "/playback/variant" || r.URL.Path == "/playback/window" || r.URL.Path == "/playback/buffer" || r.URL.Path == "/playback/session" {
+		if strings.HasPrefix(r.URL.Path, "/hls/") || r.URL.Path == "/subtitles" || r.URL.Path == "/playback/subtitles" || r.URL.Path == "/playback/variant" || r.URL.Path == "/playback/window" || r.URL.Path == "/playback/buffer" || r.URL.Path == "/playback/session" {
 			if rejection := validatePlaybackGrantRejection(r.URL.Query().Get("playbackTicket")); rejection != nil {
 				writeServiceAuthRejection(w, rejection)
 				return
@@ -1961,9 +2093,11 @@ func startHTTPServer(port int, listener net.Listener) {
 
 func newServiceHTTPHandler(port int) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", handleWebSocket)
 	mux.HandleFunc("/playback/session", handlePlaybackSession)
 	mux.HandleFunc("/playback/window", handlePlaybackWindow)
 	mux.HandleFunc("/playback/buffer", handlePlaybackBuffer)
+	mux.HandleFunc("/playback/subtitles", handleSubtitleBundle)
 	mux.HandleFunc("/playback/renew", func(w http.ResponseWriter, r *http.Request) {
 		enableCORS(w)
 		if r.Method != http.MethodPost {
@@ -1995,13 +2129,14 @@ func newServiceHTTPHandler(port int) http.Handler {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		resp := HealthResponse{
-			Status:      "online",
-			Service:     "Anirium Player Pro Torrent Node",
-			Version:     serviceVersion,
-			Port:        port,
-			IsNative:    true,
-			Engine:      "anirium-native-torrent",
-			LogFailures: serviceLog.failures.Load(),
+			PlaybackIdentityVersion: 1,
+			Status:                  "online",
+			Service:                 "Anirium Player Pro Torrent Node",
+			Version:                 serviceVersion,
+			Port:                    port,
+			IsNative:                true,
+			Engine:                  "anirium-native-torrent",
+			LogFailures:             serviceLog.failures.Load(),
 		}
 		json.NewEncoder(w).Encode(resp)
 	})
@@ -2028,118 +2163,23 @@ func newServiceHTTPHandler(port int) http.Handler {
 			http.Error(w, "Payload inválido", http.StatusBadRequest)
 			return
 		}
-		authorization, rejection := validateServiceTokenDetailed(input.Token, input.DeviceID)
-		if rejection == nil && strings.TrimSpace(authorization.PlayerSessionID) == "" {
-			rejection = &serviceAuthRejection{status: http.StatusUnauthorized, reason: "player_instance_required"}
-		}
-		if rejection != nil {
-			writeServiceAuthRejection(w, rejection)
+		outcome := executePlaybackPrepare(r.Context(), input, nil)
+		if outcome.Rejection != nil {
+			writeServiceAuthRejection(w, outcome.Rejection)
 			return
 		}
-		input.AuthorizedAddonIDs = authorization.AuthorizedAddonIDs
-		input.AccountProviderServers = accountProviderServers(authorization)
-		input.ManifestSnapshots = newProviderSnapshotStore()
-		preparePlaybackMu.Lock()
-		defer preparePlaybackMu.Unlock()
-		if playbackShuttingDown {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(map[string]string{"status": "service_shutting_down"})
+		if outcome.StatusCode == 0 {
 			return
 		}
-		if !mediaToolsAvailable() {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(map[string]string{"status": "media_tools_missing", "reason": "ffmpeg_and_ffprobe_required"})
+		if outcome.PlainError != "" {
+			http.Error(w, outcome.PlainError, outcome.StatusCode)
 			return
 		}
-		if r.Context().Err() != nil {
-			return
-		}
-		results := searchProviderServers(input, r.Context())
-		providerSubtitles := searchSubtitleProviders(input, r.Context())
-		appendLog(fmt.Sprintf("Prepare search results: count=%d providers=%+v input_title=%s ep=%d", len(results), input.AccountProviderServers, input.Title, input.Episode))
-		if r.Context().Err() != nil {
-			return
-		}
-		rechecked, recheckRejection := validateServiceTokenDetailed(input.Token, input.DeviceID)
-		if recheckRejection != nil {
-			writeServiceAuthRejection(w, recheckRejection)
-			return
-		}
-		if mismatch := recheckPrepareAuthorization(authorization, rechecked); mismatch != nil {
-			writeServiceAuthRejection(w, mismatch)
-			return
-		}
-		if r.Context().Err() != nil {
-			return
-		}
-		magnets := pooledMagnets(results)
-		if len(magnets) == 0 {
-			appendLog(fmt.Sprintf("Prepare pooledMagnets 0 for %s Ep %d status=%+v", input.Title, input.Episode, input.ManifestSnapshots.statusByID()))
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "status": "no-sources", "sources": 0, "providerStatus": input.ManifestSnapshots.statusByID()})
-			return
-		}
-		swarmMu.Lock()
-		requestedEpisode = episodeContext{Episode: input.Episode, Season: input.Season}
-		generation := resetPlaybackLocked()
-		probeContext := playbackContext
-		externalSubtitles = providerSubtitles
-		currentActiveTitle = input.Title
-		currentMixQualities = []string{}
-		currentMixAudios = []string{}
-		currentMixSubs = []string{}
-		activeLinks = append([]string(nil), magnets...)
-		playbackMagnets = append([]string(nil), magnets...)
-		workers := playbackWorkers
-		workers.Add(1)
-		swarmMu.Unlock()
-		ticket, ticketErr := issuePlaybackGrant(input.Token, input.DeviceID, authorization.AccountID, authorization.PlayerSessionID)
-		if ticketErr != nil {
-			workers.Done()
-			http.Error(w, "Playback credential unavailable", 500)
-			return
-		}
-		// Aguarda a descoberta das faixas/qualidades de todas as fontes e só
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			watchPlaybackAuthorization(probeContext, generation, ticket, 30*time.Second, magnets...)
-		}()
-		// então inicia um mixer por variante, recebendo o conjunto completo.
-		go func(sources []string) {
-			defer workers.Done()
-			sources = expandMediaSources(probeContext, sources, generation)
-			probeSources(probeContext, sources, func(source string) { probeMixFile(source, generation) })
-			swarmMu.Lock()
-			if generation != playbackGeneration {
-				swarmMu.Unlock()
-				return
-			}
-			freezeCompatibleSourceSetLocked()
-			releaseExcludedSourceTorrentsLocked()
-			refreshAudioSelectionLocked()
-			audioSelectionFrozen = true
-			playbackDiscoveryComplete = true
-			qualities := append([]string(nil), currentMixQualities...)
-			audioCandidates := append([]AudioCandidate(nil), selectedAudioCandidates...)
-			swarmMu.Unlock()
-			// Session mode inventories every choice, but media production starts
-			// only after the Player chooses its video quality and audio track.
-			if os.Getenv("ANIRIUM_CONTINUOUS_BUFFER") == "1" {
-				return
-			}
-			for index, candidate := range audioCandidates {
-				workers.Add(1)
-				go func() { defer workers.Done(); buildAudioTrack(candidate, index, generation) }()
-			}
-			if ordered := selectVariantQualities(qualities); len(ordered) > 0 {
-				requestVideoVariant(ordered[0], generation)
-			}
-		}(append([]string(nil), magnets...))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "status": "preparing", "sources": len(magnets), "playbackTicket": ticket, "providerStatus": input.ManifestSnapshots.statusByID()})
+		if outcome.StatusCode != http.StatusOK {
+			w.WriteHeader(outcome.StatusCode)
+		}
+		json.NewEncoder(w).Encode(outcome.Body)
 	})
 
 	mux.HandleFunc("/playback/variant", func(w http.ResponseWriter, r *http.Request) {
@@ -2224,12 +2264,13 @@ func newServiceHTTPHandler(port int) http.Handler {
 		swarmMu.RLock()
 		links := len(activeLinks)
 		generation := playbackGeneration
+		catalogIdentity := currentCatalogIdentity
 		qualities := append([]string(nil), currentMixQualities...)
 		episodeDuration := playbackEpisodeDurationLocked()
 		audios := append([]string(nil), currentMixAudios...)
 		audioChoices := append([]string(nil), currentMixAudios...)
 		subs := append([]string(nil), currentMixSubs...)
-		subtitleTracks := subtitleTracksLocked()
+		subtitleTracks := manifestSubtitleTracksLocked()
 		audioTracks := manifestAudioTracksLocked()
 		audios = []string{}
 		for _, track := range audioTracks {
@@ -2288,20 +2329,78 @@ func newServiceHTTPHandler(port int) http.Handler {
 				variants = append(variants, variant)
 			}
 		}
+		skipTimes := resolveCurrentSkipTimesLocked(currentSkipMALID, currentSkipEpisode)
 		swarmMu.RUnlock()
 		manifestStatus, bufferPercent := manifestAvailability(variants, discoveryComplete)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(MixManifest{
-			WindowOnDemand:   discoveryComplete,
-			ContinuousBuffer: discoveryComplete && os.Getenv("ANIRIUM_CONTINUOUS_BUFFER") == "1",
-			EpisodeDuration:  episodeDuration,
-			Version:          1, QualityOnDemand: discoveryComplete, Status: manifestStatus, ActiveLinks: links, Peers: peers,
+			CatalogIdentity:       &catalogIdentity,
+			SkipTimes:             skipTimes,
+			SubtitleBundleVersion: 1,
+			WindowOnDemand:        true,
+			ContinuousBuffer:      discoveryComplete && os.Getenv("ANIRIUM_CONTINUOUS_BUFFER") == "1",
+			EpisodeDuration:       episodeDuration,
+			Version:               1, QualityOnDemand: true, Status: manifestStatus, ActiveLinks: links, Peers: peers,
 			Qualities: manifestQualities, Audios: audios, Subtitles: subs,
 			SubtitleTracks: subtitleTracks,
 			AudioTracks:    audioTracks,
 			AudioChoices:   audioChoices,
 			Variants:       variants, BufferPercent: bufferPercent, DownloadRate: rateSnapshot,
 		})
+	})
+
+	// Tradução gratuita sob demanda de blocos WebVTT para o idioma preferido do usuário.
+	mux.HandleFunc("/api/subtitle/translate", func(w http.ResponseWriter, r *http.Request) {
+		enableCORS(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var payload struct {
+			VTT        string `json:"vtt"`
+			TargetLang string `json:"targetLang"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 512<<10)).Decode(&payload); err != nil || strings.TrimSpace(payload.VTT) == "" {
+			http.Error(w, "Invalid payload", http.StatusBadRequest)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+		defer cancel()
+		translated, cached, err := translateWebVTT(ctx, payload.VTT, payload.TargetLang)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"vtt": payload.VTT, "translated": false, "cached": false})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"vtt": translated, "translated": true, "cached": cached})
+	})
+
+	// Marca episódio como concluído (regra total - 5 min) para retenção inteligente.
+	mux.HandleFunc("/api/cache/episode-watched", func(w http.ResponseWriter, r *http.Request) {
+		enableCORS(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var payload struct {
+			EpisodeKey string `json:"episodeKey"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&payload); err != nil || strings.TrimSpace(payload.EpisodeKey) == "" {
+			http.Error(w, "Invalid payload", http.StatusBadRequest)
+			return
+		}
+		globalEpisodeRetention.markCompleted(payload.EpisodeKey)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	})
 
 	// Entrega playlists e segmentos produzidos pelo worker do mixer.
@@ -2388,6 +2487,12 @@ func newServiceHTTPHandler(port int) http.Handler {
 			return
 		}
 		requestedIndex := -1
+		swarmMu.RLock()
+		bundleCache := playbackInputs
+		swarmMu.RUnlock()
+		if serveBundledSubtitle(w, r, bundleCache, trackID) {
+			return
+		}
 		requestedFile := ""
 		windowStart := -1.0
 		if value := r.URL.Query().Get("start"); value != "" {
@@ -2425,6 +2530,8 @@ func newServiceHTTPHandler(port int) http.Handler {
 				content, alignment = adjusted, "verified"
 			}
 			w.Header().Set("X-Anirium-Subtitle-Alignment", alignment)
+			w.Header().Set("X-Anirium-Subtitle-Complete", "1")
+			w.Header().Set("X-Anirium-Subtitle-Offset", "0.000")
 			w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
 			w.Header().Set("Cache-Control", "no-store")
 			fmt.Fprint(w, content)
@@ -2503,6 +2610,8 @@ func newServiceHTTPHandler(port int) http.Handler {
 				if vtt != "" {
 					subtitleCache.rememberCompleteSubtitle(trackID)
 					w.Header().Set("X-Anirium-Subtitle-Alignment", "unverified")
+					w.Header().Set("X-Anirium-Subtitle-Complete", "1")
+					w.Header().Set("X-Anirium-Subtitle-Offset", "0.000")
 					w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
 					w.Header().Set("Cache-Control", "no-store")
 					w.WriteHeader(http.StatusOK)
@@ -2531,6 +2640,39 @@ func newServiceHTTPHandler(port int) http.Handler {
 				waitContext, cancelWait = context.WithTimeout(subtitleContext, 15*time.Second)
 				defer cancelWait()
 			}
+			fast := r.URL.Query().Get("fast") == "1"
+			if fast && windowStart >= 0 && subtitleCache != nil {
+				fastAt := windowStart
+				if value := r.URL.Query().Get("at"); value != "" {
+					if parsed, parseErr := strconv.ParseFloat(value, 64); parseErr == nil && isFiniteWindowPosition(parsed) && parsed >= windowStart && parsed < windowStart+60 {
+						fastAt = math.Floor(parsed/4) * 4
+					}
+				}
+				fullKey := subtitleWindowKey{source: magnet, stream: requestedIndex, start: windowStart}
+				if fullContent, ok := subtitleCache.cachedSubtitleWindow(fullKey); ok {
+					w.Header().Set("X-Anirium-Subtitle-Alignment", embeddedSubtitleAlignment(subtitleCache, magnet))
+					w.Header().Set("X-Anirium-Subtitle-Offset", strconv.FormatFloat(windowStart, 'f', 3, 64))
+					w.Header().Set("X-Anirium-Subtitle-Partial", "0")
+					w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
+					w.Header().Set("Cache-Control", "no-store")
+					fmt.Fprint(w, fullContent)
+					return
+				}
+				if fastContent, fastErr := extractCachedSubtitleSpan(waitContext, subtitleCache, magnet, requestedIndex, fastAt, 16); fastErr == nil {
+					subtitleCache.bundle().recordFastHead(trackID, fastAt, fastAt+16, fastContent)
+					_ = subtitleCache.prefetchSubtitleWindow(fullKey, func(shared context.Context) (string, error) {
+						return extractSubtitleWindowInput(shared, subtitleCache, magnet, requestedIndex, windowStart)
+					})
+					w.Header().Set("X-Anirium-Subtitle-Alignment", embeddedSubtitleAlignment(subtitleCache, magnet))
+					w.Header().Set("X-Anirium-Subtitle-Offset", strconv.FormatFloat(fastAt, 'f', 3, 64))
+					w.Header().Set("X-Anirium-Subtitle-Partial", "1")
+					w.Header().Set("X-Anirium-Subtitle-Coverage-End", strconv.FormatFloat(fastAt+16, 'f', 3, 64))
+					w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
+					w.Header().Set("Cache-Control", "no-store")
+					fmt.Fprint(w, fastContent)
+					return
+				}
+			}
 			if content, err := extractCachedSubtitleWindow(waitContext, subtitleCache, magnet, requestedIndex, windowStart); err == nil {
 				if windowStart < 0 {
 					subtitleCache.mu.Lock()
@@ -2540,15 +2682,29 @@ func newServiceHTTPHandler(port int) http.Handler {
 				w.Header().Set("X-Anirium-Subtitle-Alignment", embeddedSubtitleAlignment(subtitleCache, magnet))
 				if windowStart < 0 {
 					subtitleCache.rememberCompleteSubtitle(trackID)
+					w.Header().Set("X-Anirium-Subtitle-Complete", "1")
+					w.Header().Set("X-Anirium-Subtitle-Offset", "0.000")
 				}
 				if windowStart >= 0 {
 					w.Header().Set("X-Anirium-Subtitle-Offset", strconv.FormatFloat(windowStart, 'f', 3, 64))
 				}
+				w.Header().Set("X-Anirium-Subtitle-Partial", "0")
 				w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
 				w.Header().Set("Cache-Control", "no-store")
 				fmt.Fprint(w, content)
 				return
 			} else {
+				var partialErr *partialSubtitleError
+				if windowStart >= 0 && errors.As(err, &partialErr) {
+					w.Header().Set("X-Anirium-Subtitle-Alignment", embeddedSubtitleAlignment(subtitleCache, magnet))
+					w.Header().Set("X-Anirium-Subtitle-Offset", strconv.FormatFloat(windowStart, 'f', 3, 64))
+					w.Header().Set("X-Anirium-Subtitle-Partial", "1")
+					w.Header().Set("X-Anirium-Subtitle-Coverage-End", strconv.FormatFloat(windowStart+16, 'f', 3, 64))
+					w.Header().Set("Content-Type", "text/vtt; charset=utf-8")
+					w.Header().Set("Cache-Control", "no-store")
+					fmt.Fprint(w, partialErr.content)
+					return
+				}
 				if windowStart < 0 && err == context.DeadlineExceeded && subtitleContext.Err() == nil && subtitleCache.subtitlePreparationPending(subtitleWindowKey{source: magnet, stream: requestedIndex, start: -1}) {
 					w.Header().Set("Retry-After", "2")
 					w.Header().Set("Cache-Control", "no-store")
@@ -2596,11 +2752,9 @@ func main() {
 	appendLog("=== Anirium Service Starting ===")
 	options, optionErr := parseServiceStartupOptions(os.Args[1:])
 	if optionErr != nil {
-		appendLog(fmt.Sprintf("Startup options error: %v", optionErr))
 		fmt.Fprintln(os.Stderr, optionErr)
 		os.Exit(2)
 	}
-	appendLog(fmt.Sprintf("Startup options parsed: Headless=%t Port=%d DataDir=%s", options.Headless, options.Port, options.DataDir))
 	loadProviderServers()
 	// Oculta a janela de console/cmd do Windows imediatamente (aplicação nativa de bandeja)
 	consoleHwnd, _, _ := procGetConsoleWindow.Call()
@@ -2664,6 +2818,8 @@ func main() {
 	}
 	if options.Headless {
 		json.NewEncoder(os.Stdout).Encode(map[string]any{"status": "listening", "port": selectedPort})
+		ensureGlobalHubRunning()
+		startWSTelemetryLoop()
 		startHTTPServer(selectedPort, listener)
 		return
 	}
@@ -2671,6 +2827,8 @@ func main() {
 	// 4. Inicia o servidor HTTP de streaming sequencial em segundo plano
 	go func() {
 		appendLog("Starting HTTP streaming server...")
+		ensureGlobalHubRunning()
+		startWSTelemetryLoop()
 		startHTTPServer(selectedPort, listener)
 	}()
 

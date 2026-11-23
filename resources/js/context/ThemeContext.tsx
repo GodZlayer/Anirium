@@ -51,9 +51,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const [language, setLanguageState] = useState<SupportedLanguage>(() => {
     if (typeof window !== "undefined") {
-      return (localStorage.getItem("anirium_lang") as SupportedLanguage) || "pt-BR";
+      return (localStorage.getItem("anirium_lang") as SupportedLanguage) || ((window as any).ANIRIUM_DEFAULT_LANG as SupportedLanguage) || "en-US";
     }
-    return "pt-BR";
+    return "en-US";
   });
 
   const [adultContentEnabled, setAdultContentEnabledState] = useState<boolean>(() => {

@@ -11,6 +11,7 @@
     'englishTitle' => '',
     'romajiTitle' => '',
     'nativeTitle' => '',
+    'titleAliases' => [],
     'arcs' => [],
     'episodes' => [],
     'isLiked' => false,
@@ -31,14 +32,19 @@
     $epNum = $isEpisodeMode ? ($currentEpisode->number ?? 1) : 1;
     $episodeTitle = $isEpisodeMode ? (($isManga ? 'Capítulo ' : 'Episódio ') . $epNum) : null;
     $status = strtoupper($work->status ?? 'COMPLETED');
+    $scheduleMaxEp = (int) ($work->latest_episode_num ?? 0);
     $isUnreleased = in_array($status, ['NOT_YET_RELEASED', 'NOT_YET_AIRED', 'UPCOMING', 'UNRELEASED'], true);
-    if ($isEpisodeMode && !empty($currentEpisode->air_date_utc)) {
-        $curAirTs = strtotime($currentEpisode->air_date_utc);
-        if ($curAirTs > 0 && $curAirTs > time()) {
+    if ($isEpisodeMode) {
+        if (!empty($currentEpisode->air_date_utc)) {
+            $curAirTs = strtotime($currentEpisode->air_date_utc);
+            if ($curAirTs > 0 && $curAirTs > time() && ($scheduleMaxEp <= 0 || $epNum > $scheduleMaxEp)) {
+                $isUnreleased = true;
+            }
+        } elseif ($status === 'RELEASING' && $scheduleMaxEp > 0 && $epNum > $scheduleMaxEp) {
             $isUnreleased = true;
         }
     }
-    $totalEpisodes = count($episodes) ?: ($work->episode_count ?? 0);
+    $totalEpisodes = max(count($episodes), (int) ($work->episode_count ?? 0));
     if ($totalEpisodes <= 0 && count($arcs) > 0) {
         $maxArcEnd = collect($arcs)->max('end_number');
         $maxArcStart = collect($arcs)->max('start_number');
@@ -65,12 +71,19 @@
     })->values();
 
     $knownMaxEp = (int) ($displayEpisodes->max('number') ?? 0);
-    $targetMaxEp = max($knownMaxEp, (int) ($work->latest_episode_num ?? 0));
-    $isFinishedWork = $status === 'FINISHED' || $status === 'COMPLETED';
+    $scheduleMaxEp = (int) ($work->latest_episode_num ?? 0);
+    if ($isUnreleased) {
+        $targetMaxEp = 0;
+    } elseif ($status === 'RELEASING') {
+        $airedFrontier = max($knownMaxEp, $scheduleMaxEp);
+        $targetMaxEp = $airedFrontier > 0 ? $airedFrontier : max(1, (int) $totalEpisodes);
+    } else {
+        $targetMaxEp = max($knownMaxEp, $scheduleMaxEp, (int) $totalEpisodes, 1);
+    }
 
-    // Para obras já finalizadas e completas que porventura não tenham todas as linhas em catalog_episodes,
-    // sintetiza as unidades virtuais até o total da obra. Para obras em lançamento (RELEASING), não sintetiza além do lançado!
-    if ($isFinishedWork && $targetMaxEp > $knownMaxEp) {
+    // Para qualquer obra já lançada que porventura não tenha todas as linhas em catalog_episodes,
+    // sintetiza as unidades virtuais até o limite exibido/catalogado (sem gerar episódios futuros para RELEASING).
+    if (! $isUnreleased && ($targetMaxEp > $knownMaxEp || $displayEpisodes->count() < $targetMaxEp)) {
         $maxVirtual = min($targetMaxEp, 500);
         $virtualList = $displayEpisodes->all();
         $existingNums = $displayEpisodes->pluck('number')->flip()->all();
@@ -122,6 +135,7 @@
      data-work-english-title="{{ $englishTitle ?? '' }}"
      data-work-romaji-title="{{ $romajiTitle ?? '' }}"
      data-work-native-title="{{ $nativeTitle ?? '' }}"
+     data-work-aliases="{{ json_encode($titleAliases ?? []) }}"
      data-work-media="{{ $isManga ? 'manga' : 'anime' }}"
      data-work-format="{{ $format }}"
      data-episode-count="{{ $totalEpisodes }}"

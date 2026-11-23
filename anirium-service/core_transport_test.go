@@ -41,3 +41,12 @@ func TestCoreHTTP1DiagnosticPreservesTLSAndRedirectDenial(t *testing.T) {
 		t.Fatal("authorization redirect was followed")
 	}
 }
+
+func TestCoreDefaultsToNonMultiplexedAuthorization(t *testing.T) {
+	t.Setenv("ANIRIUM_CORE_HTTP1", "")
+	client := newCoreAuthorizationClient()
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport.ForceAttemptHTTP2 || !transport.DisableKeepAlives || transport.TLSNextProto == nil || transport.Protocols == nil || transport.Protocols.HTTP2() || !transport.Protocols.HTTP1() {
+		t.Fatal("Core authorization unexpectedly uses multiplexed transport")
+	}
+}

@@ -27,11 +27,25 @@ func transcodeVideoWindowWithOwnedSlot(ctx context.Context, input, dir, quality 
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
+	preset := "superfast"
+	threads := "4"
+	if os.Getenv("ANIRIUM_E2E_CHILD") == "1" {
+		preset = "veryfast"
+		threads = "2"
+	}
 	args := []string{"-hide_banner", "-loglevel", "error", "-ss", fmt.Sprint(start), "-i", input, "-t", fmt.Sprint(duration),
 		"-map", "0:V:0", "-an", "-vf", "fps=24,scale=-2:" + qualityHeight(quality), "-pix_fmt", "yuv420p",
-		"-c:v", "libx264", "-preset", "veryfast", "-g", "96", "-keyint_min", "96", "-sc_threshold", "0",
-		"-force_key_frames", "expr:gte(t,n_forced*4)", "-output_ts_offset", fmt.Sprint(start + windowTransportOffset),
+		"-c:v", "libx264", "-preset"}
+	if duration <= 4 || (duration <= 8 && os.Getenv("ANIRIUM_E2E_CHILD") != "1") {
+		preset = "ultrafast"
+		threads = "4"
+		args = append(args, preset, "-tune", "zerolatency")
+	} else {
+		args = append(args, preset)
+	}
+	args = append(args, "-g", "96", "-keyint_min", "96", "-sc_threshold", "0",
+		"-force_key_frames", "expr:gte(t,n_forced*4)", "-output_ts_offset", fmt.Sprint(start+windowTransportOffset),
 		"-f", "hls", "-hls_time", "4", "-hls_segment_options", "mpegts_copyts=1", "-hls_flags", "independent_segments+temp_file", "-hls_playlist_type", "vod",
-		"-start_number", fmt.Sprint(int(start / 4)), "-hls_segment_filename", filepath.Join(dir, "segment-%06d.ts"), filepath.Join(dir, "index.m3u8")}
-	return mediaCommandContext(ctx, mediaTool("ffmpeg"), boundedTranscodeArgs(args, "2")...).Run()
+		"-start_number", fmt.Sprint(int(start/4)), "-hls_segment_filename", filepath.Join(dir, "segment-%06d.ts"), filepath.Join(dir, "index.m3u8"))
+	return mediaCommandContext(ctx, mediaTool("ffmpeg"), boundedTranscodeArgs(args, threads)...).Run()
 }

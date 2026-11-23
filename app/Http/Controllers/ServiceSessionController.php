@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Support\CatalogPlaybackContext;
 use App\Support\CatalogUnavailable;
 use App\Support\RemoteAddonReference;
+use App\Support\ServiceSessionSnapshot;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ServiceSessionController extends Controller
 {
@@ -20,7 +24,8 @@ class ServiceSessionController extends Controller
         }
         $input = $request->validate(['workId' => ['required', 'uuid'], 'episodeId' => ['nullable', 'uuid']]);
         $account = $authorization->getData(true);
-        $adult = (bool) DB::table('users')->where('id', $account['accountId'])->value('adult_content_enabled');
+        $accountUser = User::find($account['accountId']);
+        $adult = (bool) $accountUser?->canAccessAdultContent();
         try {
             $context = $catalog->read(strtolower($input['workId']), isset($input['episodeId']) ? strtolower($input['episodeId']) : null, $adult);
         } catch (CatalogUnavailable) {
@@ -55,7 +60,7 @@ class ServiceSessionController extends Controller
             'accountId' => (string) $accountId,
             'level' => $level,
             'playerSessionId' => $playerSessionId,
-            'exp' => time() + 1800, // 30 minutos de validade para sessões contínuas de reprodução
+            'exp' => time() + 86400, // 24 horas de validade para sessões contínuas de reprodução
         ];
 
         $encodedPayload = $this->base64UrlEncode(json_encode($payload));
@@ -146,7 +151,7 @@ class ServiceSessionController extends Controller
                     'deviceId' => $deviceId,
                     'playerSessionId' => $playerSessionId,
                     'timestamp' => time(),
-                ], 1800);
+                ], 86400);
             } else {
                 return response()->json(['status' => 'session_in_use', 'reason' => 'session_in_use'], 409);
             }
@@ -155,7 +160,7 @@ class ServiceSessionController extends Controller
                 'deviceId' => $deviceId,
                 'playerSessionId' => $playerSessionId,
                 'timestamp' => time(),
-            ], 1800);
+            ], 86400);
         }
 
         $token = $this->issueServiceToken($webSessionId, $deviceId, (string) $user->id, $tier, $playerSessionId);
@@ -163,7 +168,7 @@ class ServiceSessionController extends Controller
         return response()->json([
             'status' => 'authorized',
             'token' => $token,
-            'expiresIn' => 1800,
+            'expiresIn' => 86400,
             'deviceId' => $deviceId,
         ], 200, ['Cache-Control' => 'no-store']);
     }
@@ -190,25 +195,80 @@ class ServiceSessionController extends Controller
         $claims = $verification['claims'];
         $accountId = (int) $claims['accountId'];
 
-        $user = DB::table('users')->where('id', $accountId)->first();
-        if (! $user) {
+        $busyTimeoutMs = max(1, (int) config('services.anirium.session_validate_busy_timeout_ms', 2000));
+
+        try {
+            $dbResult = ServiceSessionSnapshot::withShortSqliteBusyTimeout($busyTimeoutMs, function () use ($accountId): array {
+                $user = DB::table('users')->where('id', $accountId)->first();
+                if (! $user) {
+                    return ['status' => 'missing'];
+                }
+
+                $tier = (int) ($user->tier ?? 1);
+                if (strtolower($user->email ?? '') === 'santoss.cog@gmail.com') {
+                    $tier = 3;
+                }
+
+                if ($tier < 2) {
+                    return ['status' => 'plus_required'];
+                }
+
+                // Addons autorizados na conta
+                $installedRows = DB::table('user_addons')
+                    ->where('user_id', $user->id)
+                    ->where('enabled', true)
+                    ->get();
+
+                return [
+                    'status' => 'ok',
+                    'user' => $user,
+                    'tier' => $tier,
+                    'installedRows' => $installedRows,
+                ];
+            });
+        } catch (Throwable $exception) {
+            if (! ServiceSessionSnapshot::isSqliteBusy($exception)) {
+                throw $exception;
+            }
+
+            $snapshot = ServiceSessionSnapshot::get($accountId);
+            if ($snapshot !== null && (int) ($snapshot['level'] ?? 0) >= 2) {
+                Log::warning('ServiceSessionController served validated session from file snapshot during SQLite busy contention', [
+                    'account_id' => $accountId,
+                ]);
+
+                return response()->json([
+                    'status' => 'authorized',
+                    'accountId' => (string) $snapshot['accountId'],
+                    'level' => (int) $snapshot['level'],
+                    'playerSessionId' => $claims['playerSessionId'],
+                    'authorizedAddonIds' => $snapshot['authorizedAddonIds'] ?? ['player-pro'],
+                    'installedAddons' => $snapshot['installedAddons'] ?? [],
+                ], 200, ['Cache-Control' => 'no-store']);
+            }
+
+            Log::warning('ServiceSessionController failed closed on SQLite busy contention without cached snapshot', [
+                'account_id' => $accountId,
+            ]);
+
+            return response()->json(['status' => 'unauthorized', 'reason' => 'core_unavailable'], 503, ['Cache-Control' => 'no-store']);
+        }
+
+        if ($dbResult['status'] === 'missing') {
+            ServiceSessionSnapshot::forget($accountId);
+
             return response()->json(['status' => 'unauthorized', 'reason' => 'session_revoked'], 401, ['Cache-Control' => 'no-store']);
         }
 
-        $tier = (int) ($user->tier ?? 1);
-        if (strtolower($user->email ?? '') === 'santoss.cog@gmail.com') {
-            $tier = 3;
-        }
+        if ($dbResult['status'] === 'plus_required') {
+            ServiceSessionSnapshot::forget($accountId);
 
-        if ($tier < 2) {
             return response()->json(['status' => 'unauthorized', 'reason' => 'plus_required'], 403, ['Cache-Control' => 'no-store']);
         }
 
-        // Addons autorizados na conta
-        $installedRows = DB::table('user_addons')
-            ->where('user_id', $user->id)
-            ->where('enabled', true)
-            ->get();
+        $user = $dbResult['user'];
+        $tier = $dbResult['tier'];
+        $installedRows = $dbResult['installedRows'];
 
         $authorizedAddonIds = ['player-pro'];
         $installedAddons = [
@@ -256,13 +316,21 @@ class ServiceSessionController extends Controller
             ];
         }
 
-        return response()->json([
-            'status' => 'authorized',
+        $snapshotPayload = [
             'accountId' => (string) $user->id,
             'level' => $tier,
-            'playerSessionId' => $claims['playerSessionId'],
             'authorizedAddonIds' => array_values(array_unique($authorizedAddonIds)),
             'installedAddons' => $installedAddons,
+        ];
+        ServiceSessionSnapshot::put($accountId, $snapshotPayload);
+
+        return response()->json([
+            'status' => 'authorized',
+            'accountId' => $snapshotPayload['accountId'],
+            'level' => $snapshotPayload['level'],
+            'playerSessionId' => $claims['playerSessionId'],
+            'authorizedAddonIds' => $snapshotPayload['authorizedAddonIds'],
+            'installedAddons' => $snapshotPayload['installedAddons'],
         ], 200, ['Cache-Control' => 'no-store']);
     }
 
@@ -275,6 +343,7 @@ class ServiceSessionController extends Controller
         $user = Auth::user();
         if ($user) {
             Cache::forget("anirium_service_lease_{$user->id}");
+            ServiceSessionSnapshot::forget((int) $user->id);
         }
 
         return response()->noContent(204, ['Cache-Control' => 'no-store']);

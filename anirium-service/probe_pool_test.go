@@ -27,7 +27,7 @@ func TestProbePoolProcessesEverySourceWithinWorkerLimit(t *testing.T) {
 		active--
 		mu.Unlock()
 	})
-	if maxActive > 4 || len(seen) != 70 {
+	if maxActive > 8 || len(seen) != 70 {
 		t.Fatalf("workers=%d sources=%d", maxActive, len(seen))
 	}
 	for source, count := range seen {

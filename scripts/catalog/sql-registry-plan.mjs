@@ -1,9 +1,17 @@
 import { externalKey } from "./external-identity.mjs";
+import { READ_PAGE_SIZE, forEachKeysetPage } from "./sql-registry-connection.mjs";
 
 export const registryMedia = value => ({WORK:"anime",MANGA:"manga",NOVEL:"novel"}[value]);
 
 export function planRegistryWrites(db,previous,next) {
-  const metadata=new Set(db.prepare("SELECT entity_id FROM catalog_registry_metadata").all().map(row=>row.entity_id));
+  const metadata=new Set();
+  forEachKeysetPage(
+    db,
+    `SELECT rowid AS _cursor,entity_id FROM catalog_registry_metadata ORDER BY rowid LIMIT ${READ_PAGE_SIZE}`,
+    `SELECT rowid AS _cursor,entity_id FROM catalog_registry_metadata WHERE rowid>? ORDER BY rowid LIMIT ${READ_PAGE_SIZE}`,
+    "_cursor",
+    row=>metadata.add(row.entity_id)
+  );
   const works=[], redirects=[];
   for (const [id,value] of Object.entries(next.works)) {
     if (typeof value.title!=="string" || !value.title.trim()) throw new Error("SQL work title required");

@@ -13,10 +13,13 @@ use App\Support\CatalogUserCompletion;
 use App\Support\EntityContextAliases;
 use App\Support\EntityFanTierEvaluator;
 use App\Support\RemoteAddonReference;
+use App\Support\ServiceSessionSnapshot;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class TelemetryDeviceController extends Controller
 {
@@ -221,36 +224,75 @@ class TelemetryDeviceController extends Controller
             ];
         }
 
-        DB::table('user_interaction_events')->insert($rows);
+        $busyTimeoutMs = max(1, (int) config('services.anirium.telemetry_write_busy_timeout_ms', 3000));
 
-        // Se o usuário estiver logado, atualiza o last_ping da máquina, minutos ativos e streak diária
-        if ($user) {
-            DB::table('active_user_devices')->where('user_id', $user->id)->update([
-                'last_ping_at' => $now,
+        try {
+            ServiceSessionSnapshot::withShortSqliteBusyTimeout($busyTimeoutMs, function () use (
+                $rows,
+                $user,
+                $now,
+                $activeMinuteIncrements,
+                $uploadedBytesIncrement,
+                $downloadedBytesIncrement,
+                $seedingSecondsIncrement
+            ): void {
+                DB::transaction(function () use (
+                    $rows,
+                    $user,
+                    $now,
+                    $activeMinuteIncrements,
+                    $uploadedBytesIncrement,
+                    $downloadedBytesIncrement,
+                    $seedingSecondsIncrement
+                ): void {
+                    DB::table('user_interaction_events')->insert($rows);
+
+                    // Se o usuário estiver logado, atualiza o last_ping da máquina, minutos ativos e streak diária
+                    if ($user) {
+                        DB::table('active_user_devices')->where('user_id', $user->id)->update([
+                            'last_ping_at' => $now,
+                        ]);
+
+                        self::evaluateDailyStreak($user);
+
+                        if ($activeMinuteIncrements > 0) {
+                            $user->active_minutes = (int) ($user->active_minutes ?? 0) + $activeMinuteIncrements;
+                        }
+
+                        if ($uploadedBytesIncrement > 0 || $downloadedBytesIncrement > 0 || $seedingSecondsIncrement > 0) {
+                            $user->bytes_uploaded = (int) ($user->bytes_uploaded ?? 0) + $uploadedBytesIncrement;
+                            $user->bytes_downloaded = (int) ($user->bytes_downloaded ?? 0) + $downloadedBytesIncrement;
+                            $user->seeding_seconds = (int) ($user->seeding_seconds ?? 0) + $seedingSecondsIncrement;
+
+                            // 1 MB seeded = 1 XP | cada 60s seeding ativo = 2 XP
+                            $mbSeededXp = (int) floor($uploadedBytesIncrement / (1024 * 1024));
+                            $timeSeededXp = (int) floor($seedingSecondsIncrement / 30);
+                            $newSeedingXp = $mbSeededXp + $timeSeededXp;
+
+                            if ($newSeedingXp > 0) {
+                                $user->seeding_xp = (int) ($user->seeding_xp ?? 0) + $newSeedingXp;
+                            }
+                        }
+
+                        $user->saveQuietly();
+                    }
+                });
+            });
+        } catch (Throwable $exception) {
+            if (! ServiceSessionSnapshot::isSqliteBusy($exception)) {
+                throw $exception;
+            }
+
+            Log::warning('TelemetryDeviceController deferred telemetry event batch during SQLite busy contention', [
+                'user_id' => $userId,
+                'count' => count($rows),
             ]);
 
-            self::evaluateDailyStreak($user);
-
-            if ($activeMinuteIncrements > 0) {
-                $user->active_minutes = (int) ($user->active_minutes ?? 0) + $activeMinuteIncrements;
-            }
-
-            if ($uploadedBytesIncrement > 0 || $downloadedBytesIncrement > 0 || $seedingSecondsIncrement > 0) {
-                $user->bytes_uploaded = (int) ($user->bytes_uploaded ?? 0) + $uploadedBytesIncrement;
-                $user->bytes_downloaded = (int) ($user->bytes_downloaded ?? 0) + $downloadedBytesIncrement;
-                $user->seeding_seconds = (int) ($user->seeding_seconds ?? 0) + $seedingSecondsIncrement;
-
-                // 1 MB seeded = 1 XP | cada 60s seeding ativo = 2 XP
-                $mbSeededXp = (int) floor($uploadedBytesIncrement / (1024 * 1024));
-                $timeSeededXp = (int) floor($seedingSecondsIncrement / 30);
-                $newSeedingXp = $mbSeededXp + $timeSeededXp;
-
-                if ($newSeedingXp > 0) {
-                    $user->seeding_xp = (int) ($user->seeding_xp ?? 0) + $newSeedingXp;
-                }
-            }
-
-            $user->saveQuietly();
+            return response()->json([
+                'status' => 'deferred',
+                'reason' => 'database_busy',
+                'count' => 0,
+            ], 202);
         }
 
         return response()->json([
@@ -304,7 +346,10 @@ class TelemetryDeviceController extends Controller
                 'current_streak' => (int) ($user->current_streak ?? 0),
                 'longest_streak' => (int) ($user->longest_streak ?? 0),
                 'streak_xp' => (int) ($user->streak_xp ?? 0),
-                'adult_content_enabled' => (bool) ($user->adult_content_enabled ?? false),
+                'adult_content_enabled' => $user->canAccessAdultContent(),
+                'age_verified' => $user->isAgeVerified(),
+                'age_verification_status' => (string) ($user->age_verification_status ?? 'unverified'),
+                'age_verification_method' => $user->age_verification_method,
             ],
         ]);
     }
@@ -430,7 +475,7 @@ class TelemetryDeviceController extends Controller
 
         $query = DB::table('user_entity_preferences')->where('user_id', $user->id);
         if ($targetId) {
-            $query->where(app(EntityContextAliases::class)->matching((string) $targetType, (string) $targetId, (bool) $user->adult_content_enabled));
+            $query->where(app(EntityContextAliases::class)->matching((string) $targetType, (string) $targetId, $user->canAccessAdultContent()));
         }
         if ($targetType) {
             $query->where('target_type', $targetType);
@@ -451,14 +496,17 @@ class TelemetryDeviceController extends Controller
                 'current_streak' => (int) ($user->current_streak ?? 0),
                 'longest_streak' => (int) ($user->longest_streak ?? 0),
                 'streak_xp' => (int) ($user->streak_xp ?? 0),
-                'adult_content_enabled' => (bool) ($user->adult_content_enabled ?? false),
+                'adult_content_enabled' => $user->canAccessAdultContent(),
+                'age_verified' => $user->isAgeVerified(),
+                'age_verification_status' => (string) ($user->age_verification_status ?? 'unverified'),
+                'age_verification_method' => $user->age_verification_method,
                 'custom_title' => $user->custom_title,
             ],
         ]);
     }
 
     /**
-     * Atualiza configurações explícitas da conta do usuário (ex.: filtro +24 Anos / Hentai, título customizado ou sincronização de XP/Level)
+     * Atualiza configurações explícitas da conta do usuário (ex.: filtro +18 Anos / Hentai, título customizado ou sincronização de XP/Level)
      */
     public function updateAccountSettings(Request $request)
     {
@@ -470,7 +518,19 @@ class TelemetryDeviceController extends Controller
         $raw = $request->json()->all() ?: $request->all();
 
         if (array_key_exists('adult_content_enabled', $raw)) {
-            $user->adult_content_enabled = (bool) $raw['adult_content_enabled'];
+            $requestedAdult = (bool) $raw['adult_content_enabled'];
+            if ($requestedAdult && ! $user->isAgeVerified()) {
+                $user->adult_content_enabled = false;
+                $user->saveQuietly();
+
+                return response()->json([
+                    'error' => $user->isUnderageBlocked() ? 'underage_blocked' : 'age_verification_required',
+                    'age_verification_status' => (string) ($user->age_verification_status ?? 'unverified'),
+                    'age_verified' => false,
+                    'adult_content_enabled' => false,
+                ], 403);
+            }
+            $user->adult_content_enabled = $requestedAdult;
         }
         if (array_key_exists('custom_title_id', $raw) || array_key_exists('custom_title', $raw)) {
             $requested = array_key_exists('custom_title_id', $raw) ? $raw['custom_title_id'] : $raw['custom_title'];
@@ -487,7 +547,10 @@ class TelemetryDeviceController extends Controller
 
         return response()->json([
             'status' => 'updated',
-            'adult_content_enabled' => (bool) $user->adult_content_enabled,
+            'adult_content_enabled' => $user->canAccessAdultContent(),
+            'age_verified' => $user->isAgeVerified(),
+            'age_verification_status' => (string) ($user->age_verification_status ?? 'unverified'),
+            'age_verification_method' => $user->age_verification_method,
             'custom_title' => $user->custom_title,
             'xp' => $experience['total'],
             'level' => $experience['level'],
@@ -559,11 +622,12 @@ class TelemetryDeviceController extends Controller
     public function getEntityDiscussions(Request $request, string $type, string $id)
     {
         $since = $request->query('since');
+        $allowAdult = (bool) $request->user()?->canAccessAdultContent();
         $query = DB::table('entity_discussions as ed')
             ->join('users as u', 'ed.user_id', '=', 'u.id')
             ->select('ed.*', 'u.name as user_name', 'u.avatar as user_avatar')
             ->where('ed.target_type', $type)
-            ->where(app(EntityContextAliases::class)->matching($type, $id, (bool) $request->user()?->adult_content_enabled, 'ed.'));
+            ->where(app(EntityContextAliases::class)->matching($type, $id, $allowAdult, 'ed.'));
 
         if ($since) {
             $query->where('ed.created_at', '>', $since);
@@ -573,7 +637,7 @@ class TelemetryDeviceController extends Controller
 
         $latestTimestamp = DB::table('entity_discussions as ed')
             ->where('ed.target_type', $type)
-            ->where(app(EntityContextAliases::class)->matching($type, $id, (bool) $request->user()?->adult_content_enabled, 'ed.'))
+            ->where(app(EntityContextAliases::class)->matching($type, $id, $allowAdult, 'ed.'))
             ->max('ed.created_at');
 
         return response()->json([
@@ -724,6 +788,7 @@ class TelemetryDeviceController extends Controller
                 'updated_at' => now(),
             ]
         );
+        ServiceSessionSnapshot::forget((int) $user->id);
 
         return response()->json(['success' => true, 'addon_id' => $addonId, 'enabled' => $enabled]);
     }
@@ -738,9 +803,14 @@ class TelemetryDeviceController extends Controller
             return response()->json(['error' => 'unauthorized'], 401);
         }
 
-        $request->validate(['manifest_url' => 'nullable|string|max:2048', 'manifest' => 'nullable|array']);
+        $request->validate([
+            'manifest_url' => 'nullable|string|max:4096',
+            'manifest' => 'nullable|array',
+            'replace_addon_id' => 'nullable|string|max:100',
+        ]);
         $manifestUrl = trim((string) $request->input('manifest_url'));
         $manifestData = $request->input('manifest');
+        $replaceAddonId = trim((string) $request->input('replace_addon_id', ''));
 
         $manifestUrl = $manifestUrl ?: (string) ($manifestData['manifestUrl'] ?? '');
         if ($manifestUrl !== '') {
@@ -781,18 +851,28 @@ class TelemetryDeviceController extends Controller
             return response()->json(['error' => 'manifest_url_required'], 422);
         }
 
-        DB::table('user_addons')->updateOrInsert(
-            ['user_id' => $user->id, 'addon_id' => $addonId],
-            [
-                'name' => $name,
-                'version' => $version,
-                'type' => 'community',
-                'manifest_url' => $manifestUrl ?: null,
-                'manifest_json' => ! empty($manifestData) ? json_encode($manifestData) : null,
-                'enabled' => true,
-                'updated_at' => now(),
-            ]
-        );
+        DB::transaction(function () use ($user, $addonId, $name, $version, $manifestUrl, $manifestData, $replaceAddonId): void {
+            DB::table('user_addons')->updateOrInsert(
+                ['user_id' => $user->id, 'addon_id' => $addonId],
+                [
+                    'name' => $name,
+                    'version' => $version,
+                    'type' => 'community',
+                    'manifest_url' => $manifestUrl ?: null,
+                    'manifest_json' => ! empty($manifestData) ? json_encode($manifestData) : null,
+                    'enabled' => true,
+                    'updated_at' => now(),
+                ]
+            );
+
+            if ($replaceAddonId !== '' && $replaceAddonId !== $addonId && ! in_array($replaceAddonId, ['player-pro', 'manga-reader-pro'], true)) {
+                DB::table('user_addons')
+                    ->where('user_id', $user->id)
+                    ->where('addon_id', $replaceAddonId)
+                    ->delete();
+            }
+        });
+        ServiceSessionSnapshot::forget((int) $user->id);
 
         return response()->json(['success' => true, 'addon_id' => $addonId]);
     }
@@ -816,6 +896,7 @@ class TelemetryDeviceController extends Controller
             ->where('user_id', $user->id)
             ->where('addon_id', $addonId)
             ->delete();
+        ServiceSessionSnapshot::forget((int) $user->id);
 
         return response()->json(['success' => true, 'uninstalled' => $addonId]);
     }

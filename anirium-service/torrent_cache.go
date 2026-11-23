@@ -50,3 +50,22 @@ func newRuntimeTorrentCache() (string, func() error, error) {
 	}
 	return absolute, cleanup, nil
 }
+
+// newPersistentTorrentCache returns a stable per-user cache directory so
+// downloaded episode pieces survive restarts, refreshes, and seeks.
+func newPersistentTorrentCache() (string, func() error, error) {
+	base, err := os.UserCacheDir()
+	if err != nil || strings.TrimSpace(base) == "" {
+		return newRuntimeTorrentCache()
+	}
+	dir := filepath.Join(base, "Anirium", "torrent-cache")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return newRuntimeTorrentCache()
+	}
+	absolute, err := filepath.Abs(dir)
+	if err != nil {
+		return newRuntimeTorrentCache()
+	}
+	// Persistent cache is managed by episode retention, not wiped on exit.
+	return absolute, func() error { return nil }, nil
+}

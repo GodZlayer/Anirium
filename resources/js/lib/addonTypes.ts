@@ -97,6 +97,7 @@ export interface AniriumPlaybackPreferences {
   preferredSubtitles?: string;
   autoNextEpisode?: boolean;
   autoSkipIntro?: boolean;
+  autoSkipEnding?: boolean;
 }
 
 export interface AniriumPlayerProps {

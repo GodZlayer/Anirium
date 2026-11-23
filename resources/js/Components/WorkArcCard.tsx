@@ -1,12 +1,15 @@
 import React from "react";
 import type { CanonicalArc } from "../lib/canonicalArcs";
+import type { WatchCompletionStatus } from "../lib/watchCompletion";
+import { WatchStatusBadge } from "./WatchStatusBadge";
 
 interface Props {
   arc: CanonicalArc; image: string; accent: string; selected: boolean; onSelect: () => void;
   labels: { title: string; classification: string; range: string; count: string; action: string };
+  watchStatus?: WatchCompletionStatus;
 }
 
-export function WorkArcCard({ arc, image, accent, selected, labels, onSelect }: Props) {
+export function WorkArcCard({ arc, image, accent, selected, labels, onSelect, watchStatus }: Props) {
   return <button type="button" onClick={onSelect}
     aria-label={`${labels.title}. ${labels.range}. ${labels.classification}. ${labels.action}`}
     className="relative group w-full text-left p-4 sm:p-5 rounded-2xl border transition-all duration-300 hover:scale-[1.01] active:scale-98 cursor-pointer backdrop-blur-2xl shadow-xl flex items-center justify-between gap-4 overflow-hidden shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -22,6 +25,9 @@ export function WorkArcCard({ arc, image, accent, selected, labels, onSelect }: 
         <span className="text-xs font-mono font-bold text-[color:var(--wc-textMuted)]">{labels.range}</span>
         <span className="text-[color:var(--wc-textMuted)]">•</span>
         <span className="text-xs font-mono text-[color:var(--wc-stateSuccess)] font-bold">{labels.count}</span>
+        {watchStatus && watchStatus.status !== "none" && (
+          <WatchStatusBadge status={watchStatus} compact />
+        )}
       </span>
       <span className="block font-bold text-sm sm:text-base text-[color:var(--wc-textPrimary)] group-hover:text-[#FFC766] transition-colors truncate">{labels.title}</span>
       {arc.synopsis && <span className="block text-xs font-mono leading-relaxed line-clamp-1 text-[color:var(--wc-textSecondary)] mt-0.5">{arc.synopsis}</span>}

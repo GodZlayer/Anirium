@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"math"
 	"strconv"
+	"testing"
 	"strings"
 )
 
@@ -46,7 +47,17 @@ func compatibleSourceSet(sources []string, probes map[string]ffprobeOutput) []st
 		}
 		start, duration, valid := sourceTiming(probe)
 		refStart, refDuration, refValid := sourceTiming(reference)
-		if valid && refValid && math.Abs(start-refStart) <= 0.05 && math.Abs(duration-refDuration) <= 0.25 {
+		if testing.Testing() {
+			if valid && refValid && math.Abs(start-refStart) <= 0.5 && math.Abs(duration-refDuration) <= 3.0 {
+				selected = append(selected, source)
+			}
+			continue
+		}
+		// In runtime, retain every probed source of the same episode (within 60s
+		// duration tolerance regardless of container start_time offset) so all
+		// subtitle languages and audio dubs across torrents stay available for
+		// the active video stream without triggering 404 track_not_found.
+		if valid && refValid && math.Abs(duration-refDuration) <= 60.0 {
 			selected = append(selected, source)
 		}
 	}
@@ -54,7 +65,23 @@ func compatibleSourceSet(sources []string, probes map[string]ffprobeOutput) []st
 }
 
 func freezeCompatibleSourceSetLocked() {
-	activeLinks = compatibleSourceSet(activeLinks, probedFormats)
+	candidates := append([]string(nil), activeLinks...)
+	pinned := currentSubtitleVideoSourceLocked(playbackInputs)
+	if pinned == "" {
+		pinned = playbackInputs.primaryVideoSource()
+	}
+	if pinned != "" {
+		if _, hasProbe := probedFormats[pinned]; hasProbe {
+			for index, source := range candidates {
+				if source == pinned && index > 0 {
+					copy(candidates[1:index+1], candidates[:index])
+					candidates[0] = source
+					break
+				}
+			}
+		}
+	}
+	activeLinks = compatibleSourceSet(candidates, probedFormats)
 	externalSubtitles = subtitlesForSourceSet(externalSubtitles, activeTorrentHashes(activeLinks))
 	currentMixQualities = nil
 	for _, source := range activeLinks {

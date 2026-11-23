@@ -97,13 +97,55 @@ type providerManifestSnapshot struct {
 // prepare so magnet and subtitle discovery in the same prepare observe the
 // same current manifest, and a fresh store on the next prepare refetches.
 type providerSnapshotStore struct {
-	mu      sync.Mutex
-	entries map[string]providerManifestSnapshot
-	pending map[string]chan struct{}
+	mu                sync.Mutex
+	entries           map[string]providerManifestSnapshot
+	pending           map[string]chan struct{}
+	identityOnce      sync.Once
+	identityVideoID   string
+	identityMediaType string
+	identitySeason    int
+	identityResolved  bool
+	resolveIdentity   func(context.Context, PlaybackPrepareRequest) PlaybackPrepareRequest
 }
 
 func newProviderSnapshotStore() *providerSnapshotStore {
 	return &providerSnapshotStore{entries: map[string]providerManifestSnapshot{}}
+}
+
+// episodeIdentity resolves the IMDb/Stremio episode identity once per prepare
+// across all concurrent subtitle providers instead of repeating remote lookups.
+func (s *providerSnapshotStore) episodeIdentity(ctx context.Context, query PlaybackPrepareRequest) PlaybackPrepareRequest {
+	if query.VideoID != "" || query.MALID < 1 || query.MALID > 1000000000 || query.EpisodeCount < 1 {
+		return query
+	}
+	resolve := resolveSubtitleEpisodeIdentity
+	if s != nil && s.resolveIdentity != nil {
+		resolve = s.resolveIdentity
+	}
+	lookup := func(parent context.Context) PlaybackPrepareRequest {
+		lookupCtx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		defer cancel()
+		return resolve(lookupCtx, query)
+	}
+	if s == nil {
+		return lookup(ctx)
+	}
+	s.identityOnce.Do(func() {
+		resolved := lookup(ctx)
+		s.identityVideoID = resolved.VideoID
+		s.identityMediaType = resolved.MediaType
+		s.identitySeason = resolved.Season
+		s.identityResolved = resolved.VideoID != ""
+		appendLog(fmt.Sprintf("Subtitle identity mal=%d episode=%d count=%d resolved=%t videoId=%s", query.MALID, query.Episode, query.EpisodeCount, s.identityResolved, s.identityVideoID))
+	})
+	if s.identityResolved {
+		query.VideoID = s.identityVideoID
+		query.MediaType = s.identityMediaType
+		if s.identityMediaType == "series" && s.identitySeason > 0 {
+			query.Season = s.identitySeason
+		}
+	}
+	return query
 }
 
 func (s *providerSnapshotStore) manifest(parent context.Context, server ProviderServer) (ProviderManifest, string) {
@@ -165,11 +207,29 @@ func (s *providerSnapshotStore) statusByID() map[string]string {
 // existing network guards: HTTPS-or-trusted-local transport, no redirects,
 // public-address validation, bound timeout and a bounded JSON body.
 func fetchProviderManifest(parent context.Context, server ProviderServer) providerManifestSnapshot {
+	if isSubtitleQueryProviderURL(server.ManifestURL) {
+		return providerManifestSnapshot{
+			Manifest: ProviderManifest{
+				ID:           server.ID,
+				Capabilities: []string{"subtitle-query"},
+			},
+			Status: "ok",
+		}
+	}
+	if isRSSProviderURL(server.ManifestURL) {
+		return providerManifestSnapshot{
+			Manifest: ProviderManifest{
+				ID:           server.ID,
+				Capabilities: []string{"rss-search"},
+			},
+			Status: "ok",
+		}
+	}
 	canonical, ok := canonicalizeManifestURL(server.ManifestURL)
 	if !ok {
 		return providerManifestSnapshot{Status: "invalid_ref"}
 	}
-	ctx, cancel := context.WithTimeout(parent, 8*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 2500*time.Millisecond)
 	defer cancel()
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, canonical, nil)
 	if err != nil {
@@ -191,7 +251,7 @@ func fetchProviderManifest(parent context.Context, server ProviderServer) provid
 	if status != 200 || decodeErr != nil || !validAddonIdentity(manifest.ID) || !manifestIdentityAcceptsServer(server, manifest) {
 		return providerManifestSnapshot{Status: "invalid_manifest"}
 	}
-	supported := supportsStremioSubtitleResource(manifest, "movie", "tt0") || supportsStremioSubtitleResource(manifest, "series", "tt0:1:1")
+	supported := supportsStremioSubtitleResource(manifest, "movie", "tt0") || supportsStremioSubtitleResource(manifest, "series", "tt0:1:1") || hasStremioStreams(manifest)
 	for _, capability := range manifest.Capabilities {
 		key := ""
 		if capability == "magnet.search" {

@@ -190,3 +190,204 @@ func TestSubtitleSelectionUsesProbedStreamIndex(t *testing.T) {
 		t.Fatal(args)
 	}
 }
+
+func TestSubtitleTrackIDsStayStableAcrossActiveLinksReorderAndFreeze(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	swarmMu.Lock()
+	oldLinks, oldStreams, oldFormats, oldSidecars := activeLinks, probedStreams, probedFormats, probedSidecars
+	oldQualities, oldSubs, oldExternal, oldInputs := currentMixQualities, currentMixSubs, externalSubtitles, playbackInputs
+	gen := playbackGeneration
+	defer func() {
+		activeLinks, probedStreams, probedFormats, probedSidecars = oldLinks, oldStreams, oldFormats, oldSidecars
+		currentMixQualities, currentMixSubs, externalSubtitles, playbackInputs = oldQualities, oldSubs, oldExternal, oldInputs
+		swarmMu.Unlock()
+	}()
+
+	playbackInputs = newMediaInputCache(ctx, nil)
+	src0 := fmt.Sprintf("media-%d-0", gen)
+	src1 := fmt.Sprintf("media-%d-1", gen)
+	cut := fmt.Sprintf("media-%d-2", gen)
+
+	engSub := ffprobeStream{Index: 2, CodecType: "subtitle", CodecName: "subrip"}
+	engSub.Tags.Language = "eng"
+	porSub := ffprobeStream{Index: 3, CodecType: "subtitle", CodecName: "ass"}
+	porSub.Tags.Language = "pt-BR"
+
+	probe0 := ffprobeOutput{Streams: []ffprobeStream{{Index: 0, CodecType: "video", Height: 1080}, engSub}}
+	probe0.Format.Duration = "1440"
+	probe1 := ffprobeOutput{Streams: []ffprobeStream{{Index: 0, CodecType: "video", Height: 720}, porSub}}
+	probe1.Format.Duration = "1440"
+	probeCut := ffprobeOutput{Streams: []ffprobeStream{{Index: 0, CodecType: "video", Height: 1080}}}
+	probeCut.Format.Duration = "1400"
+
+	probedFormats = map[string]ffprobeOutput{src0: probe0, src1: probe1, cut: probeCut}
+	probedStreams = map[string][]ffprobeStream{src0: probe0.Streams, src1: probe1.Streams, cut: probeCut.Streams}
+	probedSidecars = map[string][]string{}
+	externalSubtitles = nil
+
+	activeLinks = []string{cut, src0, src1}
+	before := subtitleTracksLocked()
+
+	activeLinks = []string{src1, cut, src0}
+	reordered := subtitleTracksLocked()
+
+	playbackInputs.rememberVideoProducer("720p", src1)
+	freezeCompatibleSourceSetLocked()
+	afterFreeze := manifestSubtitleTracksLocked()
+
+	wantEngID := fmt.Sprintf("subtitle-%d-0-2", gen)
+	wantPorID := fmt.Sprintf("subtitle-%d-1-3", gen)
+	checkPair := func(label string, list []SubtitleTrack) {
+		foundEng, foundPor := false, false
+		for _, track := range list {
+			if track.ID == wantEngID && track.Language == "eng" {
+				foundEng = true
+			}
+			if track.ID == wantPorID && track.Language == "por" {
+				foundPor = true
+			}
+		}
+		if !foundEng || !foundPor {
+			t.Fatalf("%s lost stable IDs: got %+v (want %s and %s)", label, list, wantEngID, wantPorID)
+		}
+	}
+	checkPair("before", before)
+	checkPair("reordered", reordered)
+	checkPair("afterFreeze", afterFreeze)
+	if len(activeLinks) != 2 || activeLinks[0] != src1 || activeLinks[1] != src0 {
+		t.Fatalf("pinned video producer not retained during freeze: %v", activeLinks)
+	}
+	for _, track := range afterFreeze {
+		if track.Kind != "embedded" {
+			t.Fatalf("missing track kind: %+v", track)
+		}
+		if track.ID == wantPorID && !track.Primary {
+			t.Fatalf("expected active video producer subtitle to be marked Primary: %+v", track)
+		}
+	}
+}
+
+func TestSelectPriorityMagnetsIncludesMultiSubUpToLimit(t *testing.T) {
+	magnets := []string{
+		"magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&dn=Seed1",
+		"magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&dn=Seed2",
+		"magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=PlainReleaseA",
+		"magnet:?xt=urn:btih:2222222222222222222222222222222222222222&dn=PlainReleaseB",
+		"magnet:?xt=urn:btih:3333333333333333333333333333333333333333&dn=Erai-raws.Ep21",
+		"magnet:?xt=urn:btih:4444444444444444444444444444444444444444&dn=PlainReleaseC",
+		"magnet:?xt=urn:btih:5555555555555555555555555555555555555555&dn=Fansub.PT-BR.Ep21",
+		"magnet:?xt=urn:btih:6666666666666666666666666666666666666666&dn=MultiSub.Ep21",
+		"magnet:?xt=urn:btih:7777777777777777777777777777777777777777&dn=PlainReleaseD",
+		"magnet:?xt=urn:btih:8888888888888888888888888888888888888888&dn=ToonsHub.Multi.Ep21",
+	}
+	got := selectPriorityMagnets(magnets, 8)
+	if len(got) != 8 {
+		t.Fatalf("expected 8 magnets, got %d", len(got))
+	}
+	for idx, wantSub := range []string{"Seed1", "Seed2", "Erai-raws", "PT-BR", "MultiSub", "ToonsHub"} {
+		if !strings.Contains(got[idx], wantSub) {
+			t.Fatalf("slot %d missing %s: %v", idx, wantSub, got)
+		}
+	}
+}
+
+func TestManifestSubtitlesDeduplicateNonPrimaryAndPrioritizePrimary(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	swarmMu.Lock()
+	oldLinks, oldStreams, oldFormats, oldSidecars := activeLinks, probedStreams, probedFormats, probedSidecars
+	oldQualities, oldSubs, oldExternal, oldInputs := currentMixQualities, currentMixSubs, externalSubtitles, playbackInputs
+	gen := playbackGeneration
+	mediaSourceMu.Lock()
+	oldSources := mediaSources
+	src0 := fmt.Sprintf("media-%d-0", gen)
+	src1 := fmt.Sprintf("media-%d-1", gen)
+	src2 := fmt.Sprintf("media-%d-2", gen)
+	mediaSources = map[string]mediaSource{
+		src0: {FileBytes: 900},
+		src1: {FileBytes: 200},
+		src2: {FileBytes: 400},
+	}
+	mediaSourceMu.Unlock()
+	defer func() {
+		activeLinks, probedStreams, probedFormats, probedSidecars = oldLinks, oldStreams, oldFormats, oldSidecars
+		currentMixQualities, currentMixSubs, externalSubtitles, playbackInputs = oldQualities, oldSubs, oldExternal, oldInputs
+		swarmMu.Unlock()
+		mediaSourceMu.Lock()
+		mediaSources = oldSources
+		mediaSourceMu.Unlock()
+	}()
+
+	mkStream := func(index int, lang, title string) ffprobeStream {
+		s := ffprobeStream{Index: index, CodecType: "subtitle", CodecName: "subrip"}
+		s.Tags.Language = lang
+		s.Tags.Title = title
+		return s
+	}
+
+	playbackInputs = newMediaInputCache(ctx, nil)
+	playbackInputs.rememberVideoProducer("1080p", src0)
+
+	probedStreams = map[string][]ffprobeStream{
+		src0: {
+			{Index: 0, CodecType: "video", Height: 1080},
+			mkStream(3, "eng", ""),
+			mkStream(4, "eng", "Forced"),
+			mkStream(26, "por", "Brazil"),
+			mkStream(27, "por", "Portugal"),
+		},
+		src1: {
+			{Index: 0, CodecType: "video", Height: 720},
+			mkStream(2, "eng", "AMZN_English"),
+			mkStream(3, "por", "AMZN_Portuguese(Brazil)"),
+			mkStream(11, "por", "AMZN_Portuguese"),
+			mkStream(12, "por", "Brazilian (Forced)"),
+			mkStream(14, "spa", "AMZN_Spanish(Latin_America)"),
+		},
+		src2: {
+			{Index: 0, CodecType: "video", Height: 720},
+			mkStream(3, "por", "Brazil"),
+			mkStream(4, "eng", ""),
+			mkStream(5, "spa", "Latin America"),
+			mkStream(6, "fra", ""),
+		},
+	}
+	probedFormats = map[string]ffprobeOutput{
+		src0: {Streams: probedStreams[src0]},
+		src1: {Streams: probedStreams[src1]},
+		src2: {Streams: probedStreams[src2]},
+	}
+	probedSidecars = map[string][]string{}
+	externalSubtitles = []ProviderSubtitle{{Language: "ara", Title: "Arabic Ext", URL: "https://example.invalid/ar.srt"}}
+	activeLinks = []string{src0, src1, src2}
+
+	got := manifestSubtitleTracksLocked()
+	if len(got) != 7 {
+		t.Fatalf("expected 7 deduplicated tracks (4 primary + 1 external + 2 missing secondary), got %d: %+v", len(got), got)
+	}
+	for i := 0; i < 4; i++ {
+		if !got[i].Primary || got[i].Source != src0 {
+			t.Fatalf("track %d should be primary from %s: %+v", i, src0, got[i])
+		}
+	}
+	if got[4].Kind != "external" || got[4].Language != "ara" {
+		t.Fatalf("expected external ara track at index 4: %+v", got[4])
+	}
+	wantSecondary := map[string]string{
+		fmt.Sprintf("subtitle-%d-1-14", gen): "spa",
+		fmt.Sprintf("subtitle-%d-2-6", gen):  "fra",
+	}
+	for _, tr := range got[5:] {
+		if tr.Primary {
+			t.Fatalf("secondary track marked Primary: %+v", tr)
+		}
+		if wantSecondary[tr.ID] != tr.Language {
+			t.Fatalf("unexpected secondary track %+v (want one of %v)", tr, wantSecondary)
+		}
+		delete(wantSecondary, tr.ID)
+	}
+	if len(wantSecondary) != 0 {
+		t.Fatalf("missing expected secondary tracks: %v", wantSecondary)
+	}
+}

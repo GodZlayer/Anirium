@@ -12,6 +12,7 @@
     'englishTitle' => '',
     'romajiTitle' => '',
     'nativeTitle' => '',
+    'titleAliases' => [],
     'isLiked' => false,
     'isBookmarked' => false,
     'userScore' => null,
@@ -45,20 +46,37 @@
         return true;
     })->values();
 
-    $isFinishedWork = ($work->status ?? '') === 'FINISHED' || ($work->status ?? '') === 'COMPLETED';
-    if ($displayArcEpisodes->isEmpty() && $work && $totalArcEpisodes > 0 && $isFinishedWork) {
-        $maxArcVirtual = min((int) ($endNum ?: ($startNum + $totalArcEpisodes - 1)), $startNum + 199);
-        $vArcEps = [];
+    $workStatus = strtoupper($work->status ?? 'COMPLETED');
+    $isWorkUnreleased = in_array($workStatus, ['NOT_YET_RELEASED', 'NOT_YET_AIRED', 'UPCOMING', 'UNRELEASED'], true);
+    $knownMaxArcEp = (int) ($displayArcEpisodes->max('number') ?? 0);
+    $scheduleMaxEp = (int) ($work->latest_episode_num ?? 0);
+    $arcRangeEnd = (int) ($endNum ?: ($totalArcEpisodes > 0 ? ($startNum + $totalArcEpisodes - 1) : 0));
+
+    if ($isWorkUnreleased || $arcRangeEnd < max(1, $startNum)) {
+        $targetArcEnd = 0;
+    } elseif ($workStatus === 'RELEASING') {
+        $airedFrontier = max($knownMaxArcEp, $scheduleMaxEp);
+        $targetArcEnd = $airedFrontier > 0 ? min($arcRangeEnd, $airedFrontier) : $arcRangeEnd;
+    } else {
+        $targetArcEnd = $arcRangeEnd;
+    }
+
+    if ($work && ! $isWorkUnreleased && $targetArcEnd >= max(1, $startNum)) {
+        $maxArcVirtual = min($targetArcEnd, $startNum + 199);
+        $vArcEps = $displayArcEpisodes->all();
+        $existingArcNums = $displayArcEpisodes->pluck('number')->flip()->all();
         for ($i = max(1, $startNum); $i <= $maxArcVirtual; $i++) {
-            $vArcEps[] = (object) [
-                'id' => ($work->id ?? 'work') . ':ep:' . $i,
-                'work_id' => $work->id ?? '',
-                'number' => $i,
-                'air_date_utc' => null,
-                'is_virtual' => true,
-            ];
+            if (! isset($existingArcNums[$i])) {
+                $vArcEps[] = (object) [
+                    'id' => ($work->id ?? 'work') . ':ep:' . $i,
+                    'work_id' => $work->id ?? '',
+                    'number' => $i,
+                    'air_date_utc' => null,
+                    'is_virtual' => true,
+                ];
+            }
         }
-        $displayArcEpisodes = collect($vArcEps);
+        $displayArcEpisodes = collect($vArcEps)->sortBy('number')->values();
     }
 
     // Filtrar trilhas OP/ED que se sobrepõem à faixa de episódios deste arco
@@ -83,6 +101,7 @@
      data-work-english-title="{{ $englishTitle ?? '' }}"
      data-work-romaji-title="{{ $romajiTitle ?? '' }}"
      data-work-native-title="{{ $nativeTitle ?? '' }}"
+     data-work-aliases="{{ json_encode($titleAliases ?? []) }}"
      data-work-media="{{ $isManga ? 'manga' : 'anime' }}"
      data-work-format="{{ $workFormat }}"
      data-episode-count="{{ $work->episode_count ?? $totalArcEpisodes }}"

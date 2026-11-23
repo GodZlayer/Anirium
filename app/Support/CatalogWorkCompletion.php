@@ -9,11 +9,16 @@ class CatalogWorkCompletion
     public function read(object $work, array $watched, bool $workMarked): array
     {
         $known = DB::table('catalog_episodes')->where('work_id', $work->id)->where('numbering_scheme', 'original')->orderBy('number')->get();
-        $released = $known->filter(function (object $episode) use ($work): bool {
+        $scheduleLatestEp = (int) (DB::table('catalog_work_schedules')->where('work_id', $work->id)->value('latest_episode_num') ?? 0);
+        $nowTs = now()->timestamp;
+        $released = $known->filter(function (object $episode) use ($work, $scheduleLatestEp, $nowTs): bool {
+            if ($scheduleLatestEp > 0 && (int) $episode->number <= $scheduleLatestEp) {
+                return true;
+            }
             if ($episode->air_date_utc !== null) {
                 $time = strtotime($episode->air_date_utc);
 
-                return $time !== false && $time <= now()->timestamp;
+                return $time !== false && $time <= $nowTs;
             }
 
             return $work->status === 'FINISHED';

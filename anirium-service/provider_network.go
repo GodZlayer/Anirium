@@ -17,14 +17,8 @@ import (
 // grant access to private networks. Development exceptions are literal loopback
 // origins with an exact port, never a hostname, wildcard or private subnet.
 func trustedLocalProvider(address string) bool {
-	origins := strings.Split(os.Getenv("ANIRIUM_PROVIDER_LOCAL_ORIGINS"), ",")
-	origins = append(origins, "http://127.0.0.1:4001", "http://127.0.0.1:4002", "http://127.0.0.1:4003")
-	for _, origin := range origins {
-		origin = strings.TrimSpace(origin)
-		if origin == "" {
-			continue
-		}
-		u, err := url.Parse(origin)
+	for _, origin := range strings.Split(os.Getenv("ANIRIUM_PROVIDER_LOCAL_ORIGINS"), ",") {
+		u, err := url.Parse(strings.TrimSpace(origin))
 		if err != nil || u.Scheme != "http" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || u.Port() == "" {
 			continue
 		}
@@ -120,6 +114,10 @@ func (d providerNetworkDialer) DialContext(ctx context.Context, network, address
 type providerTransport struct{ transport *http.Transport }
 
 func (t providerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Header.Get("User-Agent") == "" {
+		req = req.Clone(req.Context())
+		req.Header.Set("User-Agent", "AniriumIntegration/2.3")
+	}
 	u := req.URL
 	if u == nil || u.Hostname() == "" || u.User != nil || u.Fragment != "" || u.Opaque != "" {
 		return nil, fmt.Errorf("invalid provider URL")

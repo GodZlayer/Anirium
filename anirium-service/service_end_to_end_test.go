@@ -319,11 +319,22 @@ func TestServiceEndToEndAuthorizedPeerPlayback(t *testing.T) {
 	}
 	ticket := url.QueryEscape(result.PlaybackTicket)
 	for _, track := range manifest.SubtitleTracks {
-		response := request("GET", "/subtitles?trackId="+url.QueryEscape(track.ID)+"&start=4&playbackTicket="+ticket, "")
-		data, err := io.ReadAll(response.Body)
-		response.Body.Close()
-		if err != nil || response.StatusCode != 200 || !strings.Contains(string(data), "00:01.000 --> 00:02.000\n"+track.Language+" late") || strings.Contains(string(data), "early") {
-			t.Fatalf("subtitle: %d %s %v", response.StatusCode, data, err)
+		for {
+			response := request("GET", "/subtitles?trackId="+url.QueryEscape(track.ID)+"&start=4&playbackTicket="+ticket, "")
+			data, err := io.ReadAll(response.Body)
+			response.Body.Close()
+			if err == nil && response.StatusCode == http.StatusAccepted {
+				select {
+				case <-ctx.Done():
+					t.Fatal("subtitle preparation did not finish within session deadline")
+				case <-time.After(100 * time.Millisecond):
+					continue
+				}
+			}
+			if err != nil || response.StatusCode != 200 || !strings.Contains(string(data), "00:01.000 --> 00:02.000\n"+track.Language+" late") || strings.Contains(string(data), "early") {
+				t.Fatalf("subtitle: %d %s %v", response.StatusCode, data, err)
+			}
+			break
 		}
 	}
 	playlist := serviceURL + manifest.Variants[0].PlaylistURL + "?playbackTicket=" + ticket
@@ -361,6 +372,21 @@ func TestServiceEndToEndAuthorizedPeerPlayback(t *testing.T) {
 	}
 	if window.Start != 4 || window.DeliveredDuration < expectedWindowDuration-0.1 || window.DeliveredDuration > expectedWindowDuration+0.2 {
 		t.Fatalf("wrong seek timeline: %+v", window)
+	}
+	if manifest.SubtitleBundleVersion != 1 {
+		t.Fatal("subtitle bundle capability missing")
+	}
+	bundleResponse := request("GET", "/playback/subtitles?playbackTicket="+ticket, "")
+	var bundle subtitleBundleSnapshot
+	decodeBundleErr := json.NewDecoder(bundleResponse.Body).Decode(&bundle)
+	bundleResponse.Body.Close()
+	if decodeBundleErr != nil || bundleResponse.StatusCode != 200 || bundle.Version != 1 || bundle.Source != window.SubtitleSource || len(bundle.Tracks) != 2 {
+		t.Fatalf("joint subtitle gate did not publish the window with its tracks: %+v %v", bundle, decodeBundleErr)
+	}
+	for _, track := range bundle.Tracks {
+		if track.Status != "ready" || len(track.Parts) == 0 || track.Parts[0].Start != 0 {
+			t.Fatalf("text batch not ready on first window: %+v", track)
+		}
 	}
 	for _, stream := range []string{"0:v:0", "0:a:0"} {
 		windowPlaylist := serviceURL + window.PlaylistURL + "?playbackTicket=" + ticket

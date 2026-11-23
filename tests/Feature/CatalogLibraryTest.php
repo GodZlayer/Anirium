@@ -104,6 +104,12 @@ class CatalogLibraryTest extends TestCase
         $this->getJson('/api/account/library?view=bookmarks&adult=1')->assertOk()->assertJsonPath('total', 25);
         $this->getJson('/api/account/library?view=bookmarks&page=2')->assertOk()->assertJsonCount(1, 'items');
         $user->update(['adult_content_enabled' => true]);
+        $this->getJson('/api/account/library?view=bookmarks&adult=1')->assertOk()->assertJsonPath('total', 25);
+        $user->update([
+            'age_verification_status' => 'verified',
+            'age_verification_method' => 'google_people',
+            'age_verified_at' => now(),
+        ]);
         $this->getJson('/api/account/library?view=bookmarks')->assertOk()->assertJsonPath('total', 25);
         $this->getJson('/api/account/library?view=bookmarks&adult=1')->assertOk()->assertJsonPath('total', 26);
         $this->assertDatabaseCount('user_entity_preferences', 27);

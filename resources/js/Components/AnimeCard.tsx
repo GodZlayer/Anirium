@@ -3,6 +3,8 @@ import { Play, Bookmark, Star, Clock } from "lucide-react";
 import { useDesignTheme } from "../context/ThemeContext";
 import { statusLabelKey } from "../lib/catalogMetadata.mjs";
 import { CATALOG_STRINGS } from "../lib/catalogStrings";
+import { getWorkWatchStatus } from "../lib/watchCompletion";
+import { WatchStatusBadge } from "./WatchStatusBadge";
 
 export type AnimeRecord = import("../lib/parquetCatalog").UnifiedCatalogWork;
 
@@ -29,6 +31,7 @@ export function AnimeCard({
   const { tokens, strings, language, getLocalizedTitle } = useDesignTheme();
   const labels = CATALOG_STRINGS[language] || CATALOG_STRINGS["pt-BR"];
   const localizedTitle = getLocalizedTitle(anime);
+  const watchStatus = getWorkWatchStatus(anime);
 
   return (
     <div
@@ -51,6 +54,13 @@ export function AnimeCard({
 
         {/* Gradiente de Fusão */}
         <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--wc-bgBase)]/90 via-[color:var(--wc-bgBase)]/20 to-transparent" />
+
+        {/* Badge de Progresso / Assistido */}
+        {watchStatus.status !== "none" && (
+          <div className="absolute bottom-2 left-2 z-10">
+            <WatchStatusBadge status={watchStatus} compact />
+          </div>
+        )}
 
         {/* Badge de Nota Canônica */}
         {anime.score && (

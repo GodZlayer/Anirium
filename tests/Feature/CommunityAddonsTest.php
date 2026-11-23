@@ -80,4 +80,57 @@ class CommunityAddonsTest extends TestCase
         $this->postJson('/api/addons/install', ['manifest_url' => 'https://fixture.example/manifest.json'])->assertUnauthorized();
         $this->getJson('/api/addons')->assertUnauthorized();
     }
+
+    public function test_replace_addon_id_replaces_only_owned_community_addon_and_never_official_ones(): void
+    {
+        $user = User::factory()->create(['tier' => 2]);
+        $other = User::factory()->create(['tier' => 2]);
+        $unconfigured = RemoteAddonReference::fromUrl('https://fixture.example/manifest.json');
+        $configured = RemoteAddonReference::fromUrl('https://fixture.example/cfg/manifest.json');
+
+        $this->actingAs($other)->postJson('/api/addons/install', ['manifest_url' => $unconfigured['manifestUrl']])->assertOk();
+
+        $this->actingAs($user)->postJson('/api/addons/install', ['manifest_url' => $unconfigured['manifestUrl']])->assertOk();
+        DB::table('user_addons')->insert(['user_id' => $user->id, 'addon_id' => 'player-pro', 'enabled' => true]);
+
+        $this->actingAs($user)->postJson('/api/addons/install', [
+            'manifest_url' => $configured['manifestUrl'],
+            'replace_addon_id' => $unconfigured['id'],
+        ])->assertOk()->assertJsonPath('addon_id', $configured['id']);
+
+        $this->assertDatabaseMissing('user_addons', ['user_id' => $user->id, 'addon_id' => $unconfigured['id']]);
+        $this->assertDatabaseHas('user_addons', ['user_id' => $user->id, 'addon_id' => $configured['id']]);
+        $this->assertDatabaseHas('user_addons', ['user_id' => $other->id, 'addon_id' => $unconfigured['id']]);
+
+        // Never deletes official player-pro when passed as replace_addon_id
+        $second = RemoteAddonReference::fromUrl('https://fixture.example/cfg2/manifest.json');
+        $this->actingAs($user)->postJson('/api/addons/install', [
+            'manifest_url' => $second['manifestUrl'],
+            'replace_addon_id' => 'player-pro',
+        ])->assertOk();
+        $this->assertDatabaseHas('user_addons', ['user_id' => $user->id, 'addon_id' => 'player-pro']);
+    }
+
+    public function test_web_stremio_install_url_is_unwrapped_while_other_fragments_remain_rejected(): void
+    {
+        $user = User::factory()->create(['tier' => 2]);
+        $reference = RemoteAddonReference::fromUrl('https://fixture.example/cfg/manifest.json');
+
+        $this->actingAs($user)->postJson('/api/addons/install', [
+            'manifest_url' => 'https://web.stremio.com/#/addons?addon='.rawurlencode('https://fixture.example/cfg/manifest.json'),
+        ])->assertOk()->assertJsonPath('addon_id', $reference['id']);
+
+        $this->assertDatabaseHas('user_addons', [
+            'user_id' => $user->id,
+            'addon_id' => $reference['id'],
+            'manifest_url' => 'https://fixture.example/cfg/manifest.json',
+        ]);
+
+        $this->postJson('/api/addons/install', [
+            'manifest_url' => 'https://web.stremio.com/other/#/addons?addon=https%3A%2F%2Ffixture.example%2Fmanifest.json',
+        ])->assertUnprocessable();
+        $this->postJson('/api/addons/install', [
+            'manifest_url' => 'https://fixture.example/manifest.json#fragment',
+        ])->assertUnprocessable();
+    }
 }

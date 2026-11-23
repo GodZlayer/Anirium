@@ -6,13 +6,44 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 )
+
+func streamingReadahead(capacity transferCapacity, fileLength int64) int64 {
+	if os.Getenv("ANIRIUM_E2E_CHILD") == "1" {
+		return mediaReadahead(capacity)
+	}
+	readahead := int64(8 << 20)
+	if capacity.Samples >= 3 && capacity.BytesPerSecond > 0 && !math.IsNaN(capacity.BytesPerSecond) && !math.IsInf(capacity.BytesPerSecond, 0) {
+		target := int64(capacity.BytesPerSecond * 6)
+		if target > readahead {
+			readahead = target
+		}
+	}
+	if readahead > 24<<20 {
+		readahead = 24 << 20
+	}
+	if fileLength > 0 && readahead > fileLength/4 {
+		quarter := fileLength / 4
+		minCap := int64(4 << 20)
+		if fileLength < minCap {
+			minCap = fileLength
+		}
+		if quarter < minCap {
+			readahead = minCap
+		} else {
+			readahead = quarter
+		}
+	}
+	return readahead
+}
 
 type seekableMediaInput struct {
 	name   string
@@ -44,7 +75,7 @@ func newProgressiveInputServer(ctx context.Context) (*progressiveInputServer, er
 	if err != nil {
 		return nil, err
 	}
-	input := &progressiveInputServer{ctx: ctx, baseURL: "http://" + listener.Addr().String(), inputs: map[string]seekableMediaInput{}, urls: map[string]string{}, slots: make(chan struct{}, 8), done: make(chan struct{}), retired: make(chan struct{})}
+	input := &progressiveInputServer{ctx: ctx, baseURL: "http://" + listener.Addr().String(), inputs: map[string]seekableMediaInput{}, urls: map[string]string{}, slots: make(chan struct{}, 24), done: make(chan struct{}), retired: make(chan struct{})}
 	input.server = &http.Server{Handler: http.HandlerFunc(input.serveHTTP), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 15 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
 	context.AfterFunc(ctx, func() {
 		input.mu.Lock()
@@ -215,6 +246,18 @@ func newProgressiveMediaInputCache(ctx context.Context) *mediaInputCache {
 		if err != nil || video == nil {
 			return "", fmt.Errorf("selected video unavailable: %v", err)
 		}
+		registerSequentialFile(source, video)
+		swarmMu.RLock()
+		epKey := currentCatalogIdentity.EpisodeID
+		if epKey == "" && currentSkipMALID > 0 && currentSkipEpisode > 0 {
+			epKey = fmt.Sprintf("mal:%d:ep:%d", currentSkipMALID, currentSkipEpisode)
+		}
+		swarmMu.RUnlock()
+		if epKey != "" {
+			if dropHashes := globalEpisodeRetention.recordAccess(epKey, tor.InfoHash().HexString()); len(dropHashes) > 0 {
+				go dropRetainedHashes(dropHashes)
+			}
+		}
 		once.Do(func() { server, serverErr = newProgressiveInputServer(ctx) })
 		if serverErr != nil {
 			return "", serverErr
@@ -222,10 +265,11 @@ func newProgressiveMediaInputCache(ctx context.Context) *mediaInputCache {
 		return server.register(source, seekableMediaInput{name: filepath.Base(video.DisplayPath()), length: video.Length(), open: func(request context.Context) (io.ReadSeekCloser, error) {
 			reader := video.NewReader()
 			reader.SetContext(request)
+			reader.SetResponsive()
 			swarmMu.RLock()
 			capacity := observedTransferCapacity
 			swarmMu.RUnlock()
-			reader.SetReadahead(mediaReadahead(capacity))
+			reader.SetReadahead(streamingReadahead(capacity, video.Length()))
 			return reader, nil
 		}})
 	}

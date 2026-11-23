@@ -3,23 +3,12 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 )
 
-// Experimental delivery primitive, not yet advertised to the Player. Holding
-// swarmMu protects ownership against seek/retirement while reading playlists.
-func preparedWindowSequencePlaylist(id string) (string, error) {
-	identity := continuousWindowMediaID.FindStringSubmatch(id)
-	if len(identity) != 2 {
-		return "", fmt.Errorf("invalid rendition")
-	}
-	suffix := identity[1]
-	anchor := strings.TrimSuffix(id, "-"+suffix)
-	swarmMu.RLock()
-	defer swarmMu.RUnlock()
-	windows := append([]*playbackWindow(nil), retainedPlaybackWindows...)
-	windows = append(windows, currentPlaybackWindow, prefetchedPlaybackWindow)
+func collectContinuousWindowParts(anchor, suffix string, windows []*playbackWindow) ([]continuousWindowPart, slidingPlaylistCursor, bool, error) {
 	var parts []continuousWindowPart
 	var cursor slidingPlaylistCursor
 	found, ended := false, false
@@ -37,7 +26,7 @@ func preparedWindowSequencePlaylist(id string) (string, error) {
 					var exists bool
 					cursor, exists = window.audioPlaylistCursors[suffix]
 					if !exists {
-						return "", fmt.Errorf("audio timeline unavailable")
+						return nil, slidingPlaylistCursor{}, false, fmt.Errorf("audio timeline unavailable")
 					}
 				} else {
 					cursor = slidingPlaylistCursor{}
@@ -63,6 +52,40 @@ func preparedWindowSequencePlaylist(id string) (string, error) {
 		ended = window.EndOfEpisode
 		if ended {
 			break
+		}
+	}
+	return parts, cursor, ended, nil
+}
+
+// Experimental delivery primitive, not yet advertised to the Player. Holding
+// swarmMu protects ownership against seek/retirement while reading playlists.
+func preparedWindowSequencePlaylist(id string) (string, error) {
+	identity := continuousWindowMediaID.FindStringSubmatch(id)
+	if len(identity) != 2 {
+		return "", fmt.Errorf("invalid rendition")
+	}
+	suffix := identity[1]
+	anchor := strings.TrimSuffix(id, "-"+suffix)
+	swarmMu.RLock()
+	defer swarmMu.RUnlock()
+	windows := append([]*playbackWindow(nil), retainedPlaybackWindows...)
+	windows = append(windows, currentPlaybackWindow, prefetchedPlaybackWindow)
+	parts, cursor, ended, err := collectContinuousWindowParts(anchor, suffix, windows)
+	if err != nil {
+		return "", err
+	}
+	if len(parts) == 0 && os.Getenv("ANIRIUM_E2E_CHILD") != "1" &&
+		currentPlaybackWindow != nil && currentPlaybackWindow.ctx.Err() == nil && currentPlaybackWindow.Status == "ready" &&
+		strings.HasPrefix(anchor, fmt.Sprintf("window-%d-", playbackGeneration)) {
+		fallbackAnchor := currentPlaybackWindow.timelineID
+		if fallbackAnchor == "" {
+			fallbackAnchor = currentPlaybackWindow.ID
+		}
+		if fallbackAnchor != "" && fallbackAnchor != anchor {
+			parts, cursor, ended, err = collectContinuousWindowParts(fallbackAnchor, suffix, windows)
+			if err != nil {
+				return "", err
+			}
 		}
 	}
 	return slidingWindowPlaylist(parts, ended, cursor)
@@ -130,16 +153,8 @@ func servePreparedWindowSequence(w http.ResponseWriter, r *http.Request, id stri
 	}
 }
 
-func preparedWindowMasterPlaylist(id, ticket string) (string, error) {
-	identity := continuousWindowMediaID.FindStringSubmatch(id)
-	if len(identity) != 2 || identity[1] != "video" {
-		return "", fmt.Errorf("invalid video timeline")
-	}
-	anchor := strings.TrimSuffix(id, "-video")
-	swarmMu.RLock()
-	defer swarmMu.RUnlock()
-	windows := append([]*playbackWindow(nil), retainedPlaybackWindows...)
-	windows = append(windows, currentPlaybackWindow, prefetchedPlaybackWindow)
+func buildPreparedWindowMaster(anchor, ticket string, windows []*playbackWindow) (string, bool, error) {
+	id := anchor + "-video"
 	for _, window := range windows {
 		if window == nil || window.ctx.Err() != nil || window.Status != "ready" || (window.timelineID != anchor && window.ID != anchor) {
 			continue
@@ -151,10 +166,10 @@ func preparedWindowMasterPlaylist(id, ticket string) (string, error) {
 		tracks := append([]AudioTrack(nil), window.AudioTracks...)
 		if window.MuxedAudio {
 			if !video.muxedAudio {
-				return "", fmt.Errorf("audio not prepared")
+				return "", true, fmt.Errorf("audio not prepared")
 			}
 			playlist := masterPlaylist(id, nil, ticket, video.Bandwidth)
-			return strings.Replace(playlist, "/hls/"+id+"/index.m3u8", "/hls/"+id+"/continuous.m3u8", 1), nil
+			return strings.Replace(playlist, "/hls/"+id+"/index.m3u8", "/hls/"+id+"/continuous.m3u8", 1), true, nil
 		}
 		for index := range tracks {
 			if tracks[index].Status != "ready" {
@@ -162,22 +177,47 @@ func preparedWindowMasterPlaylist(id, ticket string) (string, error) {
 			}
 			trackIdentity := continuousWindowMediaID.FindStringSubmatch(tracks[index].ID)
 			if len(trackIdentity) != 2 || trackIdentity[1] == "video" {
-				return "", fmt.Errorf("invalid audio rendition")
+				return "", true, fmt.Errorf("invalid audio rendition")
 			}
 			if window.playlistCursor.DiscontinuitySequence > 0 {
 				if _, exists := window.audioPlaylistCursors[trackIdentity[1]]; !exists {
-					return "", fmt.Errorf("audio continuity unavailable")
+					return "", true, fmt.Errorf("audio continuity unavailable")
 				}
 			}
 			tracks[index].PlaylistURL = "/hls/" + anchor + "-" + trackIdentity[1] + "/continuous.m3u8"
 		}
 		if !audioPlaybackReady(tracks) {
-			return "", fmt.Errorf("audio not prepared")
+			return "", true, fmt.Errorf("audio not prepared")
 		}
 		playlist := masterPlaylist(id, tracks, ticket, video.Bandwidth)
-		return strings.Replace(playlist, "/hls/"+id+"/index.m3u8", "/hls/"+id+"/continuous.m3u8", 1), nil
+		return strings.Replace(playlist, "/hls/"+id+"/index.m3u8", "/hls/"+id+"/continuous.m3u8", 1), true, nil
 	}
-	return "", fmt.Errorf("timeline unavailable")
+	return "", false, fmt.Errorf("timeline unavailable")
+}
+
+func preparedWindowMasterPlaylist(id, ticket string) (string, error) {
+	identity := continuousWindowMediaID.FindStringSubmatch(id)
+	if len(identity) != 2 || identity[1] != "video" {
+		return "", fmt.Errorf("invalid video timeline")
+	}
+	anchor := strings.TrimSuffix(id, "-video")
+	swarmMu.RLock()
+	defer swarmMu.RUnlock()
+	windows := append([]*playbackWindow(nil), retainedPlaybackWindows...)
+	windows = append(windows, currentPlaybackWindow, prefetchedPlaybackWindow)
+	playlist, matched, err := buildPreparedWindowMaster(anchor, ticket, windows)
+	if !matched && os.Getenv("ANIRIUM_E2E_CHILD") != "1" &&
+		currentPlaybackWindow != nil && currentPlaybackWindow.ctx.Err() == nil && currentPlaybackWindow.Status == "ready" &&
+		strings.HasPrefix(anchor, fmt.Sprintf("window-%d-", playbackGeneration)) {
+		fallbackAnchor := currentPlaybackWindow.timelineID
+		if fallbackAnchor == "" {
+			fallbackAnchor = currentPlaybackWindow.ID
+		}
+		if fallbackAnchor != "" && fallbackAnchor != anchor {
+			playlist, _, err = buildPreparedWindowMaster(fallbackAnchor, ticket, windows)
+		}
+	}
+	return playlist, err
 }
 
 func servePreparedWindowMaster(w http.ResponseWriter, r *http.Request, id string) {

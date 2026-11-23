@@ -12,5 +12,18 @@ export function nextKnownEpisode(episodes:Array<number|null|undefined>,season:nu
  if(episode<count)return {episode:episode+1,season};
  const next=episodes[season+1];return Number.isSafeInteger(next)&&next!>0?{episode:1,season:season+1}:null;
 }
+export interface SkipInterval {
+  start: number;
+  end: number;
+  source?: string;
+}
+
+export interface SkipTimes {
+  op?: SkipInterval | null;
+  ed?: SkipInterval | null;
+}
+
 export function shouldSkipIntro(enabled:boolean|undefined,position:number,duration:number,pending:boolean){return enabled===true&&Number.isFinite(position)&&position>=0&&position<5&&Number.isFinite(duration)&&duration>85&&!pending;}
+export function shouldSkipInterval(enabled:boolean|undefined,interval:SkipInterval|null|undefined,position:number,pending:boolean){return enabled===true&&Boolean(interval)&&Number.isFinite(position)&&Number.isFinite(interval!.start)&&Number.isFinite(interval!.end)&&interval!.end>interval!.start&&position>=interval!.start&&position<interval!.end-1&&!pending;}
+export function isEndingAtEpisodeEnd(ed:SkipInterval|null|undefined,duration:number){return Boolean(ed)&&Number.isFinite(duration)&&duration>0&&ed!.end>=duration-8;}
 export function finalEpisodeEnd(position:number,duration:number,windowEnd:boolean|undefined){return windowEnd===true||(Number.isFinite(position)&&Number.isFinite(duration)&&duration>0&&position>=duration-1);}

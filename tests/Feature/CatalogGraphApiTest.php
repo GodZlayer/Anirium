@@ -30,10 +30,17 @@ class CatalogGraphApiTest extends TestCase
         });
     }
 
-    private function work(string $id, string $universe, array $episodes = []): void
+    private function work(string $id, string $universe, array $episodes = [], array $overrides = []): void
     {
-        app(CatalogGraphImporter::class)->work(['work_id' => $id, 'media' => 'anime', 'title' => 'Fixture', 'episode_count' => 12,
-            'aliases' => ['work:'.$id], 'universe_reference' => $universe, 'episodes' => $episodes]);
+        app(CatalogGraphImporter::class)->work(array_merge([
+            'work_id' => $id,
+            'media' => 'anime',
+            'title' => 'Fixture',
+            'episode_count' => 12,
+            'aliases' => ['work:'.$id],
+            'universe_reference' => $universe,
+            'episodes' => $episodes,
+        ], $overrides));
     }
 
     public function test_graph_returns_persistent_episode_ids_and_explicit_membership_after_renumbering(): void
@@ -69,7 +76,7 @@ class CatalogGraphApiTest extends TestCase
         $this->getJson('/api/catalog/graph/universe/'.$universe)->assertOk()->assertJsonPath('work_ids', [$first])
             ->assertJsonPath('works.0.work_id', $first)->assertJsonPath('works.0.universe_identity_version', 1)
             ->assertJsonPath('works.0.universe_v2_id', $universe)->assertJsonPath('works.0.universe_ids_json', json_encode([$universe]));
-        $this->actingAs(User::factory()->create(['adult_content_enabled' => true]));
+        $this->actingAs(User::factory()->ageVerified()->create(['adult_content_enabled' => true]));
         $this->getJson('/api/catalog/graph/work/'.$first)->assertOk()
             ->assertJsonPath('relations.0.to_work_id', $hidden)->assertJsonPath('relations.0.relation_type', 'other');
         $this->getJson('/api/catalog/graph/universe/'.$universe)->assertOk()->assertJsonCount(2, 'work_ids');
@@ -86,5 +93,108 @@ class CatalogGraphApiTest extends TestCase
             ->assertSee('UNIDADE #01')
             ->assertSee('Raio-X do Episódio')
             ->assertSee("window.pushNavigation('episode', '".$workId.":ep:1'", false);
+    }
+
+    public function test_completed_work_without_episode_rows_renders_virtual_episodes_from_episode_count(): void
+    {
+        $workId = (string) Str::uuid();
+        $this->work($workId, $workId, [], ['status' => 'COMPLETED', 'episode_count' => 12]);
+        $this->visible([$workId => false]);
+
+        $this->get('/api/catalog/graph/work/'.$workId.'?render=blade&adult=0')
+            ->assertOk()
+            ->assertSee('12 episódios')
+            ->assertSee($workId.':ep:1')
+            ->assertSee($workId.':ep:12');
+    }
+
+    public function test_releasing_work_renders_virtual_episodes_up_to_schedule_latest_without_future_episodes(): void
+    {
+        $workId = (string) Str::uuid();
+        $this->work($workId, $workId, [], ['status' => 'RELEASING', 'episode_count' => 12]);
+        DB::table('catalog_work_schedules')->insert([
+            'work_id' => $workId,
+            'airing_day' => 'Wednesday',
+            'airing_time' => '15:00',
+            'latest_episode_num' => 6,
+        ]);
+        $this->visible([$workId => false]);
+
+        $this->get('/api/catalog/graph/work/'.$workId.'?render=blade&adult=0')
+            ->assertOk()
+            ->assertSee('6 episódios')
+            ->assertSee($workId.':ep:1')
+            ->assertSee($workId.':ep:6')
+            ->assertDontSee($workId.':ep:7')
+            ->assertDontSee($workId.':ep:12');
+    }
+
+    public function test_releasing_work_includes_existing_episode_rows_up_to_schedule_latest_even_when_imported_air_date_is_stale_future(): void
+    {
+        $workId = (string) Str::uuid();
+        $this->work($workId, $workId, [
+            ['number' => 1, 'air_date_utc' => now()->subDays(14)->toISOString()],
+            ['number' => 2, 'air_date_utc' => now()->subDays(7)->toISOString()],
+            ['number' => 3, 'air_date_utc' => now()->addDays(5)->toISOString()],
+            ['number' => 4, 'air_date_utc' => now()->addDays(12)->toISOString()],
+        ], ['status' => 'RELEASING', 'episode_count' => 12]);
+
+        DB::table('catalog_work_schedules')->insert([
+            'work_id' => $workId,
+            'airing_day' => 'Sunday',
+            'airing_time' => '14:30',
+            'latest_episode_num' => 3,
+        ]);
+        $this->visible([$workId => false]);
+
+        $ep3Id = (string) DB::table('catalog_episodes')->where('work_id', $workId)->where('number', 3)->value('id');
+
+        $this->getJson('/api/catalog/graph/work/'.$workId)
+            ->assertOk()
+            ->assertJsonCount(3, 'episodes')
+            ->assertJsonPath('episodes.2.id', $ep3Id)
+            ->assertJsonPath('episodes.2.number', 3);
+
+        $this->get('/api/catalog/graph/work/'.$workId.'?render=blade&adult=0')
+            ->assertOk()
+            ->assertSee('3 episódios')
+            ->assertSee($ep3Id)
+            ->assertDontSee('⏳ Em Breve');
+    }
+
+    public function test_releasing_work_excludes_unscheduled_null_air_date_episodes_beyond_schedule_latest(): void
+    {
+        $workId = (string) Str::uuid();
+        $this->work($workId, $workId, [
+            ['number' => 1, 'air_date_utc' => now()->subDays(14)->toISOString()],
+            ['number' => 2, 'air_date_utc' => now()->subDays(7)->toISOString()],
+            ['number' => 3, 'air_date_utc' => null],
+            ['number' => 4, 'air_date_utc' => null],
+        ], ['status' => 'RELEASING', 'episode_count' => 12]);
+
+        DB::table('catalog_work_schedules')->insert([
+            'work_id' => $workId,
+            'airing_day' => 'Friday',
+            'airing_time' => '09:40',
+            'latest_episode_num' => 2,
+        ]);
+        $this->visible([$workId => false]);
+
+        $ep3Id = (string) DB::table('catalog_episodes')->where('work_id', $workId)->where('number', 3)->value('id');
+
+        $this->getJson('/api/catalog/graph/work/'.$workId)
+            ->assertOk()
+            ->assertJsonCount(2, 'episodes')
+            ->assertJsonPath('episodes.0.number', 1)
+            ->assertJsonPath('episodes.1.number', 2);
+
+        $this->get('/api/catalog/graph/work/'.$workId.'?render=blade&adult=0')
+            ->assertOk()
+            ->assertSee('2 episódios')
+            ->assertDontSee($ep3Id);
+
+        $this->get('/api/catalog/graph/episode/'.$ep3Id.'?render=blade&adult=0')
+            ->assertOk()
+            ->assertSee('Transmissão Futura (Não Lançado)');
     }
 }

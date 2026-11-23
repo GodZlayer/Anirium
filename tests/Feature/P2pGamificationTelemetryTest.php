@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use PDO;
 use Tests\TestCase;
 
 class P2pGamificationTelemetryTest extends TestCase
@@ -54,5 +56,81 @@ class P2pGamificationTelemetryTest extends TestCase
         $this->assertEquals(60, $user->seeding_seconds);
         // 10 MB = 10 XP + 60s / 30 = 2 XP => 12 XP de seeding
         $this->assertEquals(12, $user->seeding_xp);
+    }
+
+    public function test_p2p_seeding_heartbeat_defers_with_202_during_sqlite_lock(): void
+    {
+        $originalConfig = config('database.connections.sqlite');
+        $originalPdo = DB::connection('sqlite')->getPdo();
+        $path = tempnam(sys_get_temp_dir(), 'telemetry-lock-');
+        $locker = null;
+
+        try {
+            while (DB::connection('sqlite')->transactionLevel() > 0) {
+                DB::connection('sqlite')->rollBack();
+            }
+
+            config([
+                'database.connections.sqlite' => array_merge($originalConfig, [
+                    'database' => $path,
+                    'busy_timeout' => 10,
+                ]),
+                'services.anirium.telemetry_write_busy_timeout_ms' => 10,
+            ]);
+            DB::purge('sqlite');
+            $this->artisan('migrate', ['--force' => true]);
+
+            $user = User::factory()->create([
+                'bytes_uploaded' => 0,
+                'bytes_downloaded' => 0,
+                'seeding_seconds' => 0,
+                'seeding_xp' => 0,
+            ]);
+
+            $this->actingAs($user);
+
+            $locker = new PDO('sqlite:'.$path);
+            $locker->exec('BEGIN EXCLUSIVE');
+
+            $response = $this->postJson('/api/telemetry/events', [
+                'machine_fingerprint' => 'test-device-uuid-lock',
+                'events' => [
+                    [
+                        'target_type' => 'global',
+                        'target_id' => 'p2p_swarm',
+                        'event_type' => 'p2p_seeding_heartbeat',
+                        'payload' => [
+                            'delta_uploaded_bytes' => 1024,
+                            'delta_downloaded_bytes' => 2048,
+                            'seeding_seconds' => 30,
+                            'peers' => 12,
+                        ],
+                    ],
+                ],
+            ]);
+
+            $response->assertAccepted();
+            $response->assertJson([
+                'status' => 'deferred',
+                'reason' => 'database_busy',
+                'count' => 0,
+            ]);
+        } finally {
+            if ($locker instanceof PDO) {
+                try {
+                    if ($locker->inTransaction()) {
+                        $locker->exec('ROLLBACK');
+                    }
+                } catch (\Throwable) {
+                }
+                unset($locker);
+            }
+
+            DB::purge('sqlite');
+            config(['database.connections.sqlite' => $originalConfig]);
+            DB::connection('sqlite')->setPdo($originalPdo);
+            @unlink($path);
+            @unlink($path.'-journal');
+        }
     }
 }

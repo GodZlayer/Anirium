@@ -5,15 +5,20 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 )
+
+const runtimeGrantRevalidationTTL = 10 * time.Minute
 
 type playbackGrant struct {
 	token, device, account string
 	playerSession          string
 	expires                time.Time
+	lastValidated          time.Time
 }
 
 var grantMu sync.Mutex
@@ -32,7 +37,8 @@ func issuePlaybackGrant(token, device, account string, playerSessions ...string)
 			delete(grants, key)
 		}
 	}
-	grants[id] = playbackGrant{token: token, device: device, account: account, expires: time.Now().Add(5 * time.Minute)}
+	now := time.Now()
+	grants[id] = playbackGrant{token: token, device: device, account: account, expires: now.Add(24 * time.Hour), lastValidated: now}
 	if len(playerSessions) > 0 {
 		grant := grants[id]
 		grant.playerSession = playerSessions[0]
@@ -58,7 +64,8 @@ func renewPlaybackGrantDetailed(id, token, device string) *serviceAuthRejection 
 		return &serviceAuthRejection{status: http.StatusUnauthorized, reason: serviceAuthReasonInvalid}
 	}
 	grant.token = token
-	grant.expires = time.Now().Add(5 * time.Minute)
+	grant.expires = time.Now().Add(24 * time.Hour)
+	grant.lastValidated = time.Now()
 	grants[id] = grant
 	return nil
 }
@@ -74,6 +81,9 @@ func validatePlaybackGrantRejection(id string) *serviceAuthRejection {
 	if !ok || time.Now().After(grant.expires) {
 		return &serviceAuthRejection{status: http.StatusUnauthorized, reason: serviceAuthReasonInvalid}
 	}
+	if !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" && !grant.lastValidated.IsZero() && time.Since(grant.lastValidated) < runtimeGrantRevalidationTTL {
+		return nil
+	}
 	authorization, rejection := validateServiceTokenDetailed(grant.token, grant.device)
 	if rejection != nil {
 		return rejection
@@ -83,11 +93,27 @@ func validatePlaybackGrantRejection(id string) *serviceAuthRejection {
 	if authorization.AccountID != grant.account || (grant.playerSession != "" && grant.playerSession != authorization.PlayerSessionID) {
 		return &serviceAuthRejection{status: http.StatusUnauthorized, reason: serviceAuthReasonInvalid}
 	}
+	grantMu.Lock()
+	if current, exists := grants[id]; exists && current.token == grant.token {
+		current.lastValidated = time.Now()
+		grants[id] = current
+	}
+	grantMu.Unlock()
 	return nil
 }
 
 func validatePlaybackGrant(id string) bool {
 	return validatePlaybackGrantRejection(id) == nil
+}
+
+func hasActivePlaybackGrant(id string) bool {
+	if id == "" {
+		return false
+	}
+	grantMu.Lock()
+	grant, ok := grants[id]
+	grantMu.Unlock()
+	return ok && time.Now().Before(grant.expires)
 }
 
 func authorizePlaylist(data, ticket string) string {

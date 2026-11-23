@@ -73,7 +73,10 @@ func playbackBufferSnapshot(position float64, audio, subtitle string) (preparedP
 	}
 	result.Coverage.VideoAhead = preparedPlaybackAhead(videoIntervals, position)
 	result.Coverage.AudioAhead = preparedPlaybackAhead(audioIntervals, position)
-	if subtitle != "" {
+	if bundle := playbackInputs.existingBundle(); bundle != nil {
+		result.Coverage.SubtitleAhead, result.Coverage.SubtitleRequired = bundle.aheadForSource(position, currentPlaybackWindow.SubtitleSource)
+		result.SubtitleUnverified = subtitle != ""
+	} else if subtitle != "" {
 		found := false
 		for _, track := range subtitleTracksLocked() {
 			if track.ID != subtitle {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -49,18 +50,33 @@ func searchSubtitleProvidersSubset(query PlaybackPrepareRequest, parent context.
 			continue
 		}
 		func() {
-			ctx, cancel := context.WithTimeout(parent, 20*time.Second)
+			providerBudget := 10 * time.Second
+			if os.Getenv("ANIRIUM_E2E_CHILD") == "1" {
+				providerBudget = 20 * time.Second
+			}
+			ctx, cancel := context.WithTimeout(parent, providerBudget)
 			defer cancel()
 			manifest, snapshotStatus := query.ManifestSnapshots.manifest(parent, server)
 			if snapshotStatus != "ok" || !manifestIdentityAcceptsServer(server, manifest) {
 				return
 			}
+			if isSubtitleQueryProviderURL(server.ManifestURL) || containsString(manifest.Capabilities, "subtitle-query") {
+				for _, subtitle := range searchSubtitleQueryProvider(ctx, server, query) {
+					if !seen[subtitle.URL] {
+						seen[subtitle.URL] = true
+						result = append(result, subtitle)
+					}
+				}
+				return
+			}
 			sdkQuery := query
 			if query.VideoID == "" && (supportsStremioSubtitleResource(manifest, "series", "tt0:1:1") || supportsStremioSubtitleResource(manifest, "movie", "tt0")) {
-				sdkQuery = resolveSubtitleEpisodeIdentity(ctx, query)
+				sdkQuery = query.ManifestSnapshots.episodeIdentity(ctx, query)
 			}
 			if supportsStremioSubtitleResource(manifest, sdkQuery.MediaType, sdkQuery.VideoID) {
-				for _, subtitle := range searchStremioSubtitles(ctx, base, sdkQuery) {
+				subtitles, statusCode := searchStremioSubtitlesWithStatus(ctx, base, sdkQuery)
+				appendLog(fmt.Sprintf("Subtitle provider candidates=%d status=%d timeout=%t", len(subtitles), statusCode, ctx.Err() != nil))
+				for _, subtitle := range subtitles {
 					if !seen[subtitle.URL] {
 						seen[subtitle.URL] = true
 						result = append(result, subtitle)
@@ -144,12 +160,17 @@ func subtitleMatchesEpisode(subtitle ProviderSubtitle, query PlaybackPrepareRequ
 }
 
 func externalSubtitleVTT(ctx context.Context, subtitle ProviderSubtitle) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	return externalSubtitleVTTWithBudget(ctx, subtitle, 15*time.Second)
+}
+
+func externalSubtitleVTTWithBudget(ctx context.Context, subtitle ProviderSubtitle, budget time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, subtitle.URL, nil)
 	if err != nil {
 		return "", err
 	}
+	request.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Anirium/1.0")
 	response, err := providerHTTPClient.Do(request)
 	if err != nil {
 		return "", err
@@ -163,8 +184,8 @@ func externalSubtitleVTT(ctx context.Context, subtitle ProviderSubtitle) (string
 	if err != nil || len(data) > limit {
 		return "", fmt.Errorf("subtitle payload unreadable or too large")
 	}
-	format := strings.ToLower(subtitle.Format)
-	if subtitle.stremio {
+	format := strings.ToLower(strings.TrimSpace(subtitle.Format))
+	if subtitle.stremio || format == "" {
 		text := strings.TrimSpace(strings.TrimPrefix(string(data), "\ufeff"))
 		switch {
 		case strings.HasPrefix(text, "WEBVTT"):

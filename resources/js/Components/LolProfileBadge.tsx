@@ -401,13 +401,13 @@ export function LolProfileBadge({
             </div>
           )}
 
-          {/* Switcher Explícito de Conteúdo Adulto (+24 Anos) */}
+          {/* Switcher Explícito de Conteúdo Adulto (+18 Anos) */}
           <div className="flex flex-col gap-2 p-3 rounded-xl border border-[color:var(--wc-borderDefault)]/10 bg-[color:var(--wc-bgBase)]/40">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <ShieldAlert className="w-4 h-4 text-[color:var(--wc-stateWarning)] shrink-0" />
                 <span className="text-xs font-bold text-[color:var(--wc-textPrimary)]">
-                  Conteúdo Sensível (+24 Anos)
+                  Conteúdo Sensível (+18 Anos)
                 </span>
               </div>
               <button

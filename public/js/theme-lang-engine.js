@@ -6,7 +6,13 @@ window.THEME_CACHE = {};
 window.LANG_CACHE = {};
 
 window.currentTheme = localStorage.getItem('anirium_theme') || 'black';
-window.currentLang = localStorage.getItem('anirium_lang') || 'pt-BR';
+window.currentLang = localStorage.getItem('anirium_lang') || window.ANIRIUM_DEFAULT_LANG || 'en-US';
+
+window.persistLanguageCookie = function(langCode) {
+    if (!langCode || typeof document === 'undefined') return;
+    document.cookie = 'anirium_lang=' + encodeURIComponent(langCode) + '; path=/; max-age=31536000; SameSite=Lax';
+};
+window.persistLanguageCookie(window.currentLang);
 
 // 1. CARREGADOR E APLICADOR DE TEMA VIA TOKENS POR ID
 window.applyTheme = async function(themeId) {
@@ -121,6 +127,7 @@ window.applyLanguage = async function(langCode) {
         const langData = window.LANG_CACHE[langCode];
         window.currentLang = langData.locale || langCode;
         localStorage.setItem('anirium_lang', window.currentLang);
+        window.persistLanguageCookie?.(window.currentLang);
 
         // Atualiza indicadores de idioma no botão da topbar (Exibe a Bandeira Visual SVG)
         const flagEl = document.getElementById('current-lang-flag');
@@ -144,6 +151,9 @@ window.applyLanguage = async function(langCode) {
         }
         if (typeof window.renderCalendarPage === 'function' && window.currentTab === 'calendar') {
             window.renderCalendarPage();
+        }
+        if (typeof window.renderActiveNavContext === 'function' && window.currentTab === 'context') {
+            window.renderActiveNavContext();
         }
 
         console.log(`[i18nEngine] Idioma aplicado: ${langData.name} (${window.currentLang})`);

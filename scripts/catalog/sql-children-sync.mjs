@@ -1,4 +1,4 @@
-import { registryConnection } from "./sql-registry-connection.mjs";
+import { registryConnection, yieldBetweenBatches } from "./sql-registry-connection.mjs";
 import { SqlChildIdentities } from "./sql-child-identities.mjs";
 import { SqlChildEpisodes } from "./sql-child-episodes.mjs";
 import { SqlChildArcs } from "./sql-child-arcs.mjs";
@@ -16,6 +16,7 @@ export function syncSqlChildren(rows, directory, { database = process.env.CATALO
     const commit = apply => {
       db.exec("BEGIN IMMEDIATE");
       try { apply(); db.exec("COMMIT"); } catch (error) { db.exec("ROLLBACK"); throw error; }
+      yieldBetweenBatches();
     };
     for (const row of rows) {
       if (["MANGA", "NOVEL"].includes(row.entity_type)) continue;

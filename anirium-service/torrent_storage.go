@@ -9,8 +9,9 @@ import (
 
 // Reserve space for incomplete chunks and their atomic promotion while the
 // library schedules requests against a smaller advertised storage capacity.
-const runtimePieceCacheBudget = 2 << 30
-const runtimePieceSchedulingCapacity = 1 << 30
+// Sized to hold multiple 1080p episodes without evicting active sequential pieces.
+const runtimePieceCacheBudget = 12 << 30
+const runtimePieceSchedulingCapacity = 8 << 30
 
 func newBoundedRuntimeTorrentClient(cfg *torrent.ClientConfig) (*torrent.Client, func(), error) {
 	cache, err := newPieceResourceCache(cfg.DataDir, runtimePieceCacheBudget)

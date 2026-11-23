@@ -73,6 +73,8 @@ type playbackWindow struct {
 	ContinuousPlaylistURL string       `json:"continuousPlaylistUrl,omitempty"`
 	TimelineStart         float64      `json:"timelineStart"`
 	AudioTracks           []AudioTrack `json:"audioTracks"`
+	SubtitleSource        string       `json:"subtitleSource,omitempty"`
+	isPrefetch            bool
 	cancel                context.CancelFunc
 	ctx                   context.Context
 }
@@ -124,6 +126,17 @@ func requestPlaybackWindow(quality string, start float64, prefetch ...bool) bool
 		return false
 	}
 	isPrefetch := len(prefetch) > 0 && prefetch[0]
+	// HTTP positions use a four-second grid; internal windows retain exact
+	// media boundaries, including fractional AAC padding. Resolve that grid
+	// back to the known successor rather than inventing a timeline gap.
+	if isPrefetch && currentPlaybackWindow != nil {
+		successor := currentPlaybackWindow.Start + currentPlaybackWindow.DeliveredDuration
+		if start == math.Floor(successor/4)*4 {
+			start = successor
+		}
+	} else if !isPrefetch && prefetchedPlaybackWindow != nil && start == math.Floor(prefetchedPlaybackWindow.Start/4)*4 {
+		start = prefetchedPlaybackWindow.Start
+	}
 	if isPrefetch {
 		if currentPlaybackWindow == nil || currentPlaybackWindow.Status != "ready" || currentPlaybackWindow.EndOfEpisode || currentPlaybackWindow.Quality != quality || currentPlaybackWindow.Audio != selectedAudio || math.Abs(start-(currentPlaybackWindow.Start+currentPlaybackWindow.DeliveredDuration)) > 0.05 {
 			return false
@@ -148,7 +161,12 @@ func requestPlaybackWindow(quality string, start float64, prefetch ...bool) bool
 	}
 	playbackWindowSequence++
 	ctx, cancel := context.WithCancel(playbackContext)
-	window := &playbackWindow{ID: fmt.Sprintf("window-%d-%d", playbackGeneration, playbackWindowSequence), Start: start, Duration: 24, Quality: quality, Status: "preparing", AudioTracks: []AudioTrack{}, cancel: cancel, ctx: ctx}
+	timelineOriginForWindow := start
+	if isPrefetch && currentPlaybackWindow != nil {
+		timelineOriginForWindow = currentPlaybackWindow.TimelineStart
+	}
+	initDuration := progressiveWindowDuration(isPrefetch, start, timelineOriginForWindow, sessionContinuousPreparationLocked(), os.Getenv("ANIRIUM_E2E_CHILD") == "1")
+	window := &playbackWindow{ID: fmt.Sprintf("window-%d-%d", playbackGeneration, playbackWindowSequence), Start: start, Duration: initDuration, Quality: quality, Status: "preparing", AudioTracks: []AudioTrack{}, isPrefetch: isPrefetch, cancel: cancel, ctx: ctx}
 	window.EpisodeDuration = episodeDuration
 	window.preparationStarted = time.Now()
 	window.Audio = selectedAudio
@@ -198,6 +216,23 @@ func requestPlaybackWindow(quality string, start float64, prefetch ...bool) bool
 	return true
 }
 
+func progressiveWindowDuration(isPrefetch bool, start, timelineStart float64, continuous, e2e bool) float64 {
+	if e2e || !continuous {
+		return 24.0
+	}
+	if !isPrefetch {
+		return 4.0
+	}
+	ahead := start - timelineStart
+	if ahead < 12.0 {
+		return 8.0
+	}
+	if ahead < 24.0 {
+		return 12.0
+	}
+	return 24.0
+}
+
 // Caller holds swarmMu. Keep at most two completed preceding windows, never
 // unlimited episode media. Their contexts still belong to playbackContext.
 func retainPlaybackWindowLocked(window *playbackWindow) {
@@ -221,6 +256,17 @@ func buildPlaybackWindow(window *playbackWindow, inputs *mediaInputCache, source
 	videoID := window.ID + "-video"
 	workContext, cancelWork := context.WithCancel(window.ctx)
 	defer cancelWork()
+	prefSources := inputs.preferredVideoSources(window.Quality, sources)
+	var fastSubDone chan struct{}
+	if os.Getenv("ANIRIUM_E2E_CHILD") != "1" && len(prefSources) > 0 && math.Abs(window.Start-window.TimelineStart) < 0.05 {
+		fastSubDone = make(chan struct{})
+		prefSource := prefSources[0]
+		subStart := window.Start
+		go func() {
+			defer close(fastSubDone)
+			prewarmPrioritySubtitles(inputs.ctx, inputs, prefSource, subStart)
+		}()
+	}
 	type videoResult struct {
 		runtime *variantRuntime
 		err     error
@@ -312,15 +358,51 @@ func buildPlaybackWindow(window *playbackWindow, inputs *mediaInputCache, source
 			finishPlaybackWindow(window, nil, tracks, err)
 			return
 		}
+		oldVideoDir, oldAudioDir := video.runtime.Dir, audio.Dir
 		video.runtime.Dir, video.runtime.BufferedSeconds, video.runtime.muxedAudio = combinedDir, delivered, true
 		audio.Dir, audio.BufferedSeconds = combinedDir, delivered
+		if oldVideoDir != "" && oldVideoDir != combinedDir {
+			_ = os.RemoveAll(oldVideoDir)
+		}
+		if oldAudioDir != "" && oldAudioDir != combinedDir {
+			_ = os.RemoveAll(oldAudioDir)
+		}
 	}
+	if os.Getenv("ANIRIUM_E2E_CHILD") == "1" {
+		_ = prepareWindowSubtitles(window.ctx, inputs, video.runtime.videoSource, window.Start, window.Duration)
+	} else {
+		if fastSubDone != nil && math.Abs(window.Start-window.TimelineStart) < 0.05 && len(prefSources) > 0 && video.runtime.videoSource == prefSources[0] {
+			select {
+			case <-fastSubDone:
+			case <-time.After(700 * time.Millisecond):
+			case <-window.ctx.Done():
+			}
+		}
+		// Continua preparação completa de 60s e lookahead em segundo plano.
+		subInputs, subSource, subStart, subDuration, subCtx, subSpeculative := inputs, video.runtime.videoSource, window.Start, window.Duration, window.ctx, window.isPrefetch
+		go func() {
+			_ = prepareWindowSubtitlesWithMode(subCtx, subInputs, subSource, subStart, subDuration, subSpeculative)
+		}()
+	}
+	swarmMu.Lock()
+	window.SubtitleSource = publicSubtitleSource(video.runtime.videoSource)
+	swarmMu.Unlock()
 	finishPlaybackWindow(window, runtimes, tracks, nil)
 }
 
 // Audio and video retain their separate bounded worker pools. Their outputs
 // join before publication; neither incomplete media nor retired work is served.
 func buildPlaybackWindowVideo(ctx context.Context, window *playbackWindow, inputs *mediaInputCache, sources []string, dir string) (*variantRuntime, error) {
+	if os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
+		if subSrc := activeSubtitleTrackSource(""); subSrc != "" && containsString(sources, subSrc) {
+			inputs.rememberVideoProducer(window.Quality, subSrc)
+		}
+	}
+	if window.isPrefetch && len(sources) > 1 && os.Getenv("ANIRIUM_E2E_CHILD") != "1" && inputs.preferredVideoSource(window.Quality) == "" {
+		sources = inputs.balancedPrefetchVideoSources(window.Quality, sources, window.Start)
+	} else {
+		sources = inputs.preferredVideoSources(window.Quality, sources)
+	}
 	videoDir := filepath.Join(dir, "video")
 	var videoErr error = fmt.Errorf("no compatible video source")
 	chosenSource := ""
@@ -328,6 +410,7 @@ func buildPlaybackWindowVideo(ctx context.Context, window *playbackWindow, input
 	for index, source := range sources {
 		videoDir = filepath.Join(dir, fmt.Sprintf("video-%d", index))
 		videoErr = runQueuedVideoInput(ctx, window.Quality, func() error {
+			activateSequentialSource(ctx, source)
 			input, release, err := inputs.acquire(ctx, source, index)
 			if err != nil {
 				return err
@@ -360,6 +443,9 @@ func buildPlaybackWindowVideo(ctx context.Context, window *playbackWindow, input
 	delivered, err := windowSegmentDuration(segments)
 	if err != nil {
 		return nil, err
+	}
+	if !window.isPrefetch || inputs.primaryVideoSource() == "" {
+		inputs.rememberVideoProducer(window.Quality, chosenSource)
 	}
 	return &variantRuntime{MixVariant: MixVariant{ID: window.ID + "-video", Quality: window.Quality, Status: "ready", ProcessingComplete: true, BufferedSeconds: delivered}, Dir: videoDir, videoSource: chosenSource}, nil
 }
@@ -431,6 +517,23 @@ func finishPlaybackWindow(window *playbackWindow, runtimes map[string]*variantRu
 			window.audioSegmentCounts[identity[1]] = uint64(len(segments))
 		}
 	}
+	timelineStart, minRetainedStart, cachedEnd, _ := activeContinuousWindowRangeLocked()
+	wakeSessionPreparation()
+	// Notifica via WebSocket imediatamente que a janela ficou pronta!
+	go func(id, playlistURL, continuousPlaylistURL, quality, status string, start, tlStart, minStart, cEnd float64) {
+		broadcastWSEvent("window_ready", map[string]interface{}{
+			"windowId":              id,
+			"playlistUrl":           playlistURL,
+			"continuousPlaylistUrl": continuousPlaylistURL,
+			"quality":               quality,
+			"start":                 start,
+			"timelineStart":         tlStart,
+			"minRetainedStart":      minStart,
+			"cachedEnd":             cEnd,
+			"status":                status,
+		})
+		broadcastWSEvent("manifest", buildCurrentManifest())
+	}(window.ID, window.PlaylistURL, window.ContinuousPlaylistURL, window.Quality, window.Status, window.Start, timelineStart, minRetainedStart, cachedEnd)
 }
 
 func nextAudioPlaylistCursors(window *playbackWindow) map[string]slidingPlaylistCursor {

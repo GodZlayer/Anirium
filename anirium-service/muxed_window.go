@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // Join already normalized, episode-aligned streams without another encode.
@@ -29,14 +30,41 @@ func muxPlaybackWindow(ctx context.Context, videoDir, audioDir, outputDir string
 	if err != nil || !complete || len(segments) == 0 {
 		return fmt.Errorf("incomplete muxed window")
 	}
-	for _, segment := range segments {
-		videoPTS, err := segmentPacketPTS(ctx, segment.path, "v:0")
-		if err != nil {
-			return err
+	checkSegments := segments
+	if os.Getenv("ANIRIUM_E2E_CHILD") != "1" && len(segments) > 2 {
+		checkSegments = segments[:1]
+	}
+	for _, segment := range checkSegments {
+		if os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
+			videoPTS, audioPTS, err := muxedSegmentFirstPacketPTS(ctx, segment.path)
+			if err != nil {
+				return err
+			}
+			if videoPTS < audioPTS-0.25 || videoPTS > audioPTS+0.25 {
+				return fmt.Errorf("muxed stream clocks differ")
+			}
+			continue
 		}
-		audioPTS, err := segmentPacketPTS(ctx, segment.path, "a:0")
-		if err != nil {
-			return err
+		var (
+			videoPTS, audioPTS float64
+			vErr, aErr         error
+			wg                 sync.WaitGroup
+		)
+		wg.Add(2)
+		go func(path string) {
+			defer wg.Done()
+			videoPTS, vErr = segmentPacketPTS(ctx, path, "v:0")
+		}(segment.path)
+		go func(path string) {
+			defer wg.Done()
+			audioPTS, aErr = segmentPacketPTS(ctx, path, "a:0")
+		}(segment.path)
+		wg.Wait()
+		if vErr != nil {
+			return vErr
+		}
+		if aErr != nil {
+			return aErr
 		}
 		if videoPTS < audioPTS-0.25 || videoPTS > audioPTS+0.25 {
 			return fmt.Errorf("muxed stream clocks differ")

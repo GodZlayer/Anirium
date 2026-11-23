@@ -274,9 +274,9 @@ export function getCatalogRevision(): string | null { return catalogCache.revisi
 const ADULT_RESTRICTED_GENRES = new Set(["hentai", "erotica", "rx"]);
 
 /**
- * Identifica obras classificadas como Hentai / Erotica (+24 anos).
+ * Identifica obras classificadas como Hentai / Erotica (+18 anos).
  * No modo sem conta (visitante / guest), nunca podem ser listadas nem acessadas,
- * pois não há como comprovar maioridade de +24 anos sem autenticação.
+ * pois não há como comprovar maioridade de +18 anos sem autenticação e verificação.
  */
 export function isHentaiOrAdultAnime(anime: Pick<ParquetAnime, "genres" | "category"> | null | undefined): boolean {
   if (!anime) return false;
@@ -295,7 +295,7 @@ export function filterCatalog<T extends UnifiedCatalogWork>(
   searchQuery?: string,
   allowAdult = false
 ): T[] {
-  // 0. Trava de Segurança Etária (+24): se allowAdult for false (modo sem conta ou filtro +24 desativado), remove 100% dos Hentais/Erotica
+  // 0. Trava de Segurança Etária (+18): se allowAdult for false (modo sem conta ou filtro +18 desativado), remove 100% dos Hentais/Erotica
   let filtered = allowAdult ? catalog : catalog.filter((a) => !isHentaiOrAdultAnime(a));
 
   // 1. Filtro de Texto Global (busca por qualquer título ou estúdio)

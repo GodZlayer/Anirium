@@ -17,6 +17,10 @@ if [ -f /var/www/html/docker/php-performance.ini ]; then
     cp /var/www/html/docker/php-performance.ini /usr/local/etc/php/conf.d/anirium-performance.ini
 fi
 
+if [ -f /var/www/html/docker/php-fpm-pool.conf ]; then
+    cp /var/www/html/docker/php-fpm-pool.conf /usr/local/etc/php-fpm.d/zz-anirium.conf
+fi
+
 # Inicia o daemon de tarefas agendadas (Cron do Laravel a cada minuto)
 crond -b -l 8
 

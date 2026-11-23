@@ -42,4 +42,14 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    public function ageVerified(string $birthDate = '1995-05-15'): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'age_verification_status' => 'verified',
+            'age_verification_method' => 'google_people',
+            'age_verified_at' => now(),
+            'birth_date' => $birthDate,
+        ]);
+    }
 }

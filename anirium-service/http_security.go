@@ -11,6 +11,38 @@ import (
 
 const maxLocalAPIBody = 64 * 1024
 
+func isPrivateLANIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
+}
+
+func isAllowedLocalHost(host string) bool {
+	h := strings.Trim(strings.ToLower(strings.TrimSpace(host)), "[]")
+	if h == "localhost" {
+		return true
+	}
+	return isPrivateLANIP(net.ParseIP(h))
+}
+
+func isAllowedLANOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return false
+	}
+	host := u.Hostname()
+	if !isPrivateLANIP(net.ParseIP(host)) {
+		return false
+	}
+	switch u.Port() {
+	case "", "80", "443", "8080", "5173", "8000", "3000":
+		return true
+	default:
+		return false
+	}
+}
+
 func trustedPlayerOrigin(origin string) bool {
 	trusted := []string{
 		officialCoreURL,
@@ -30,19 +62,25 @@ func trustedPlayerOrigin(origin string) bool {
 			return true
 		}
 	}
-	return false
+	return isAllowedLANOrigin(origin)
 }
 
-// Loopback binding alone does not prevent DNS rebinding or a hostile website
-// from invoking a local API. Native clients may omit Origin; grants still apply.
+// Restrict API access to loopback and private LAN clients/hosts only.
 func secureLocalHTTP(next http.Handler, port int) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Cache-Control", "no-store")
+		if r.RemoteAddr != "" {
+			if remoteHost, _, splitErr := net.SplitHostPort(r.RemoteAddr); splitErr == nil {
+				if ip := net.ParseIP(remoteHost); ip != nil && !isPrivateLANIP(ip) {
+					http.Error(w, "LAN-only local API", http.StatusForbidden)
+					return
+				}
+			}
+		}
 		host, requestPort, err := net.SplitHostPort(r.Host)
-		if err != nil || requestPort != strconv.Itoa(port) ||
-			(host != "localhost" && host != "127.0.0.1" && host != "::1") {
+		if err != nil || requestPort != strconv.Itoa(port) || !isAllowedLocalHost(host) {
 			http.Error(w, "Invalid local API host", http.StatusForbidden)
 			return
 		}
@@ -56,6 +94,9 @@ func secureLocalHTTP(next http.Handler, port int) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
 		if r.Method == http.MethodOptions {
+			if r.Header.Get("Access-Control-Request-Private-Network") == "true" {
+				w.Header().Set("Access-Control-Allow-Private-Network", "true")
+			}
 			method := r.Header.Get("Access-Control-Request-Method")
 			if method != "GET" && method != "POST" && method != "HEAD" {
 				http.Error(w, "Unsupported preflight method", http.StatusForbidden)

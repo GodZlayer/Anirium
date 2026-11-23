@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
+	"strings"
 )
 
 var stremioIMDbVideoID = regexp.MustCompile(`^tt[0-9]{1,12}(:[0-9]{1,4}:[0-9]{1,4})?$`)
@@ -12,20 +14,43 @@ var stremioIMDbVideoID = regexp.MustCompile(`^tt[0-9]{1,12}(:[0-9]{1,4}:[0-9]{1,
 // Require an exact video identity supplied by the catalog. Titles, franchise
 // order and torrent hashes cannot be substituted for an IMDb episode identity.
 func searchStremioSubtitles(ctx context.Context, base *url.URL, query PlaybackPrepareRequest) []ProviderSubtitle {
-	if !stremioIMDbVideoID.MatchString(query.VideoID) || (query.MediaType != "movie" && query.MediaType != "series") {
-		return nil
+	subtitles, _ := searchStremioSubtitlesWithStatus(ctx, base, query)
+	return subtitles
+}
+
+func searchStremioSubtitlesWithStatus(ctx context.Context, base *url.URL, query PlaybackPrepareRequest) ([]ProviderSubtitle, int) {
+	hasVideoHash := strings.TrimSpace(query.VideoHash) != "" && query.VideoSize > 0
+	videoID := strings.TrimSpace(query.VideoID)
+	mediaType := strings.TrimSpace(query.MediaType)
+	if hasVideoHash && !stremioIMDbVideoID.MatchString(videoID) {
+		videoID = "tt0000000"
+		mediaType = "movie"
 	}
-	if (query.MediaType == "series") != (len(stremioIMDbVideoID.FindStringSubmatch(query.VideoID)[1]) > 0) {
-		return nil
+	if !stremioIMDbVideoID.MatchString(videoID) || (mediaType != "movie" && mediaType != "series") {
+		return nil, 0
 	}
-	endpoint := base.ResolveReference(&url.URL{Path: "subtitles/" + query.MediaType + "/" + query.VideoID + ".json"})
+	if (mediaType == "series") != (len(stremioIMDbVideoID.FindStringSubmatch(videoID)[1]) > 0) {
+		return nil, 0
+	}
+	path := "subtitles/" + mediaType + "/" + videoID + ".json"
+	if hasVideoHash {
+		extras := []string{
+			"videoHash=" + url.PathEscape(strings.TrimSpace(query.VideoHash)),
+			"videoSize=" + strconv.FormatInt(query.VideoSize, 10),
+		}
+		if strings.TrimSpace(query.Filename) != "" {
+			extras = append(extras, "filename="+url.PathEscape(strings.TrimSpace(query.Filename)))
+		}
+		path = "subtitles/" + mediaType + "/" + videoID + "/" + strings.Join(extras, "&") + ".json"
+	}
+	endpoint := base.ResolveReference(&url.URL{Path: path})
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return nil
+		return nil, 0
 	}
 	response, err := providerHTTPClient.Do(request)
 	if err != nil {
-		return nil
+		return nil, 0
 	}
 	defer response.Body.Close()
 	var payload struct {
@@ -36,7 +61,7 @@ func searchStremioSubtitles(ctx context.Context, base *url.URL, query PlaybackPr
 		} `json:"subtitles"`
 	}
 	if response.StatusCode != http.StatusOK || decodeProviderJSON(response.Body, 4<<20, &payload) != nil {
-		return nil
+		return nil, response.StatusCode
 	}
 	result := []ProviderSubtitle{}
 	for _, item := range payload.Subtitles {
@@ -60,5 +85,5 @@ func searchStremioSubtitles(ctx context.Context, base *url.URL, query PlaybackPr
 			break
 		}
 	}
-	return result
+	return result, response.StatusCode
 }

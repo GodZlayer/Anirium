@@ -40,6 +40,10 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        if ($request->is('api/*')) {
+            return parent::share($request);
+        }
+
         $user = $request->user();
         $resolvedUser = null;
 
@@ -90,7 +94,10 @@ class HandleInertiaRequests extends Middleware
                 'current_streak' => (int) ($user->current_streak ?? 1),
                 'longest_streak' => (int) ($user->longest_streak ?? 1),
                 'streak_xp' => (int) ($user->streak_xp ?? 10),
-                'adult_content_enabled' => (bool) ($user->adult_content_enabled ?? false),
+                'adult_content_enabled' => $user->canAccessAdultContent(),
+                'age_verified' => $user->isAgeVerified(),
+                'age_verification_status' => (string) ($user->age_verification_status ?? 'unverified'),
+                'age_verification_method' => $user->age_verification_method,
                 'custom_title' => $user->custom_title,
                 'preferences' => $preferences,
                 'commented_targets' => $commentedTargets,

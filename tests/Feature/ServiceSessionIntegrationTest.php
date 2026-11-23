@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use PDO;
 use Tests\TestCase;
 
 class ServiceSessionIntegrationTest extends TestCase
@@ -106,5 +108,97 @@ class ServiceSessionIntegrationTest extends TestCase
         // 3. Liberação da Sessão ao fechar o player
         $releaseResponse = $this->actingAs($admin)->deleteJson('/api/service/session');
         $releaseResponse->assertStatus(204);
+    }
+
+    public function test_service_validation_falls_back_to_snapshot_during_sqlite_lock_and_fails_closed_after_downgrade(): void
+    {
+        $originalConfig = config('database.connections.sqlite');
+        $originalPdo = DB::connection('sqlite')->getPdo();
+        $path = tempnam(sys_get_temp_dir(), 'service-session-lock-');
+        $locker = null;
+
+        try {
+            while (DB::connection('sqlite')->transactionLevel() > 0) {
+                DB::connection('sqlite')->rollBack();
+            }
+
+            config([
+                'database.connections.sqlite' => array_merge($originalConfig, [
+                    'database' => $path,
+                    'busy_timeout' => 10,
+                ]),
+                'services.anirium.session_validate_busy_timeout_ms' => 10,
+            ]);
+            DB::purge('sqlite');
+            $this->artisan('migrate', ['--force' => true]);
+
+            $user = User::factory()->create(['email' => 'snapshot-plus@example.test', 'tier' => 2]);
+            $deviceId = 'snapshot-lock-device-123';
+            $playerSessionId = 'snapshot-lock-player-session-123456';
+
+            $sessionResponse = $this->actingAs($user)->getJson('/api/service/session', [
+                'x-anirium-device' => $deviceId,
+                'x-anirium-player-session' => $playerSessionId,
+            ])->assertOk();
+
+            $headers = [
+                'Authorization' => 'Bearer '.$sessionResponse->json('token'),
+                'X-Anirium-Device' => $deviceId,
+            ];
+
+            $this->getJson('/api/service/session/validate', $headers)
+                ->assertOk()
+                ->assertJson([
+                    'status' => 'authorized',
+                    'accountId' => (string) $user->id,
+                    'level' => 2,
+                    'playerSessionId' => $playerSessionId,
+                ]);
+
+            $locker = new PDO('sqlite:'.$path);
+            $locker->exec('BEGIN EXCLUSIVE');
+
+            $this->getJson('/api/service/session/validate', $headers)
+                ->assertOk()
+                ->assertJson([
+                    'status' => 'authorized',
+                    'accountId' => (string) $user->id,
+                    'level' => 2,
+                    'playerSessionId' => $playerSessionId,
+                ]);
+
+            $locker->exec('COMMIT');
+            unset($locker);
+            $locker = null;
+
+            $user->update(['tier' => 1]);
+
+            $this->getJson('/api/service/session/validate', $headers)
+                ->assertForbidden()
+                ->assertJson(['reason' => 'plus_required']);
+
+            $locker = new PDO('sqlite:'.$path);
+            $locker->exec('BEGIN EXCLUSIVE');
+
+            $this->getJson('/api/service/session/validate', $headers)
+                ->assertServiceUnavailable()
+                ->assertJson(['status' => 'unauthorized', 'reason' => 'core_unavailable']);
+        } finally {
+            if ($locker instanceof PDO) {
+                try {
+                    if ($locker->inTransaction()) {
+                        $locker->exec('ROLLBACK');
+                    }
+                } catch (\Throwable) {
+                }
+                unset($locker);
+            }
+
+            DB::purge('sqlite');
+            config(['database.connections.sqlite' => $originalConfig]);
+            DB::connection('sqlite')->setPdo($originalPdo);
+            @unlink($path);
+            @unlink($path.'-journal');
+        }
     }
 }

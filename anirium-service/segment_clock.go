@@ -48,3 +48,42 @@ func segmentPacketPTS(parent context.Context, path, stream string) (float64, err
 	}
 	return pts, nil
 }
+
+func muxedSegmentFirstPacketPTS(parent context.Context, path string) (float64, float64, error) {
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+	defer cancel()
+	data, err := mediaCommandContext(ctx, mediaTool("ffprobe"), "-v", "error",
+		"-show_entries", "packet=codec_type,pts_time", "-read_intervals", "%+0.5", "-of", "json", path).Output()
+	if err != nil {
+		return 0, 0, err
+	}
+	var result struct {
+		Packets []struct {
+			CodecType string `json:"codec_type"`
+			PTS       string `json:"pts_time"`
+		} `json:"packets"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil || len(result.Packets) == 0 {
+		return 0, 0, fmt.Errorf("segment has no valid clock packet")
+	}
+	var videoPTS, audioPTS float64
+	var hasVideo, hasAudio bool
+	for _, packet := range result.Packets {
+		if packet.PTS == "" {
+			continue
+		}
+		pts, err := strconv.ParseFloat(packet.PTS, 64)
+		if err != nil || math.IsNaN(pts) || math.IsInf(pts, 0) {
+			continue
+		}
+		if packet.CodecType == "video" && !hasVideo {
+			videoPTS, hasVideo = pts, true
+		} else if packet.CodecType == "audio" && !hasAudio {
+			audioPTS, hasAudio = pts, true
+		}
+		if hasVideo && hasAudio {
+			return videoPTS, audioPTS, nil
+		}
+	}
+	return 0, 0, fmt.Errorf("segment missing video or audio clock")
+}

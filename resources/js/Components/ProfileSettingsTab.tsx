@@ -1,7 +1,8 @@
 import React from "react";
-import { ShieldAlert, Laptop, LogOut, CheckCircle, Shield } from "lucide-react";
+import { ShieldAlert, Laptop, LogOut, CheckCircle, FastForward } from "lucide-react";
 import { router } from "@inertiajs/react";
 import { useDesignTheme } from "../context/ThemeContext";
+import { usePlayerProPrefs } from "../lib/playerProPreferences";
 
 interface ProfileSettingsTabProps {
   user: any;
@@ -17,10 +18,86 @@ export function ProfileSettingsTab({
   machineFingerprint,
 }: ProfileSettingsTabProps) {
   const { tokens, strings } = useDesignTheme();
+  const [playerProPrefs, updatePlayerProPrefs] = usePlayerProPrefs();
+
+  const automationItems: Array<{
+    key: "autoSkipIntro" | "autoSkipEnding" | "autoNextEpisode";
+    title: string;
+    description: string;
+  }> = [
+    {
+      key: "autoSkipIntro",
+      title: "Pular aberturas automaticamente",
+      description: "Avança o trecho de abertura (OP) assim que ele começa, usando capítulos do vídeo ou AniSkip.",
+    },
+    {
+      key: "autoSkipEnding",
+      title: "Pular endings automaticamente",
+      description: "Pula o encerramento (ED) para a cena pós-créditos ou para o final do episódio.",
+    },
+    {
+      key: "autoNextEpisode",
+      title: "Próximo episódio automático",
+      description: "Inicia o próximo episódio automaticamente ao terminar o atual (quando disponível).",
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Switcher Explícito de Conteúdo Adulto (+24 Anos) */}
+      {/* Automação do Player Pro */}
+      <div className="p-4 rounded-2xl border border-[color:var(--wc-borderDefault)]/10 bg-[color:var(--wc-bgBase)]/40 flex flex-col gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-[color:var(--wc-accentGold)]/10 border border-[color:var(--wc-accentGold)]/20 text-[color:var(--wc-accentGold)]">
+            <FastForward className="w-5 h-5" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-[color:var(--wc-textPrimary)]">
+              Automação do Player Pro
+            </span>
+            <span className="text-xs text-[color:var(--wc-textMuted)]">
+              Ações automáticas durante a reprodução de episódios
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2.5 pt-2 border-t border-[color:var(--wc-borderDefault)]/5">
+          {automationItems.map((item) => {
+            const enabled = playerProPrefs[item.key];
+            return (
+              <div key={item.key} className="flex items-center justify-between gap-4 py-1">
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold text-[color:var(--wc-textPrimary)]">
+                    {item.title}
+                  </span>
+                  <span className="text-[11px] text-[color:var(--wc-textMuted)]">
+                    {item.description}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={enabled}
+                  onClick={() => updatePlayerProPrefs({ [item.key]: !enabled })}
+                  className="w-11 h-6 rounded-full transition-colors duration-200 relative cursor-pointer border shrink-0"
+                  style={{
+                    backgroundColor: enabled ? tokens.colors.accentGold : "rgba(255,255,255,0.12)",
+                    borderColor: enabled ? tokens.colors.accentGold : "rgba(255,255,255,0.2)",
+                  }}
+                >
+                  <span
+                    className="block w-4 h-4 rounded-full transition-transform duration-200"
+                    style={{
+                      backgroundColor: enabled ? tokens.colors.bgBase : "#FFFFFF",
+                      transform: enabled ? "translateX(22px)" : "translateX(3px)",
+                    }}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* Switcher Explícito de Conteúdo Adulto (+18 Anos) */}
       <div className="p-4 rounded-2xl border border-[color:var(--wc-borderDefault)]/10 bg-[color:var(--wc-bgBase)]/40 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
@@ -29,7 +106,7 @@ export function ProfileSettingsTab({
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-bold text-[color:var(--wc-textPrimary)]">
-                Filtro de Conteúdo Adulto (+24 Anos)
+                Filtro de Conteúdo Adulto (+18 Anos)
               </span>
               <span className="text-xs text-[color:var(--wc-textMuted)]">
                 Obras de classificação sensível e Hentai

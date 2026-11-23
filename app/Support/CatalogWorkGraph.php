@@ -15,15 +15,46 @@ class CatalogWorkGraph
             return null;
         }
         $nowTs = time();
-        $episodes = DB::table('catalog_episodes')
+        $scheduleLatestEp = (int) (DB::table('catalog_work_schedules')->where('work_id', $id)->value('latest_episode_num') ?? 0);
+        $maxAiredByDate = (int) (DB::table('catalog_episodes')
             ->where('work_id', $id)
+            ->whereNotNull('air_date_utc')
             ->where(function ($query) use ($nowTs) {
-                $query->whereNull('air_date_utc')
-                    ->orWhereRaw('unixepoch(air_date_utc) <= ?', [$nowTs])
+                $query->whereRaw('unixepoch(air_date_utc) <= ?', [$nowTs])
                     ->orWhereRaw('strftime("%s", air_date_utc) <= ?', [$nowTs]);
             })
+            ->max('number') ?? 0);
+        $airedFrontier = max($scheduleLatestEp, $maxAiredByDate);
+        $isReleasing = strtoupper((string) ($work->status ?? '')) === 'RELEASING';
+
+        $episodes = DB::table('catalog_episodes')
+            ->where('work_id', $id)
+            ->where(function ($query) use ($nowTs, $scheduleLatestEp, $airedFrontier, $isReleasing) {
+                if ($isReleasing && $airedFrontier > 0) {
+                    $query->where(function ($q) use ($airedFrontier) {
+                        $q->whereNull('air_date_utc')->where('number', '<=', $airedFrontier);
+                    });
+                } else {
+                    $query->whereNull('air_date_utc');
+                }
+                $query->orWhereRaw('unixepoch(air_date_utc) <= ?', [$nowTs])
+                    ->orWhereRaw('strftime("%s", air_date_utc) <= ?', [$nowTs]);
+                if ($scheduleLatestEp > 0) {
+                    $query->orWhere('number', '<=', $scheduleLatestEp);
+                }
+            })
             ->orderBy('number')
-            ->get(['id', 'work_id', 'season_id', 'number', 'numbering_scheme', 'air_date_utc', 'classification']);
+            ->get(['id', 'work_id', 'season_id', 'number', 'numbering_scheme', 'air_date_utc', 'classification'])
+            ->map(function (object $ep) use ($nowTs, $scheduleLatestEp): object {
+                if ($scheduleLatestEp > 0 && (int) $ep->number <= $scheduleLatestEp && ! empty($ep->air_date_utc)) {
+                    $ts = strtotime((string) $ep->air_date_utc);
+                    if ($ts !== false && $ts > $nowTs) {
+                        $ep->air_date_utc = null;
+                    }
+                }
+
+                return $ep;
+            });
         $relations = DB::table('catalog_work_relations')->where('from_work_id', $id)->get(['to_work_id', 'relation_type', 'provider']);
         $visible = $this->visibility->works($relations->pluck('to_work_id')->all(), $adult);
         $arcs = DB::table('catalog_arcs as arc')->join('catalog_arc_works as link', 'arc.id', '=', 'link.arc_id')

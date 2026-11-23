@@ -35,6 +35,11 @@ func (job *retiringPlayback) wait() {
 	if job.workers != nil {
 		job.workers.Wait()
 	}
+	if job.inputs != nil {
+		if bundle := job.inputs.existingBundle(); bundle != nil {
+			bundle.wait()
+		}
+	}
 	if job.inputs != nil && job.inputs.waitRetired != nil {
 		job.inputs.waitRetired()
 	}
@@ -63,6 +68,10 @@ func playbackVariantID(generation uint64, quality string) string {
 
 // Caller holds swarmMu exclusively; lock order is swarmMu then variantMu.
 func resetPlaybackLocked() uint64 {
+	currentCatalogIdentity = catalogPlaybackIdentity{}
+	currentSkipMALID = 0
+	currentSkipEpisode = 0
+	retireAllParkedTimelinesLocked()
 	cancelPlaybackWindowLocked()
 	if cancelPlayback != nil {
 		cancelPlayback()
@@ -95,6 +104,7 @@ func resetPlaybackLocked() uint64 {
 	currentPlaybackSession = playbackSessionState{Generation: playbackGeneration, BufferSeconds: 30}
 	requestedVariants = map[string]bool{}
 	playbackDiscoveryComplete = false
+	playbackInventoryScanning = false
 	observedTransferCapacity = transferCapacity{}
 	activeLinks = nil
 	playbackMagnets = nil

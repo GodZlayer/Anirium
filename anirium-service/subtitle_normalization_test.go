@@ -33,3 +33,18 @@ func TestWebVTTWindowNormalization(t *testing.T) {
 		}
 	}
 }
+
+func TestWebVTTWindowNormalizationToleratesZeroDurationAndMultiParagraphCues(t *testing.T) {
+	input := "WEBVTT\n\n04:05.000 --> 04:05.000\nzero-duration sign\n\n04:10.000 --> 04:14.000\nTop sign\n\nBottom dialogue\n\n05:00.000 --> 05:00.000\nboundary clamp\n"
+	got, err := normalizeWebVTT(input, 240)
+	if err != nil {
+		t.Fatalf("normalizeWebVTT failed on zero-duration/multi-paragraph cue: %v", err)
+	}
+	if !strings.Contains(got, "00:10.000 --> 00:14.000\nTop sign\nBottom dialogue") {
+		t.Fatalf("expected preserved multi-paragraph cue at 240s offset, got:\n%s", got)
+	}
+	cues, err := parseBundleCues(got, 240)
+	if err != nil || len(cues) != 1 || cues[0].Start != 250 || cues[0].End != 254 {
+		t.Fatalf("unexpected parsed cues: err=%v cues=%+v", err, cues)
+	}
+}

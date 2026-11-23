@@ -11,6 +11,7 @@
     'englishTitle' => '',
     'romajiTitle' => '',
     'nativeTitle' => '',
+    'titleAliases' => [],
     'arcs' => [],
     'episodes' => [],
     'isLiked' => false,
@@ -33,12 +34,19 @@
     $episodeTitle = $unitLabel . ' ' . $epNum;
     $classification = strtolower($currentEpisode->classification ?? ($currentArc->classification ?? 'canon'));
     $isFiller = $classification === 'filler';
-    $airDate = $currentEpisode->air_date_utc ?? ($status === 'RELEASING' ? 'Em exibição' : 'Catalogado');
+    $scheduleMaxEp = (int) ($work->latest_episode_num ?? 0);
     $epAirTs = !empty($currentEpisode->air_date_utc) ? strtotime($currentEpisode->air_date_utc) : 0;
-    $isEpUnreleased = ($epAirTs > 0 && $epAirTs > time()) || in_array($status, ['NOT_YET_RELEASED', 'NOT_YET_AIRED', 'UPCOMING', 'UNRELEASED'], true);
+    if ($scheduleMaxEp > 0 && $epNum <= $scheduleMaxEp && $epAirTs > time()) {
+        $epAirTs = 0;
+        $currentEpisode->air_date_utc = null;
+    }
+    $airDate = $currentEpisode->air_date_utc ?? ($status === 'RELEASING' ? 'Em exibição' : 'Catalogado');
+    $isEpUnreleased = ($epAirTs > 0 && $epAirTs > time())
+        || in_array($status, ['NOT_YET_RELEASED', 'NOT_YET_AIRED', 'UPCOMING', 'UNRELEASED'], true)
+        || ($status === 'RELEASING' && $scheduleMaxEp > 0 && $epNum > $scheduleMaxEp && $epAirTs <= 0);
     $isVirtualEp = !empty($currentEpisode->is_virtual);
 
-    $totalEpisodes = count($episodes) ?: ($work->episode_count ?? 0);
+    $totalEpisodes = max(count($episodes), (int) ($work->episode_count ?? 0));
     if ($totalEpisodes <= 0 && count($arcs) > 0) {
         $maxArcEnd = collect($arcs)->max('end_number');
         $maxArcStart = collect($arcs)->max('start_number');
@@ -89,20 +97,34 @@
         return true;
     })->values();
 
-    $isFinishedWork = $status === 'FINISHED' || $status === 'COMPLETED';
-    if ($displayEpisodes->isEmpty() && $totalEpisodes > 0 && $isFinishedWork) {
-        $maxVirtual = min((int) $totalEpisodes, 200);
-        $vList = [];
+    $isWorkUnreleased = in_array($status, ['NOT_YET_RELEASED', 'NOT_YET_AIRED', 'UPCOMING', 'UNRELEASED'], true);
+    $knownMaxEp = (int) ($displayEpisodes->max('number') ?? 0);
+    $scheduleMaxEp = (int) ($work->latest_episode_num ?? 0);
+    if ($isWorkUnreleased) {
+        $targetMaxEp = 0;
+    } elseif ($status === 'RELEASING') {
+        $airedFrontier = max($knownMaxEp, $scheduleMaxEp);
+        $targetMaxEp = $airedFrontier > 0 ? $airedFrontier : max(1, (int) $totalEpisodes);
+    } else {
+        $targetMaxEp = max($knownMaxEp, $scheduleMaxEp, (int) $totalEpisodes, 1);
+    }
+
+    if (! $isWorkUnreleased && ($targetMaxEp > $knownMaxEp || $displayEpisodes->count() < $targetMaxEp)) {
+        $maxVirtual = min($targetMaxEp, 500);
+        $vList = $displayEpisodes->all();
+        $existingNums = $displayEpisodes->pluck('number')->flip()->all();
         for ($i = 1; $i <= $maxVirtual; $i++) {
-            $vList[] = (object) [
-                'id' => ($work->id ?? 'work') . ':ep:' . $i,
-                'work_id' => $work->id ?? '',
-                'number' => $i,
-                'air_date_utc' => null,
-                'is_virtual' => true,
-            ];
+            if (! isset($existingNums[$i])) {
+                $vList[] = (object) [
+                    'id' => ($work->id ?? 'work') . ':ep:' . $i,
+                    'work_id' => $work->id ?? '',
+                    'number' => $i,
+                    'air_date_utc' => null,
+                    'is_virtual' => true,
+                ];
+            }
         }
-        $displayEpisodes = collect($vList);
+        $displayEpisodes = collect($vList)->sortBy('number')->values();
     }
 
     $totalEpisodes = $displayEpisodes->count() ?: $totalEpisodes;
@@ -119,6 +141,7 @@
      data-work-english-title="{{ $englishTitle ?? '' }}"
      data-work-romaji-title="{{ $romajiTitle ?? '' }}"
      data-work-native-title="{{ $nativeTitle ?? '' }}"
+     data-work-aliases="{{ json_encode($titleAliases ?? []) }}"
      data-work-media="{{ $isManga ? 'manga' : 'anime' }}"
      data-work-format="{{ $format }}"
      data-episode-count="{{ $totalEpisodes }}"

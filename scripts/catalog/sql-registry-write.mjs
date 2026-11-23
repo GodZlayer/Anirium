@@ -1,16 +1,12 @@
 import { readSqlRegistry } from "./sql-registry-read.mjs";
 import { assertRegistryPreserved } from "./sql-registry-preservation.mjs";
 import { planRegistryWrites, registryMedia } from "./sql-registry-plan.mjs";
+import { yieldBetweenBatches } from "./sql-registry-connection.mjs";
 
 export function writeSqlRegistry(db, registry) {
-  let plan;
-  db.exec("BEGIN");
-  try {
-    const previous=readSqlRegistry(db);
-    assertRegistryPreserved(previous,registry);
-    plan=planRegistryWrites(db,previous,registry);
-    db.exec("COMMIT");
-  } catch(error) {db.exec("ROLLBACK");throw error;}
+  const previous=readSqlRegistry(db);
+  assertRegistryPreserved(previous,registry);
+  const plan=planRegistryWrites(db,previous,registry);
   const owner=db.prepare("SELECT e.kind,w.media,m.media_history FROM catalog_entities e LEFT JOIN catalog_works w ON w.id=e.id LEFT JOIN catalog_registry_metadata m ON m.entity_id=e.id WHERE e.id=?");
   const entity=db.prepare("INSERT INTO catalog_entities(id,kind,resolution_status,created_at,updated_at) VALUES(?,'work','verified',?,?) ON CONFLICT(id) DO NOTHING");
   const work=db.prepare("INSERT INTO catalog_works(id,media,title) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET media=excluded.media,title=excluded.title");
@@ -27,6 +23,7 @@ export function writeSqlRegistry(db, registry) {
         for (const row of rows.slice(offset,offset+250)) apply(row);
         db.exec("COMMIT"); batches++;
       } catch(error) {db.exec("ROLLBACK");throw error;}
+      if (offset + 250 < rows.length) yieldBetweenBatches();
     }
   };
   commit(plan.works,({id,value,before,fields,meta,references,aliases})=>{

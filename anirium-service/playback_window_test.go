@@ -202,8 +202,8 @@ func TestPrefetchedWindowPreservesCurrentUntilPromotion(t *testing.T) {
 	nextContext, cancelNext := context.WithCancel(ctx)
 	defer cancelCurrent()
 	defer cancelNext()
-	current := &playbackWindow{ID: "prefetch-current-fixture", Quality: "720p", Start: 0, DeliveredDuration: 24, Status: "ready", ctx: currentContext, cancel: cancelCurrent}
-	next := &playbackWindow{ID: "prefetch-next-fixture", Quality: "720p", Start: 24, Duration: 24, Status: "preparing", ctx: nextContext, cancel: cancelNext}
+	current := &playbackWindow{ID: "prefetch-current-fixture", Quality: "720p", Start: 0, DeliveredDuration: 24.083333, Status: "ready", ctx: currentContext, cancel: cancelCurrent}
+	next := &playbackWindow{ID: "prefetch-next-fixture", Quality: "720p", Start: 24.083333, Duration: 24, Status: "preparing", ctx: nextContext, cancel: cancelNext}
 	swarmMu.Lock()
 	oldCurrent, oldNext := currentPlaybackWindow, prefetchedPlaybackWindow
 	oldContext, oldInputs, oldDiscovery, oldQualities := playbackContext, playbackInputs, playbackDiscoveryComplete, currentMixQualities
@@ -217,6 +217,12 @@ func TestPrefetchedWindowPreservesCurrentUntilPromotion(t *testing.T) {
 		playbackContext, playbackInputs, playbackDiscoveryComplete, currentMixQualities = oldContext, oldInputs, oldDiscovery, oldQualities
 		swarmMu.Unlock()
 	}()
+	if !requestPlaybackWindow("720p", 24, true) {
+		t.Fatal("fractional delivered duration rejected the normalized successor")
+	}
+	if requestPlaybackWindow("720p", 48, true) {
+		t.Fatal("prefetch accepted a nonadjacent window")
+	}
 	finishPlaybackWindow(next, map[string]*variantRuntime{next.ID + "-video": {MixVariant: MixVariant{Status: "ready", BufferedSeconds: 24}}}, nil, nil)
 	snapshot, _ := playbackWindowSnapshot()
 	if snapshot.ID != current.ID || currentContext.Err() != nil {

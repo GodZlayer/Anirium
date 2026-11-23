@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -67,5 +68,46 @@ class GoogleAccountIdentityTest extends TestCase
             ->assertStatus(409)->assertJsonPath('error', 'account_identity_conflict');
         $this->assertGuest();
         $this->assertDatabaseCount('users', 2);
+    }
+
+    public function test_cached_x509_certs_verify_rs256_id_token_locally_without_outbound_http(): void
+    {
+        config(['services.google.client_id' => 'test-client']);
+        $email = 'dnleventos@gmail.com';
+        $user = User::factory()->create(['email' => $email, 'tier' => 2, 'google_id' => null]);
+
+        $privateKey = openssl_pkey_new([
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+        $this->assertNotFalse($privateKey);
+
+        $csr = openssl_csr_new(['commonName' => 'test-google-oauth'], $privateKey);
+        $this->assertNotFalse($csr);
+        $x509 = openssl_csr_sign($csr, null, $privateKey, 1);
+        $this->assertNotFalse($x509);
+        $this->assertTrue(openssl_x509_export($x509, $certPem));
+
+        $header = $this->base64UrlEncode(json_encode(['alg' => 'RS256', 'typ' => 'JWT', 'kid' => 'test-kid'], JSON_THROW_ON_ERROR));
+        $payload = $this->base64UrlEncode(json_encode($this->claims($email), JSON_THROW_ON_ERROR));
+        $this->assertTrue(openssl_sign("{$header}.{$payload}", $rawSignature, $privateKey, OPENSSL_ALGO_SHA256));
+        $idToken = "{$header}.{$payload}.".$this->base64UrlEncode($rawSignature);
+
+        Cache::put('google_oauth_x509_certs', ['test-kid' => $certPem], 3600);
+        Http::preventStrayRequests();
+
+        $this->postJson('/api/auth/google', ['credential' => $idToken])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('user.id', $user->id)
+            ->assertJsonPath('user.tier', 2);
+
+        $this->assertAuthenticatedAs($user);
+        Http::assertNothingSent();
+    }
+
+    private function base64UrlEncode(string $value): string
+    {
+        return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
     }
 }

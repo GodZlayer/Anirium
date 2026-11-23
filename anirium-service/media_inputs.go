@@ -28,6 +28,8 @@ type mediaInputCache struct {
 	completeSubtitleTracks           map[string]bool
 	completeSubtitleOrder            []string
 	externalSubtitleAlignmentSources map[string]string
+	subtitleBundle                   *subtitleBundle
+	videoProducers                   map[string]string
 }
 
 // Explicit playback demand can retry terminal failures. Never evict a pending

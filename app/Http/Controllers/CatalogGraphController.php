@@ -7,6 +7,8 @@ use App\Support\CatalogGraphVisibility;
 use App\Support\CatalogSearch;
 use App\Support\CatalogUnavailable;
 use App\Support\CatalogWorkGraph;
+use App\Support\LocaleResolver;
+use App\Support\SynopsisTranslator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -119,12 +121,21 @@ class CatalogGraphController extends Controller
         return $firstWorkTitle ?: 'Universo Canônico';
     }
 
+    private function isMultiWorkUniverse(string $universeId): bool
+    {
+        return DB::table('catalog_universe_works')
+            ->where('universe_id', $universeId)
+            ->limit(2)
+            ->pluck('work_id')
+            ->count() >= 2;
+    }
+
     public function context(Request $request, string $kind, string $id, CatalogContextLookup $lookup): JsonResponse
     {
         $input = $request->validate(['work_id' => ['sometimes', 'string', 'uuid']]);
         $id = $this->resolveUuid($id, $kind);
         try {
-            $result = $lookup->resolve($kind, $id, (bool) $request->user()?->adult_content_enabled, $input['work_id'] ?? null);
+            $result = $lookup->resolve($kind, $id, (bool) $request->user()?->canAccessAdultContent(), $input['work_id'] ?? null);
 
             return $result ? response()->json($result) : response()->json(['error' => 'entity_not_found'], 404);
         } catch (CatalogUnavailable) {
@@ -132,15 +143,120 @@ class CatalogGraphController extends Controller
         }
     }
 
+    public function adultShard(Request $request, string $kind): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user || ! $user->canAccessAdultContent()) {
+            return response()->json(['error' => 'adult_access_forbidden'], 403, ['Cache-Control' => 'private, no-store']);
+        }
+
+        $items = Cache::remember("catalog:adult_shard:v1:{$kind}", 3600, function () use ($kind): array {
+            $query = DB::table('catalog_works as w')
+                ->leftJoin('catalog_work_assets as a', 'a.work_id', '=', 'w.id')
+                ->where('w.is_adult', 1);
+
+            if ($kind === 'manga') {
+                $query->whereIn('w.media', ['manga', 'novel']);
+            } else {
+                $query->where('w.media', 'anime');
+            }
+
+            $rows = $query->orderBy('w.title', 'ASC')
+                ->get(['w.id', 'w.title', 'w.format', 'w.status', 'w.episode_count', 'a.image_url']);
+
+            $result = [];
+            foreach ($rows as $r) {
+                $fmt = strtoupper((string) ($r->format ?: ($kind === 'manga' ? 'MANGA' : 'OVA')));
+                if ($kind === 'work' && in_array($fmt, ['MUSIC', 'OST'], true)) {
+                    continue;
+                }
+
+                $subMeta = $fmt;
+                if ($r->episode_count) {
+                    $subMeta .= ' • '.$r->episode_count.($r->episode_count === 1 ? ' ep' : ' eps');
+                }
+
+                $result[] = [
+                    'id' => $r->id,
+                    'title' => $r->title,
+                    'format' => $fmt,
+                    'status' => $r->status ?? 'COMPLETED',
+                    'image' => $r->image_url,
+                    'episode_count' => $r->episode_count,
+                    'is_adult' => true,
+                    'kind' => $kind,
+                    'works_count' => null,
+                    'role' => null,
+                    'subMeta' => $subMeta,
+                ];
+            }
+
+            return $result;
+        });
+
+        return response()->json($items)->header('Cache-Control', 'private, no-store');
+    }
+
+    /**
+     * Resolve international and romanized titles plus distinct aliases for a catalog work.
+     *
+     * @return array{englishTitle: string, romajiTitle: string, nativeTitle: string, titleAliases: list<string>}
+     */
+    private function resolveWorkTitles(string $workId): array
+    {
+        $titleRows = DB::table('catalog_entity_titles')
+            ->where('entity_id', $workId)
+            ->select('locale', 'title')
+            ->get();
+
+        $byLocale = [];
+        $titleAliases = [];
+        foreach ($titleRows as $row) {
+            $loc = strtolower((string) $row->locale);
+            $val = trim((string) $row->title);
+            if ($val === '') {
+                continue;
+            }
+            if (! isset($byLocale[$loc])) {
+                $byLocale[$loc] = $val;
+            }
+            if (count($titleAliases) < 24 && ! in_array($val, $titleAliases, true)) {
+                $titleAliases[] = $val;
+            }
+        }
+
+        $englishTitle = $byLocale['en'] ?? '';
+        $romajiTitle = '';
+        foreach (['x-jat', 'ja-latn', 'zh-latn', 'ko-latn', 'romaji', 'und'] as $loc) {
+            if (! empty($byLocale[$loc])) {
+                $romajiTitle = $byLocale[$loc];
+                break;
+            }
+        }
+        $nativeTitle = '';
+        foreach (['ja', 'zh', 'zh-hans', 'zh-hant', 'ko'] as $loc) {
+            if (! empty($byLocale[$loc])) {
+                $nativeTitle = $byLocale[$loc];
+                break;
+            }
+        }
+
+        return [
+            'englishTitle' => $englishTitle,
+            'romajiTitle' => $romajiTitle,
+            'nativeTitle' => $nativeTitle,
+            'titleAliases' => $titleAliases,
+        ];
+    }
+
     public function work(Request $request, string $id, CatalogWorkGraph $graph): JsonResponse|Response
     {
         try {
             $kind = $request->query('kind', 'work');
             $realId = $this->resolveUuid($id, $kind);
-            $allowAdult = (bool) (
-                $request->user()?->adult_content_enabled ||
-                in_array($request->query('adult'), ['1', 'true', true], true)
-            );
+            $userCanAccessAdult = (bool) $request->user()?->canAccessAdultContent();
+            $explicitlySafe = in_array($request->query('adult'), ['0', 'false', false], true);
+            $allowAdult = $userCanAccessAdult && ! $explicitlySafe;
 
             // Cache atômico em memória para o grafo estático da obra (reduz de 6s para 0ms)
             $res = $graph->read($realId, $allowAdult);
@@ -148,22 +264,18 @@ class CatalogGraphController extends Controller
                 return response()->json(['error' => 'entity_not_found'], 404);
             }
 
-            $metaKey = "catalog:work:graph:meta:v5:{$realId}";
-            $meta = Cache::remember($metaKey, 3600, function () use ($realId, $res) {
+            $uiLocale = app(LocaleResolver::class)->resolveFromRequest($request);
+            $metaKey = "catalog:work:graph:meta:v7:{$realId}:{$uiLocale}";
+            $meta = Cache::remember($metaKey, 3600, function () use ($realId, $res, $uiLocale) {
                 $workRow = DB::table('catalog_works')->where('id', $realId)->first();
-                $synopsis = DB::table('catalog_translations')
-                    ->where('entity_id', $realId)
-                    ->where('field', 'synopsis')
-                    ->whereIn('locale', ['pt-BR', 'en', 'und'])
-                    ->orderByRaw("CASE WHEN locale = 'pt-BR' THEN 1 WHEN locale = 'en' THEN 2 ELSE 3 END")
-                    ->value('value');
+                $synopsis = app(SynopsisTranslator::class)->resolveForWork($realId, $uiLocale);
 
                 // Injetar relações de Universo Canônico
                 $universeWork = DB::table('catalog_universe_works')
                     ->where('work_id', $realId)
                     ->first();
                 $universeData = null;
-                if ($universeWork) {
+                if ($universeWork && $this->isMultiWorkUniverse($universeWork->universe_id)) {
                     $u = DB::table('catalog_universes')->where('id', $universeWork->universe_id)->first();
                     if ($u) {
                         $universeData = [
@@ -202,13 +314,7 @@ class CatalogGraphController extends Controller
                     ->toArray();
 
                 // Títulos canônicos e internacionais para busca multi-nome nos provedores (Inglês, Rômaji, Kanji/Hanzi)
-                $titleRows = DB::table('catalog_entity_titles')
-                    ->where('entity_id', $realId)
-                    ->select('locale', 'title')
-                    ->get();
-                $englishTitle = $titleRows->firstWhere('locale', 'en')?->title ?? '';
-                $romajiTitle = $titleRows->whereIn('locale', ['und', 'romaji', 'ja-latn'])->first()?->title ?? '';
-                $nativeTitle = $titleRows->whereIn('locale', ['ja', 'zh', 'ko'])->first()?->title ?? '';
+                $resolvedTitles = $this->resolveWorkTitles($realId);
 
                 $image = DB::table('catalog_work_assets')->where('work_id', $realId)->value('image_url');
 
@@ -220,9 +326,10 @@ class CatalogGraphController extends Controller
                     'studios' => $studios,
                     'tracks' => $tracks,
                     'external_ids' => $externalIds,
-                    'englishTitle' => $englishTitle,
-                    'romajiTitle' => $romajiTitle,
-                    'nativeTitle' => $nativeTitle,
+                    'englishTitle' => $resolvedTitles['englishTitle'],
+                    'romajiTitle' => $resolvedTitles['romajiTitle'],
+                    'nativeTitle' => $resolvedTitles['nativeTitle'],
+                    'titleAliases' => $resolvedTitles['titleAliases'],
                     'image_url' => $image,
                 ]), true);
             });
@@ -234,11 +341,26 @@ class CatalogGraphController extends Controller
                 $res['entity']['status'] = $workRow['status'] ?? ($res['entity']['status'] ?? 'COMPLETED');
                 $res['entity']['episode_count'] = $workRow['episode_count'] ?? ($res['entity']['episode_count'] ?? null);
             }
-            if (empty($res['entity']['synopsis']) && ! empty($meta['synopsis'])) {
+            if (! empty($meta['synopsis'])) {
                 $res['entity']['synopsis'] = $meta['synopsis'];
             }
             if (! empty($meta['image_url'])) {
                 $res['entity']['image_url'] = $meta['image_url'];
+            }
+
+            $schedule = DB::table('catalog_work_schedules')
+                ->where('work_id', $realId)
+                ->first(['latest_episode_num', 'airing_day', 'airing_time']);
+            if ($schedule) {
+                if ($schedule->latest_episode_num !== null) {
+                    $res['entity']['latest_episode_num'] = (int) $schedule->latest_episode_num;
+                }
+                if (! empty($schedule->airing_day)) {
+                    $res['entity']['airing_day'] = $schedule->airing_day;
+                }
+                if (! empty($schedule->airing_time)) {
+                    $res['entity']['airing_time'] = $schedule->airing_time;
+                }
             }
 
             $res['creators'] = $meta['creators'] ?? [];
@@ -249,6 +371,7 @@ class CatalogGraphController extends Controller
             $res['englishTitle'] = $meta['englishTitle'] ?? '';
             $res['romajiTitle'] = $meta['romajiTitle'] ?? '';
             $res['nativeTitle'] = $meta['nativeTitle'] ?? '';
+            $res['titleAliases'] = $meta['titleAliases'] ?? [];
 
             $result = json_decode(json_encode($res), true);
 
@@ -261,6 +384,7 @@ class CatalogGraphController extends Controller
             $englishTitle = $result['englishTitle'] ?? '';
             $romajiTitle = $result['romajiTitle'] ?? '';
             $nativeTitle = $result['nativeTitle'] ?? '';
+            $titleAliases = $result['titleAliases'] ?? [];
 
             // Se for requisição pedindo HTML/Blade ou HTMX, retorna a view compilada diretamente pelo PHP
             if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
@@ -288,6 +412,7 @@ class CatalogGraphController extends Controller
                     'englishTitle' => $englishTitle,
                     'romajiTitle' => $romajiTitle,
                     'nativeTitle' => $nativeTitle,
+                    'titleAliases' => $titleAliases,
                     'arcs' => $arcsObj,
                     'episodes' => $episodesObj,
                     'isLiked' => (bool) ($pref->liked ?? false),
@@ -307,7 +432,9 @@ class CatalogGraphController extends Controller
     public function universe(Request $request, string $id, CatalogSearch $catalog): JsonResponse|Response
     {
         $realId = $this->resolveUuid($id, 'universe');
-        $allowAdult = (bool) ($request->user()?->adult_content_enabled || $request->query('adult') === '1');
+        $userCanAccessAdult = (bool) $request->user()?->canAccessAdultContent();
+        $explicitlySafe = in_array($request->query('adult'), ['0', 'false', false], true);
+        $allowAdult = $userCanAccessAdult && ! $explicitlySafe;
 
         $universeRow = DB::table('catalog_universes')->where('id', $realId)->first();
         if (! $universeRow) {
@@ -319,17 +446,22 @@ class CatalogGraphController extends Controller
         $visibleWorkIds = $visibility->works($allWorkIds, $allowAdult);
         sort($visibleWorkIds, SORT_STRING);
 
-        $cacheKey = "catalog:universe:graph:payload:v9:{$realId}:".($allowAdult ? '1' : '0');
-        $data = Cache::remember($cacheKey, 3600, function () use ($realId, $universeRow, $allWorkIds, $visibleWorkIds) {
-            $universe = clone $universeRow;
-            $safeWorkIds = $allWorkIds ?: ['00000000-0000-0000-0000-000000000000'];
+        if ($allWorkIds !== [] && $visibleWorkIds === []) {
+            return response()->json(['error' => 'entity_not_found'], 404);
+        }
 
-            // Buscar todas as obras vinculadas a este universo
+        $cacheKey = "catalog:universe:graph:payload:v10:{$realId}:".($allowAdult ? '1' : '0');
+        $data = Cache::remember($cacheKey, 3600, function () use ($realId, $universeRow, $visibleWorkIds) {
+            $universe = clone $universeRow;
+            $safeWorkIds = $visibleWorkIds ?: ['00000000-0000-0000-0000-000000000000'];
+
+            // Buscar todas as obras visíveis vinculadas a este universo
             $works = DB::table('catalog_universe_works as uw')
                 ->join('catalog_works as w', 'uw.work_id', '=', 'w.id')
                 ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
                 ->where('uw.universe_id', $realId)
                 ->where('w.media', 'anime')
+                ->whereIn('w.id', $safeWorkIds)
                 ->get(['w.id', 'w.title', 'w.format', 'w.status', 'w.episode_count', 'wa.image_url']);
 
             $universe->name = $this->resolveCanonicalUniverseName($realId, $works[0]->title ?? null);
@@ -413,15 +545,13 @@ class CatalogGraphController extends Controller
             $universe->image_url = $universeLeadImage;
             $universe->total_episodes = $totalEpisodes;
 
-            $mangasQuery = DB::table('catalog_universe_works as uw')
+            $mangas = DB::table('catalog_universe_works as uw')
                 ->join('catalog_works as w', 'uw.work_id', '=', 'w.id')
                 ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
                 ->where('uw.universe_id', $realId)
-                ->where('w.media', 'manga');
-            if (! empty($visibleWorkIds)) {
-                $mangasQuery->whereIn('w.id', $visibleWorkIds);
-            }
-            $mangas = $mangasQuery->get(['w.id', 'w.title', 'w.format', 'w.status', 'wa.image_url']);
+                ->where('w.media', 'manga')
+                ->whereIn('w.id', $safeWorkIds)
+                ->get(['w.id', 'w.title', 'w.format', 'w.status', 'wa.image_url']);
 
             // Sagas & Arcos com mapeamento exato de cobertura sem subquery em catalog_seasons
             $seasonMap = DB::table('catalog_seasons')
@@ -597,6 +727,12 @@ class CatalogGraphController extends Controller
             $universesRaw = DB::table('catalog_universe_works as uw')
                 ->join('catalog_universes as u', 'uw.universe_id', '=', 'u.id')
                 ->whereIn('uw.work_id', $workIds ?: ['00000000-0000-0000-0000-000000000000'])
+                ->whereExists(function ($query): void {
+                    $query->select(DB::raw(1))
+                        ->from('catalog_universe_works as uw2')
+                        ->whereColumn('uw2.universe_id', 'u.id')
+                        ->whereColumn('uw2.work_id', '!=', 'uw.work_id');
+                })
                 ->select('u.id', DB::raw('COUNT(DISTINCT uw.work_id) as total_works'))
                 ->groupBy('u.id')
                 ->orderByDesc('total_works')
@@ -721,6 +857,12 @@ class CatalogGraphController extends Controller
             $universesRaw = DB::table('catalog_universe_works as uw')
                 ->join('catalog_universes as u', 'uw.universe_id', '=', 'u.id')
                 ->whereIn('uw.work_id', $workIds ?: ['00000000-0000-0000-0000-000000000000'])
+                ->whereExists(function ($query): void {
+                    $query->select(DB::raw(1))
+                        ->from('catalog_universe_works as uw2')
+                        ->whereColumn('uw2.universe_id', 'u.id')
+                        ->whereColumn('uw2.work_id', '!=', 'uw.work_id');
+                })
                 ->select('u.id', DB::raw('COUNT(DISTINCT uw.work_id) as total_works'))
                 ->groupBy('u.id')
                 ->orderByDesc('total_works')
@@ -846,7 +988,7 @@ class CatalogGraphController extends Controller
                 $uWork = DB::table('catalog_universe_works as uw')
                     ->where('uw.work_id', $works[0]->id)
                     ->first();
-                if ($uWork) {
+                if ($uWork && $this->isMultiWorkUniverse($uWork->universe_id)) {
                     $uRow = DB::table('catalog_universes')->where('id', $uWork->universe_id)->first();
                     if ($uRow) {
                         $universe = [
@@ -939,7 +1081,7 @@ class CatalogGraphController extends Controller
     {
         $realId = $this->resolveUuid($id, 'arc');
 
-        $data = Cache::remember("catalog:arc:graph:payload:v5:{$realId}", 3600, function () use ($realId) {
+        $data = Cache::remember("catalog:arc:graph:payload:v7:{$realId}", 3600, function () use ($realId) {
             $arc = DB::table('catalog_arcs')->where('id', $realId)->first();
             if (! $arc) {
                 return null;
@@ -955,8 +1097,9 @@ class CatalogGraphController extends Controller
 
                 $work = DB::table('catalog_works as w')
                     ->leftJoin('catalog_work_assets as wa', 'w.id', '=', 'wa.work_id')
+                    ->leftJoin('catalog_work_schedules as ws', 'w.id', '=', 'ws.work_id')
                     ->where('w.id', $arcWork->work_id)
-                    ->first(['w.id', 'w.title', 'w.media', 'w.format', 'w.status', 'w.episode_count', 'wa.image_url']);
+                    ->first(['w.id', 'w.title', 'w.media', 'w.format', 'w.status', 'w.episode_count', 'wa.image_url', 'ws.latest_episode_num', 'ws.airing_day', 'ws.airing_time']);
             }
 
             $universeId = $arc->universe_id ?? null;
@@ -974,13 +1117,33 @@ class CatalogGraphController extends Controller
             }
 
             $nowTs = time();
+            $scheduleLatestEp = (int) ($work->latest_episode_num ?? 0);
+            $maxAiredByDate = $work ? (int) (DB::table('catalog_episodes')
+                ->where('work_id', $work->id)
+                ->whereNotNull('air_date_utc')
+                ->where(function ($query) use ($nowTs) {
+                    $query->whereRaw('unixepoch(air_date_utc) <= ?', [$nowTs])
+                        ->orWhereRaw('strftime("%s", air_date_utc) <= ?', [$nowTs]);
+                })
+                ->max('number') ?? 0) : 0;
+            $airedFrontier = max($scheduleLatestEp, $maxAiredByDate);
+            $isReleasing = strtoupper((string) ($work->status ?? '')) === 'RELEASING';
+
             $episodes = DB::table('catalog_arc_episodes as ae')
                 ->join('catalog_episodes as e', 'ae.episode_id', '=', 'e.id')
                 ->where('ae.arc_id', $realId)
-                ->where(function ($query) use ($nowTs) {
-                    $query->whereNull('e.air_date_utc')
-                        ->orWhereRaw('unixepoch(e.air_date_utc) <= ?', [$nowTs])
-                        ->orWhereRaw('strftime("%s", e.air_date_utc) <= ?', [$nowTs]);
+                ->where(function ($query) use ($nowTs, $scheduleLatestEp, $airedFrontier, $isReleasing) {
+                    if ($isReleasing && $airedFrontier > 0) {
+                        $query->where(function ($q) use ($airedFrontier) {
+                            $q->whereNull('e.air_date_utc')->where('e.number', '<=', $airedFrontier);
+                        });
+                    } else {
+                        $query->whereNull('e.air_date_utc');
+                    }
+                    $query->orWhereRaw('unixepoch(e.air_date_utc) <= ?', [$nowTs]);
+                    if ($scheduleLatestEp > 0) {
+                        $query->orWhere('e.number', '<=', $scheduleLatestEp);
+                    }
                 })
                 ->orderBy('e.number')
                 ->get(['e.id', 'e.number', 'e.air_date_utc']);
@@ -990,16 +1153,34 @@ class CatalogGraphController extends Controller
                 $epQuery = DB::table('catalog_episodes')
                     ->where('work_id', $work->id)
                     ->where('number', '>=', (int) $arc->start_number)
-                    ->where(function ($query) use ($nowTs) {
-                        $query->whereNull('air_date_utc')
-                            ->orWhereRaw('unixepoch(air_date_utc) <= ?', [$nowTs])
-                            ->orWhereRaw('strftime("%s", air_date_utc) <= ?', [$nowTs]);
+                    ->where(function ($query) use ($nowTs, $scheduleLatestEp, $airedFrontier, $isReleasing) {
+                        if ($isReleasing && $airedFrontier > 0) {
+                            $query->where(function ($q) use ($airedFrontier) {
+                                $q->whereNull('air_date_utc')->where('number', '<=', $airedFrontier);
+                            });
+                        } else {
+                            $query->whereNull('air_date_utc');
+                        }
+                        $query->orWhereRaw('unixepoch(air_date_utc) <= ?', [$nowTs]);
+                        if ($scheduleLatestEp > 0) {
+                            $query->orWhere('number', '<=', $scheduleLatestEp);
+                        }
                     });
                 if (! empty($arc->end_number)) {
                     $epQuery->where('number', '<=', (int) $arc->end_number);
                 }
                 $episodes = $epQuery->orderBy('number')->limit(200)->get(['id', 'number', 'air_date_utc']);
             }
+            $episodes = $episodes->map(function (object $ep) use ($nowTs, $scheduleLatestEp): object {
+                if ($scheduleLatestEp > 0 && (int) $ep->number <= $scheduleLatestEp && ! empty($ep->air_date_utc)) {
+                    $ts = strtotime((string) $ep->air_date_utc);
+                    if ($ts !== false && $ts > $nowTs) {
+                        $ep->air_date_utc = null;
+                    }
+                }
+
+                return $ep;
+            });
 
             // Outros arcos da mesma obra ou universo (incluindo o próprio para linha cronológica anterior -> atual -> próximo)
             $allWorkArcs = [];
@@ -1050,13 +1231,11 @@ class CatalogGraphController extends Controller
                     ->get()
                     ->toArray();
 
-                $titleRows = DB::table('catalog_entity_titles')
-                    ->where('entity_id', $work->id)
-                    ->select('locale', 'title')
-                    ->get();
-                $englishTitle = $titleRows->firstWhere('locale', 'en')?->title ?? '';
-                $romajiTitle = $titleRows->whereIn('locale', ['und', 'romaji', 'ja-latn'])->first()?->title ?? '';
-                $nativeTitle = $titleRows->whereIn('locale', ['ja', 'zh', 'ko'])->first()?->title ?? '';
+                $resolvedTitles = $this->resolveWorkTitles($work->id);
+                $englishTitle = $resolvedTitles['englishTitle'];
+                $romajiTitle = $resolvedTitles['romajiTitle'];
+                $nativeTitle = $resolvedTitles['nativeTitle'];
+                $titleAliases = $resolvedTitles['titleAliases'];
             }
 
             return json_decode(json_encode([
@@ -1073,6 +1252,7 @@ class CatalogGraphController extends Controller
                 'englishTitle' => $englishTitle ?? '',
                 'romajiTitle' => $romajiTitle ?? '',
                 'nativeTitle' => $nativeTitle ?? '',
+                'titleAliases' => $titleAliases ?? [],
             ]), true);
         });
 
@@ -1093,6 +1273,7 @@ class CatalogGraphController extends Controller
         $englishTitle = $data['englishTitle'] ?? '';
         $romajiTitle = $data['romajiTitle'] ?? '';
         $nativeTitle = $data['nativeTitle'] ?? '';
+        $titleAliases = $data['titleAliases'] ?? [];
 
         if ($request->query('render') === 'blade' || $request->header('HX-Request') || ! $request->expectsJson()) {
             $user = $request->user();
@@ -1118,6 +1299,7 @@ class CatalogGraphController extends Controller
                 'englishTitle' => $englishTitle,
                 'romajiTitle' => $romajiTitle,
                 'nativeTitle' => $nativeTitle,
+                'titleAliases' => $titleAliases,
                 'isLiked' => (bool) ($pref->liked ?? false),
                 'isBookmarked' => (bool) ($pref->bookmarked ?? false),
                 'userScore' => $pref->user_score ?? null,

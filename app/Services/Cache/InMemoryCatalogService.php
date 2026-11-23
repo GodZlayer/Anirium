@@ -3,6 +3,8 @@
 namespace App\Services\Cache;
 
 use App\Support\CatalogSearch;
+use App\Support\LocaleResolver;
+use App\Support\SynopsisTranslator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -13,10 +15,13 @@ class InMemoryCatalogService
     /**
      * Retorna os 3 lançamentos reais do horário atual para o Hero da Home (100% canônico com CatalogEpisodeFeed).
      */
-    public function getHeroFeatured(): array
+    public function getHeroFeatured(bool $allowAdult = false, string $uiLocale = 'en-US'): array
     {
-        return Cache::remember('catalog:home:hero:3latest:canonical:v2', 900, function () {
-            $calendar = $this->getCalendarByDay();
+        $scope = $allowAdult ? 'adult' : 'safe';
+        $normalizedLocale = app(LocaleResolver::class)->normalize($uiLocale) ?? 'en-US';
+
+        return Cache::remember("catalog:home:hero:3latest:canonical:v4:{$scope}:{$normalizedLocale}", 900, function () use ($allowAdult, $normalizedLocale) {
+            $calendar = $this->getCalendarByDay($allowAdult);
             $daysOrder = ['sundays', 'mondays', 'tuesdays', 'wednesdays', 'thursdays', 'fridays', 'saturdays'];
             $currentDayIdx = (int) date('w');
             $nowTimeStr = date('H:i');
@@ -43,32 +48,65 @@ class InMemoryCatalogService
             }
 
             if (count($roll) >= 1) {
-                $selected = array_slice($roll, 0, 3);
+                $nowTs = time();
                 $results = [];
-                foreach ($selected as $it) {
+                foreach ($roll as $it) {
+                    if (count($results) >= 3) {
+                        break;
+                    }
+                    $workId = (string) $it['id'];
+                    $episodeNum = (int) ($it['episode'] ?? 1);
+                    $scheduleLatestEp = (int) (DB::table('catalog_work_schedules')->where('work_id', $workId)->value('latest_episode_num') ?? 0);
+                    $epAirDate = DB::table('catalog_episodes')
+                        ->where('work_id', $workId)
+                        ->where('number', $episodeNum)
+                        ->value('air_date_utc');
+                    if (! empty($epAirDate) && strtotime((string) $epAirDate) > $nowTs && ($scheduleLatestEp <= 0 || $episodeNum > $scheduleLatestEp)) {
+                        $latestAired = DB::table('catalog_episodes')
+                            ->where('work_id', $workId)
+                            ->where(function ($query) use ($nowTs) {
+                                $query->whereNull('air_date_utc')
+                                    ->orWhereRaw('unixepoch(air_date_utc) <= ?', [$nowTs]);
+                            })
+                            ->max('number');
+                        if (! $latestAired || (int) $latestAired < 1) {
+                            continue;
+                        }
+                        $episodeNum = (int) $latestAired;
+                    }
                     $results[] = $this->hydrateWorkPayload(
-                        (string) $it['id'],
+                        $workId,
                         (string) ($it['title'] ?? 'Obra da Temporada'),
                         (string) ($it['format'] ?? 'TV'),
-                        (int) ($it['episode'] ?? 1),
+                        $episodeNum,
                         $it['image'] ?? null,
                         [
                             'airing_time' => $it['time'] ?? null,
-                            'latest_episode' => $it['episode'] ?? 1,
-                        ]
+                            'latest_episode' => $episodeNum,
+                            'is_adult' => (bool) ($it['is_adult'] ?? false),
+                        ],
+                        $normalizedLocale
                     );
                 }
 
-                return $results;
+                if (count($results) >= 1) {
+                    return $results;
+                }
             }
 
-            $rows = DB::table('catalog_work_schedules as s')
+            $rowsQuery = DB::table('catalog_work_schedules as s')
                 ->join('catalog_works as w', 'w.id', '=', 's.work_id')
                 ->join('catalog_work_assets as a', 'a.work_id', '=', 's.work_id')
-                ->whereNotNull('a.image_url')
+                ->whereNotNull('a.image_url');
+
+            if (! $allowAdult) {
+                $rowsQuery->where('w.is_adult', 0);
+            }
+
+            $rows = $rowsQuery
                 ->orderBy('s.latest_episode_num', 'DESC')
                 ->limit(3)
-                ->get(['w.id', 'w.title', 'w.format', 'w.episode_count', 'a.image_url', 's.airing_day', 's.airing_time', 's.latest_episode_num']);
+                ->get(['w.id', 'w.title', 'w.format', 'w.episode_count', 'w.is_adult', 'a.image_url', 's.airing_day', 's.airing_time', 's.latest_episode_num']);
 
             $results = [];
             foreach ($rows as $r) {
@@ -78,7 +116,9 @@ class InMemoryCatalogService
                         'airing_day' => $r->airing_day,
                         'airing_time' => $r->airing_time,
                         'latest_episode' => $r->latest_episode_num,
-                    ]
+                        'is_adult' => (bool) ($r->is_adult ?? false),
+                    ],
+                    $normalizedLocale
                 );
             }
 
@@ -86,9 +126,11 @@ class InMemoryCatalogService
         });
     }
 
-    public function getCalendarByDay(): array
+    public function getCalendarByDay(bool $allowAdult = false): array
     {
-        return Cache::remember('catalog:calendar:by_day:canonical_full', self::TTL_SECONDS, function () {
+        $scope = $allowAdult ? 'adult' : 'safe';
+
+        return Cache::remember("catalog:calendar:by_day:canonical_full:v2:{$scope}", self::TTL_SECONDS, function () use ($allowAdult) {
             $dayMap = [
                 'monday' => 'mondays',
                 'tuesday' => 'tuesdays',
@@ -114,7 +156,7 @@ class InMemoryCatalogService
                 $allItems = [];
                 $page = 1;
                 do {
-                    $feed = $catalogSearch->feed('calendar', $page, false);
+                    $feed = $catalogSearch->feed('calendar', $page, $allowAdult);
                     $pageItems = $feed['items'] ?? [];
                     if (empty($pageItems)) {
                         break;
@@ -152,6 +194,7 @@ class InMemoryCatalogService
                         'format' => $it['format'] ?? 'TV',
                         'time' => $it['airing_time'] ?? 'TBA',
                         'episode' => $it['latest_episode_num'] ?? 1,
+                        'is_adult' => (bool) ($it['is_adult'] ?? false),
                     ];
                 }
 
@@ -177,13 +220,19 @@ class InMemoryCatalogService
                 ];
 
                 foreach ($daysMapping as $key => $dayName) {
-                    $works = DB::table('catalog_work_schedules as s')
+                    $worksQuery = DB::table('catalog_work_schedules as s')
                         ->join('catalog_works as w', 'w.id', '=', 's.work_id')
                         ->join('catalog_work_assets as a', 'a.work_id', '=', 's.work_id')
                         ->where('s.airing_day', $dayName)
-                        ->whereNotNull('a.image_url')
+                        ->whereNotNull('a.image_url');
+
+                    if (! $allowAdult) {
+                        $worksQuery->where('w.is_adult', 0);
+                    }
+
+                    $works = $worksQuery
                         ->orderBy('s.airing_time', 'ASC')
-                        ->get(['w.id', 'w.title', 'w.format', 'a.image_url', 's.airing_time', 's.latest_episode_num']);
+                        ->get(['w.id', 'w.title', 'w.format', 'w.is_adult', 'a.image_url', 's.airing_time', 's.latest_episode_num']);
 
                     $items = [];
                     foreach ($works as $w) {
@@ -194,6 +243,7 @@ class InMemoryCatalogService
                             'format' => $w->format ?? 'ANIME',
                             'time' => $w->airing_time ?? 'TBA',
                             'episode' => $w->latest_episode_num ?? 1,
+                            'is_adult' => (bool) ($w->is_adult ?? false),
                         ];
                     }
                     $calendar[$key] = $items;
@@ -207,11 +257,12 @@ class InMemoryCatalogService
     /**
      * Retorna o catálogo paginado para a visão Explorar com filtros.
      */
-    public function getExploreFeed(string $media = 'all', string $format = 'all', int $page = 1, int $perPage = 600, string $status = 'all', string $sort = 'title'): array
+    public function getExploreFeed(string $media = 'all', string $format = 'all', int $page = 1, int $perPage = 600, string $status = 'all', string $sort = 'title', bool $allowAdult = false): array
     {
-        $cacheKey = "catalog:explore:client_payload:v2:{$media}:{$perPage}";
+        $scope = $allowAdult ? 'adult' : 'safe';
+        $cacheKey = "catalog:explore:client_payload:v3:{$media}:{$perPage}:{$scope}";
 
-        return Cache::remember($cacheKey, self::TTL_SECONDS, function () use ($media, $perPage) {
+        return Cache::remember($cacheKey, self::TTL_SECONDS, function () use ($media, $perPage, $allowAdult) {
             $query = DB::table('catalog_works as w')
                 ->join('catalog_work_assets as a', 'a.work_id', '=', 'w.id')
                 ->whereNotNull('a.image_url');
@@ -220,9 +271,15 @@ class InMemoryCatalogService
                 $query->where('w.media', $media);
             }
 
-            // Filtro rigoroso: Obras no Explore inicial sao estritamente livres de conteudo adulto
-            $query->where('w.is_adult', 0)
-                ->whereIn('w.format', ['TV', 'MOVIE', 'OVA', 'ONA', 'SPECIAL'])
+            if (! $allowAdult) {
+                $query->where('w.is_adult', 0);
+            }
+
+            $allowedFormats = $allowAdult
+                ? ['TV', 'MOVIE', 'OVA', 'ONA', 'SPECIAL', 'HENTAI']
+                : ['TV', 'MOVIE', 'OVA', 'ONA', 'SPECIAL'];
+
+            $query->whereIn('w.format', $allowedFormats)
                 ->orderBy('w.id', 'ASC')
                 ->limit($perPage);
 
@@ -255,7 +312,7 @@ class InMemoryCatalogService
         });
     }
 
-    public function hydrateWorkPayload(string $workId, string $title, ?string $format, ?int $episodes, ?string $imageUrl = null, array $extra = []): array
+    public function hydrateWorkPayload(string $workId, string $title, ?string $format, ?int $episodes, ?string $imageUrl = null, array $extra = [], string $uiLocale = 'en-US'): array
     {
         $translations = DB::table('catalog_translations')
             ->where('entity_id', $workId)
@@ -267,7 +324,7 @@ class InMemoryCatalogService
             ?? $title;
 
         $titleNative = $translations->get('title')?->firstWhere('locale', 'ja')?->value ?? null;
-        $synopsis = $translations->get('synopsis')?->firstWhere('locale', 'en')?->value ?? 'Sinopse oficial em catalogação.';
+        $synopsis = app(SynopsisTranslator::class)->resolveForWork($workId, $uiLocale) ?? 'Sinopse oficial em catalogação.';
 
         $studio = DB::table('catalog_work_studios as ws')
             ->join('catalog_studios as s', 'ws.studio_id', '=', 's.id')

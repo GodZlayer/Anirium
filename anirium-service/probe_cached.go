@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"os"
 	"strings"
 	"time"
 )
@@ -15,14 +17,18 @@ func probeCachedInput(parent context.Context, cache *mediaInputCache, source str
 	}
 	// Discovery's deadline includes acquiring the progressive input. An
 	// unavailable peer must not hold an inventory worker for half an hour.
-	ctx, cancel := context.WithTimeout(parent, 90*time.Second)
+	probeTimeout := 14 * time.Second
+	if os.Getenv("ANIRIUM_E2E_CHILD") == "1" {
+		probeTimeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(parent, probeTimeout)
 	defer cancel()
 	path, release, err := cache.acquire(ctx, source, 0)
 	if err != nil {
 		return parsed, err
 	}
 	defer release()
-	output, err := mediaCommandContext(ctx, mediaTool("ffprobe"), "-v", "error", "-show_streams", "-show_format", "-of", "json", path).Output()
+	output, err := mediaCommandContext(ctx, mediaTool("ffprobe"), "-v", "error", "-show_streams", "-show_format", "-show_chapters", "-of", "json", path).Output()
 	if err != nil {
 		return parsed, err
 	}
@@ -60,6 +66,51 @@ func extractCachedSubtitleWindow(parent context.Context, cache *mediaInputCache,
 	return content, err
 }
 
+type partialSubtitleError struct {
+	content string
+}
+
+func (e *partialSubtitleError) Error() string {
+	return "partial subtitle recovered"
+}
+
+func extractCachedSubtitleSpan(parent context.Context, cache *mediaInputCache, source string, streamIndex int, start, span float64) (string, error) {
+	if cache == nil {
+		return "", fmt.Errorf("media cache unavailable")
+	}
+	blockStart := math.Floor(start/60) * 60
+	if content, ok := cache.cachedSubtitleWindow(subtitleWindowKey{source: source, stream: streamIndex, start: blockStart}); ok {
+		if math.Abs(start-blockStart) < 0.05 {
+			return content, nil
+		}
+		if normalized, normErr := normalizeWebVTTWindow(content, start-blockStart, span); normErr == nil {
+			return normalized, nil
+		}
+	}
+	if content, ok := cache.cachedSubtitleWindow(subtitleWindowKey{source: source, stream: streamIndex, start: -1}); ok {
+		if normalized, err := normalizeWebVTTWindow(content, start, span); err == nil {
+			return normalized, nil
+		}
+	}
+	ctx, cancel := context.WithTimeout(parent, 12*time.Second)
+	defer cancel()
+	path, release, err := cache.acquire(ctx, source, 0)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	args := subtitleWindowSpanExtractionArgs(path, streamIndex, start, span)
+	output, err := mediaCommandContext(ctx, mediaTool("ffmpeg"), args...).Output()
+	if err != nil {
+		return "", err
+	}
+	text := string(output)
+	if !strings.HasPrefix(text, "WEBVTT") {
+		return "", fmt.Errorf("invalid embedded subtitle")
+	}
+	return normalizeWebVTTWindow(text, start, span)
+}
+
 func extractSubtitleWindowInput(parent context.Context, cache *mediaInputCache, source string, streamIndex int, start float64) (string, error) {
 	started := time.Now()
 	// Only stage/index/timing are recorded; source and tool stderr may contain credentials.
@@ -78,11 +129,12 @@ func extractSubtitleWindowInput(parent context.Context, cache *mediaInputCache, 
 		record("vtt", "cached")
 		return content, nil
 	}
-	extractionBudget := 90 * time.Second
+	extractionBudget := 30 * time.Second
 	if start < 0 {
-		// A complete embedded track may require scanning the entire torrent.
-		// Its job belongs to playback, not to one short HTTP observation.
-		extractionBudget = 15 * time.Minute
+		// Legenda de arquivo inteiro não pode sequestrar a rede nem gastar 15 minutos travando o stream
+		extractionBudget = 10 * time.Second
+	} else if os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
+		extractionBudget = 20 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(parent, extractionBudget)
 	defer cancel()
@@ -104,6 +156,15 @@ func extractSubtitleWindowInput(parent context.Context, cache *mediaInputCache, 
 	}
 	output, err := mediaCommandContext(ctx, mediaTool("ffmpeg"), args...).Output()
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded && start >= 0 && os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
+			partial := string(output)
+			if strings.HasPrefix(partial, "WEBVTT") && strings.Contains(partial, "-->") {
+				if normalized, normErr := normalizeWebVTT(partial, start); normErr == nil {
+					appendLog(fmt.Sprintf("Subtitle extraction partial_recovered stream=%d bytes=%d normalized_cues=%d window_start=%.3f", streamIndex, len(output), strings.Count(normalized, "-->"), start))
+					return normalized, &partialSubtitleError{content: normalized}
+				}
+			}
+		}
 		appendLog(fmt.Sprintf("Subtitle extraction output_bytes=%d stream=%d", len(output), streamIndex))
 		appendLog(fmt.Sprintf("Subtitle extraction failure_category=%s stream=%d", mediaFailureCategory(err), streamIndex))
 		outcome := "failed"
@@ -137,6 +198,8 @@ func extractSubtitleWindowInput(parent context.Context, cache *mediaInputCache, 
 		appendLog(fmt.Sprintf("Subtitle extraction stream=%d normalized_cues=%d window_start=%.3f", streamIndex, strings.Count(text, "-->"), start))
 	}
 	record("vtt", "ready")
-	cache.rememberSubtitleWindow(windowKey, text)
+	if strings.Contains(text, "-->") {
+		cache.rememberSubtitleWindow(windowKey, text)
+	}
 	return text, nil
 }

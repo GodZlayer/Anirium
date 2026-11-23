@@ -59,6 +59,8 @@ class CatalogCandidateCommand extends Command implements Isolatable
             }
             $result = Process::path(base_path())->env([
                 'CATALOG_IDENTITY_DATABASE' => DB::connection()->getDatabaseName(),
+                'CATALOG_SQLITE_JOURNAL_MODE' => (string) config('database.connections.sqlite.journal_mode', 'WAL'),
+                'CATALOG_SQLITE_BUSY_TIMEOUT' => (string) config('database.connections.sqlite.busy_timeout', 30000),
                 'CATALOG_HEAP_MB' => (string) $heap,
                 'MAL_CLIENT_ID' => (string) config('services.myanimelist.client_id', ''),
                 'MAL_DETAIL_BUDGET' => (string) config('services.myanimelist.detail_budget', 200),

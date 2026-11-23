@@ -11,6 +11,10 @@ func supportsStremioSubtitleResource(manifest ProviderManifest, mediaType, video
 	if videoID == "" || (mediaType != "movie" && mediaType != "series") {
 		return false
 	}
+	return supportsStremioResource(manifest, "subtitles", mediaType, videoID)
+}
+
+func supportsStremioResource(manifest ProviderManifest, wanted, mediaType, videoID string) bool {
 	for _, raw := range manifest.Resources {
 		var name string
 		types, prefixes := manifest.Types, manifest.IDPrefixes
@@ -25,7 +29,7 @@ func supportsStremioSubtitleResource(manifest ProviderManifest, mediaType, video
 			}
 			name, types, prefixes = resource.Name, resource.Types, resource.IDPrefixes
 		}
-		if name != "subtitles" || !containsString(types, mediaType) {
+		if name != wanted || !containsString(types, mediaType) {
 			continue
 		}
 		if len(prefixes) == 0 {

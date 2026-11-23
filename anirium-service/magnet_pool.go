@@ -8,6 +8,7 @@ func pooledMagnets(results []ProviderSearchResult) []string {
 	hashes := []string{}
 	values := map[string]url.Values{}
 	announcements := map[string]map[string]map[string]bool{}
+	conflicts := map[string]bool{}
 	for _, result := range results {
 		hash, valid := normalizedMagnetHash(result.Magnet)
 		if !valid {
@@ -24,7 +25,16 @@ func pooledMagnets(results []ProviderSearchResult) []string {
 			if name := query.Get("dn"); name != "" {
 				values[hash].Set("dn", name)
 			}
+			if selected := query.Get("so"); selected != "" {
+				values[hash].Set("so", selected)
+			}
 			announcements[hash] = map[string]map[string]bool{}
+		}
+		if selected := query.Get("so"); selected != "" {
+			if previous := values[hash].Get("so"); previous != "" && previous != selected {
+				conflicts[hash] = true
+			}
+			values[hash].Set("so", selected)
 		}
 		// Trackers, web seeds and explicit peers are independent discovery
 		// hints. Deduplicating the hash must not discard any provider's hints.
@@ -42,6 +52,9 @@ func pooledMagnets(results []ProviderSearchResult) []string {
 	}
 	magnets := make([]string, 0, len(hashes))
 	for _, hash := range hashes {
+		if conflicts[hash] {
+			continue
+		}
 		magnets = append(magnets, "magnet:?"+values[hash].Encode())
 	}
 	return magnets

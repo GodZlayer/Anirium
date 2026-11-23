@@ -41,13 +41,39 @@ func decodePlaybackPrepare(body io.Reader) (PlaybackPrepareRequest, error) {
 	input.Title = strings.TrimSpace(input.Title)
 	input.TitleEnglish = strings.TrimSpace(input.TitleEnglish)
 	input.TitleRomaji = strings.TrimSpace(input.TitleRomaji)
+	input.TitleNative = strings.TrimSpace(input.TitleNative)
+	if len(input.Aliases) > 32 {
+		input.Aliases = input.Aliases[:32]
+	}
+	cleanAliases := make([]string, 0, len(input.Aliases))
+	for _, alias := range input.Aliases {
+		alias = strings.TrimSpace(alias)
+		if alias == "" {
+			continue
+		}
+		if len([]rune(alias)) > 300 || strings.ContainsAny(alias, "\x00\r\n") {
+			return input, fmt.Errorf("invalid title")
+		}
+		cleanAliases = append(cleanAliases, alias)
+	}
+	input.Aliases = cleanAliases
+	if len(input.Token) > 8192 || len(input.DeviceID) > 256 {
+		return input, fmt.Errorf("invalid credential size")
+	}
+	if input.WorkID != "" || input.EpisodeID != "" {
+		input.WorkID, input.EpisodeID = strings.ToLower(input.WorkID), strings.ToLower(input.EpisodeID)
+		if !catalogUUID.MatchString(input.WorkID) || (input.EpisodeID != "" && !catalogUUID.MatchString(input.EpisodeID)) {
+			return input, fmt.Errorf("invalid catalog identity")
+		}
+		return input, nil
+	}
 	if input.Episode < 1 || input.Season < 1 {
 		return input, fmt.Errorf("positive episode and season required")
 	}
-	if input.Title == "" && input.TitleEnglish == "" && input.TitleRomaji == "" {
+	if input.Title == "" && input.TitleEnglish == "" && input.TitleRomaji == "" && input.TitleNative == "" && len(input.Aliases) == 0 {
 		return input, fmt.Errorf("title required")
 	}
-	for _, title := range []string{input.Title, input.TitleEnglish, input.TitleRomaji} {
+	for _, title := range []string{input.Title, input.TitleEnglish, input.TitleRomaji, input.TitleNative} {
 		if len([]rune(title)) > 300 || strings.ContainsAny(title, "\x00\r\n") {
 			return input, fmt.Errorf("invalid title")
 		}

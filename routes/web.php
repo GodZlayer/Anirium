@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AgeVerificationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogGraphController;
 use App\Http\Controllers\CatalogLibraryController;
@@ -57,6 +58,17 @@ Route::get('/api/entity/preferences', [TelemetryDeviceController::class, 'getEnt
 Route::post('/api/entity/comments', [TelemetryDeviceController::class, 'addDiscussionComment'])->name('entity.add_comment');
 Route::get('/api/entity/comments/{type}/{id}', [TelemetryDeviceController::class, 'getEntityDiscussions'])->name('entity.get_comments');
 Route::post('/api/account/settings', [TelemetryDeviceController::class, 'updateAccountSettings'])->name('account.settings');
+
+// Verificação de Idade (+18) & Filtro Adulto Seguro
+Route::get('/auth/google/verify-age', [AgeVerificationController::class, 'redirectToGoogle'])->name('age_verification.google.redirect');
+Route::get('/api/account/age-verification/status', [AgeVerificationController::class, 'status'])->middleware('throttle:60,1')->name('age_verification.status');
+Route::post('/api/account/age-verification/google', [AgeVerificationController::class, 'verifyWithGoogle'])->middleware('throttle:10,1')->name('age_verification.google.verify');
+Route::post('/api/account/age-verification/request', [AgeVerificationController::class, 'submitRequest'])->middleware('throttle:5,10')->name('age_verification.request');
+Route::get('/api/admin/age-verifications', [AgeVerificationController::class, 'adminIndex'])->middleware('throttle:60,1')->name('admin.age_verification.index');
+Route::post('/api/admin/age-verifications/{ageVerificationRequest}/approve', [AgeVerificationController::class, 'adminApprove'])->middleware('throttle:30,1')->name('admin.age_verification.approve');
+Route::post('/api/admin/age-verifications/{ageVerificationRequest}/reject', [AgeVerificationController::class, 'adminReject'])->middleware('throttle:30,1')->name('admin.age_verification.reject');
+Route::post('/api/admin/age-verifications/users/{user}/revoke', [AgeVerificationController::class, 'adminRevoke'])->middleware('throttle:30,1')->name('admin.age_verification.revoke');
+Route::get('/api/catalog/adult-shard/{kind}', [CatalogGraphController::class, 'adultShard'])->whereIn('kind', ['work', 'manga'])->middleware('throttle:120,1')->name('catalog.adult_shard');
 
 // Gerenciamento de Addons (Anirium+ & Comunidade / Stremio)
 Route::get('/api/addons', [TelemetryDeviceController::class, 'listUserAddons'])->name('addons.list');

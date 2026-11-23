@@ -14,7 +14,7 @@ class CatalogSearchController extends Controller
         $input = $request->validate(['view' => ['required', 'in:home,calendar'], 'page' => ['sometimes', 'integer', 'min:1', 'max:1000000'], 'adult' => ['sometimes', 'boolean']]);
         try {
             return response()->json($catalog->feed($input['view'], (int) ($input['page'] ?? 1),
-                (bool) $request->user()?->adult_content_enabled && $request->boolean('adult')));
+                (bool) $request->user()?->canAccessAdultContent() && $request->boolean('adult')));
         } catch (CatalogUnavailable $exception) {
             return response()->json(['error' => 'catalog_feed_unavailable'], 503);
         }
@@ -23,7 +23,7 @@ class CatalogSearchController extends Controller
     public function work(Request $request, string $reference, CatalogSearch $catalog): JsonResponse
     {
         try {
-            $work = $catalog->resolve($reference, (bool) $request->user()?->adult_content_enabled);
+            $work = $catalog->resolve($reference, (bool) $request->user()?->canAccessAdultContent());
 
             return $work ? response()->json($work) : response()->json(['error' => 'work_not_found'], 404);
         } catch (CatalogUnavailable $exception) {
@@ -47,7 +47,7 @@ class CatalogSearchController extends Controller
         ]);
         try {
             return response()->json($catalog->search($input['q'] ?? '', $input['media'] ?? 'anime', (int) ($input['page'] ?? 1),
-                (bool) $request->user()?->adult_content_enabled && $request->boolean('adult'), $input['universe'] ?? null, $input));
+                (bool) $request->user()?->canAccessAdultContent() && $request->boolean('adult'), $input['universe'] ?? null, $input));
         } catch (CatalogUnavailable $exception) {
             return response()->json(['error' => 'catalog_search_unavailable'], 503);
         } catch (\Throwable $exception) {

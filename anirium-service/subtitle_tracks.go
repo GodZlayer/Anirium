@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"math"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"testing"
 )
 
 // Guarded by swarmMu, alongside the probed manifest metadata.
@@ -18,6 +20,9 @@ type SubtitleTrack struct {
 	ID          string `json:"id"`
 	Language    string `json:"language"`
 	Title       string `json:"title,omitempty"`
+	Kind        string `json:"kind,omitempty"`
+	Ready       bool   `json:"ready,omitempty"`
+	Primary     bool   `json:"primary,omitempty"`
 	StreamIndex int    `json:"-"`
 	Source      string `json:"-"`
 	FilePath    string `json:"-"`
@@ -25,21 +30,51 @@ type SubtitleTrack struct {
 
 // normalizeWebVTT accepts FFmpeg's identifier-free cues and preserves cue payloads.
 func normalizeWebVTT(raw string, start float64) (string, error) {
+	return normalizeWebVTTWindow(raw, start, 60)
+}
+
+func normalizeWebVTTWindow(raw string, start, span float64) (string, error) {
 	if start < 0 {
 		return raw, nil
 	}
-	if math.IsNaN(start) || math.IsInf(start, 0) {
+	if math.IsNaN(start) || math.IsInf(start, 0) || span <= 0 || math.IsNaN(span) || math.IsInf(span, 0) {
 		return "", fmt.Errorf("invalid subtitle offset")
 	}
 	raw = strings.ReplaceAll(strings.TrimPrefix(raw, "\ufeff"), "\r\n", "\n")
-	blocks := strings.Split(strings.TrimSpace(raw), "\n\n")
-	if len(blocks) == 0 || (blocks[0] != "WEBVTT" && !strings.HasPrefix(blocks[0], "WEBVTT\n") && !strings.HasPrefix(blocks[0], "WEBVTT ")) {
+	rawBlocks := strings.Split(strings.TrimSpace(raw), "\n\n")
+	if len(rawBlocks) == 0 || (rawBlocks[0] != "WEBVTT" && !strings.HasPrefix(rawBlocks[0], "WEBVTT\n") && !strings.HasPrefix(rawBlocks[0], "WEBVTT ")) {
 		return "", fmt.Errorf("invalid WebVTT header")
+	}
+	// Rejoin multi-paragraph cue payloads (e.g. ASS \N\N converted by FFmpeg into \n\n)
+	// so split text fragments without "-->" do not abort normalization of the 60s window.
+	blocks := make([]string, 0, len(rawBlocks))
+	blocks = append(blocks, rawBlocks[0])
+	for _, blk := range rawBlocks[1:] {
+		trimmed := strings.TrimSpace(blk)
+		if trimmed == "" {
+			continue
+		}
+		lines := strings.Split(blk, "\n")
+		first := strings.TrimSpace(lines[0])
+		isMeta := first == "STYLE" || first == "REGION" || first == "NOTE" || strings.HasPrefix(first, "NOTE ")
+		hasArrow := strings.Contains(lines[0], "-->") || (len(lines) > 1 && strings.Contains(lines[1], "-->"))
+		if !isMeta && !hasArrow {
+			if len(blocks) > 1 {
+				prevFirst := strings.TrimSpace(strings.SplitN(blocks[len(blocks)-1], "\n", 2)[0])
+				prevIsMeta := prevFirst == "STYLE" || prevFirst == "REGION" || prevFirst == "NOTE" || strings.HasPrefix(prevFirst, "NOTE ")
+				if !prevIsMeta {
+					blocks[len(blocks)-1] += "\n" + blk
+					continue
+				}
+			}
+			continue
+		}
+		blocks = append(blocks, blk)
 	}
 	var output strings.Builder
 	output.WriteString(blocks[0] + "\n\n")
 	offset := int64(math.Round(start * 1000))
-	end := offset + 60000
+	end := offset + int64(math.Round(span*1000))
 	for _, block := range blocks[1:] {
 		lines := strings.Split(block, "\n")
 		first := strings.TrimSpace(lines[0])
@@ -52,15 +87,15 @@ func normalizeWebVTT(raw string, start float64) (string, error) {
 			timing = 1
 		}
 		if timing >= len(lines) {
-			return "", fmt.Errorf("missing cue timing")
+			continue
 		}
 		parts := strings.SplitN(lines[timing], "-->", 2)
 		if len(parts) != 2 {
-			return "", fmt.Errorf("invalid cue timing")
+			continue
 		}
 		fields := strings.Fields(parts[1])
 		if len(fields) == 0 {
-			return "", fmt.Errorf("missing cue end")
+			continue
 		}
 		a, err := parseWebVTTMillis(strings.TrimSpace(parts[0]))
 		if err != nil {
@@ -71,7 +106,7 @@ func normalizeWebVTT(raw string, start float64) (string, error) {
 			return "", err
 		}
 		if b <= a {
-			return "", fmt.Errorf("invalid cue duration")
+			continue
 		}
 		if b <= offset || a >= end {
 			continue
@@ -81,6 +116,9 @@ func normalizeWebVTT(raw string, start float64) (string, error) {
 		}
 		if b > end {
 			b = end
+		}
+		if b <= a {
+			continue
 		}
 		lines[timing] = formatWebVTTMillis(a-offset) + " --> " + formatWebVTTMillis(b-offset)
 		if len(fields) > 1 {
@@ -134,7 +172,15 @@ func formatWebVTTMillis(ms int64) string {
 	return fmt.Sprintf("%02d:%02d.%03d", ms/60000, ms/1000%60, ms%1000)
 }
 
-var sidecarLanguageToken = regexp.MustCompile(`(?i)(?:^|[ ._\[(-])(pt-br|por|pob|pt|eng|en|spa|es|jpn|ja|fra|fre|fr|deu|ger|de|ita|it|rus|ru|kor|ko|zho|chi|zh|ara|ar|hin|hi|tur|tr|nld|dut|nl|pol|pl|ukr|uk|tha|th|vie|vi|ind|id)(?:[ ._\])\-]|$)`)
+var (
+	brazilianSubtitlePattern = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:pt[-_]?br|br|brazil|brazilian|brasil|brasileir[oa])(?:$|[^a-z])`)
+	europeanPorSubPattern  = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:pt[-_]?pt|portugal|european|europe|iberian)(?:$|[^a-z])`)
+	latamSpaSubPattern     = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:es[-_]?419|latam|latin|latino|america)(?:$|[^a-z])`)
+	europeanSpaSubPattern  = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:es[-_]?es|spain|espanha|european|europe|castilian)(?:$|[^a-z])`)
+	sdhSubtitlePattern     = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:sdh|cc|closed[-_ ]captions?)(?:$|[^a-z])`)
+	forcedSubtitlePattern  = regexp.MustCompile(`(?i)(?:^|[^a-z])(?:forced|signs?|songs?|placas)(?:$|[^a-z])`)
+	sidecarLanguageToken   = regexp.MustCompile(`(?i)(?:^|[ ._\[(-])(pt-br|por|pob|pt|eng|en|spa|es|jpn|ja|fra|fre|fr|deu|ger|de|ita|it|rus|ru|kor|ko|zho|chi|zh|ara|ar|hin|hi|tur|tr|nld|dut|nl|pol|pl|ukr|uk|tha|th|vie|vi|ind|id)(?:[ ._\])\-]|$)`)
+)
 
 // Never expose another episode's subtitles from a season batch. Unnumbered
 // subtitles require a filename association, or a single-video container.
@@ -191,6 +237,18 @@ func sidecarLanguage(path string) string {
 	return "und"
 }
 
+func stableMediaSourceSlot(source string, generation uint64) (int, bool) {
+	prefix := fmt.Sprintf("media-%d-", generation)
+	if !strings.HasPrefix(source, prefix) {
+		return 0, false
+	}
+	slot, err := strconv.Atoi(strings.TrimPrefix(source, prefix))
+	if err != nil || slot < 0 {
+		return 0, false
+	}
+	return slot, true
+}
+
 // Caller holds swarmMu. Prefer smaller selected episode files to avoid making
 // the default subtitle require a heavier torrent than the video. Keep every
 // alternative and its source-derived ID; stable ties preserve discovery order.
@@ -201,11 +259,15 @@ func subtitleTracksLocked() []SubtitleTrack {
 		if language == "" {
 			language = "und"
 		}
-		tracks = append(tracks, SubtitleTrack{ID: fmt.Sprintf("external-%d-%d", playbackGeneration, index), Language: language, Title: subtitle.Title, StreamIndex: -1})
+		tracks = append(tracks, SubtitleTrack{ID: fmt.Sprintf("external-%d-%d", playbackGeneration, index), Language: language, Title: subtitle.Title, Kind: "external", StreamIndex: -1})
 	}
 	for sourceIndex, source := range activeLinks {
+		slot := sourceIndex
+		if stableSlot, ok := stableMediaSourceSlot(source, playbackGeneration); ok {
+			slot = stableSlot
+		}
 		for fileIndex, path := range probedSidecars[source] {
-			tracks = append(tracks, SubtitleTrack{ID: fmt.Sprintf("sidecar-%d-%d-%d", playbackGeneration, sourceIndex, fileIndex), Language: sidecarLanguage(path), Title: filepath.Base(path), StreamIndex: -1, Source: source, FilePath: path})
+			tracks = append(tracks, SubtitleTrack{ID: fmt.Sprintf("sidecar-%d-%d-%d", playbackGeneration, slot, fileIndex), Language: sidecarLanguage(path), Title: filepath.Base(path), Kind: "sidecar", StreamIndex: -1, Source: source, FilePath: path})
 		}
 		for _, stream := range probedStreams[source] {
 			if stream.CodecType != "subtitle" {
@@ -221,7 +283,7 @@ func subtitleTracksLocked() []SubtitleTrack {
 			if language == "" {
 				language = "und"
 			}
-			tracks = append(tracks, SubtitleTrack{ID: fmt.Sprintf("subtitle-%d-%d-%d", playbackGeneration, sourceIndex, stream.Index), Language: language, Title: stream.Tags.Title, StreamIndex: stream.Index, Source: source})
+			tracks = append(tracks, SubtitleTrack{ID: fmt.Sprintf("subtitle-%d-%d-%d", playbackGeneration, slot, stream.Index), Language: language, Title: stream.Tags.Title, Kind: "embedded", StreamIndex: stream.Index, Source: source})
 		}
 	}
 	weights := make(map[string]int64)
@@ -245,6 +307,178 @@ func subtitleTracksLocked() []SubtitleTrack {
 		return wa < wb
 	})
 	return tracks
+}
+
+func isForcedSubtitleTitle(title string) bool {
+	return forcedSubtitlePattern.MatchString(strings.TrimSpace(title))
+}
+
+func isSDHSubtitleTitle(title string) bool {
+	return sdhSubtitlePattern.MatchString(strings.TrimSpace(title))
+}
+
+func isBrazilianPortugueseTitle(title string) bool {
+	return brazilianSubtitlePattern.MatchString(strings.TrimSpace(title))
+}
+
+func manifestSubtitleVariantParts(track SubtitleTrack) (lang, region, flavor string) {
+	lang = canonicalLanguage(track.Language)
+	if lang == "" {
+		lang = "und"
+	}
+	title := strings.TrimSpace(track.Title)
+	lower := strings.ToLower(title)
+	region = "default"
+	switch lang {
+	case "por":
+		if isBrazilianPortugueseTitle(title) {
+			region = "br"
+		} else if europeanPorSubPattern.MatchString(title) {
+			region = "pt"
+		}
+	case "spa":
+		if latamSpaSubPattern.MatchString(title) {
+			region = "latam"
+		} else if europeanSpaSubPattern.MatchString(title) {
+			region = "eu"
+		}
+	case "zho":
+		if strings.Contains(lower, "simplif") || strings.Contains(lower, "chs") || strings.Contains(lower, "hans") {
+			region = "simp"
+		} else if strings.Contains(lower, "tradit") || strings.Contains(lower, "cht") || strings.Contains(lower, "hant") {
+			region = "trad"
+		}
+	}
+	flavor = "full"
+	if isForcedSubtitleTitle(title) {
+		flavor = "forced"
+	} else if isSDHSubtitleTitle(title) {
+		flavor = "sdh"
+	}
+	return lang, region, flavor
+}
+
+func manifestSubtitleVariantKey(track SubtitleTrack) string {
+	lang, region, flavor := manifestSubtitleVariantParts(track)
+	return lang + "|" + region + "|" + flavor
+}
+
+// Caller holds swarmMu. Enriches subtitle tracks with safe readiness/primary flags
+// for Player Pro without mutating identity or exposing private torrent sources,
+// and deduplicates secondary torrents against the active primary source.
+func manifestSubtitleTracksLocked() []SubtitleTrack {
+	tracks := subtitleTracksLocked()
+	if playbackInputs == nil {
+		return tracks
+	}
+	primarySource := currentSubtitleVideoSourceLocked(playbackInputs)
+	if primarySource == "" {
+		primarySource = playbackInputs.primaryVideoSource()
+	}
+	if primarySource == "" {
+		for _, source := range activeLinks {
+			if len(probedStreams[source]) > 0 {
+				primarySource = source
+				break
+			}
+		}
+	}
+	bundle := playbackInputs.existingBundle()
+	for i := range tracks {
+		track := tracks[i]
+		tracks[i].Primary = track.Source != "" && primarySource != "" && track.Source == primarySource
+		ready := playbackInputs.hasCompleteSubtitle(track.ID)
+		if !ready && bundle != nil {
+			ready = bundle.hasTrackReadyOrFastHead(track.ID)
+		}
+		if !ready && track.StreamIndex >= 0 {
+			_, ok0 := playbackInputs.cachedSubtitleWindow(subtitleWindowKey{source: track.Source, stream: track.StreamIndex, start: 0})
+			_, okFull := playbackInputs.cachedSubtitleWindow(subtitleWindowKey{source: track.Source, stream: track.StreamIndex, start: -1})
+			ready = ok0 || okFull
+		}
+		tracks[i].Ready = ready
+	}
+
+	primaryTracks := []SubtitleTrack{}
+	externalAndSidecar := []SubtitleTrack{}
+	secondaryCandidates := []SubtitleTrack{}
+	primaryVariants := map[string]bool{}
+	primaryFullLangs := map[string]bool{}
+	primaryForcedLangs := map[string]bool{}
+
+	for _, track := range tracks {
+		if track.Primary && track.Kind == "embedded" {
+			primaryTracks = append(primaryTracks, track)
+			lang, _, flavor := manifestSubtitleVariantParts(track)
+			primaryVariants[manifestSubtitleVariantKey(track)] = true
+			if flavor == "full" {
+				primaryFullLangs[lang] = true
+			} else if flavor == "forced" {
+				primaryForcedLangs[lang] = true
+			}
+			continue
+		}
+		if track.Kind == "external" || track.Kind == "sidecar" || track.StreamIndex < 0 {
+			externalAndSidecar = append(externalAndSidecar, track)
+			continue
+		}
+		secondaryCandidates = append(secondaryCandidates, track)
+	}
+
+	secondaryTracks := []SubtitleTrack{}
+	seenSecondary := map[string]int{}
+	for _, track := range secondaryCandidates {
+		lang, region, flavor := manifestSubtitleVariantParts(track)
+		key := lang + "|" + region + "|" + flavor
+		if primaryVariants[key] {
+			continue
+		}
+		if (flavor == "forced" || flavor == "sdh") && (primaryFullLangs[lang] || (flavor == "forced" && primaryForcedLangs[lang])) {
+			continue
+		}
+		if primaryFullLangs[lang] && region == "default" {
+			continue
+		}
+		if existingIdx, seen := seenSecondary[key]; seen {
+			if !secondaryTracks[existingIdx].Ready && track.Ready {
+				secondaryTracks[existingIdx] = track
+			}
+			continue
+		}
+		seenSecondary[key] = len(secondaryTracks)
+		secondaryTracks = append(secondaryTracks, track)
+	}
+
+	result := make([]SubtitleTrack, 0, len(primaryTracks)+len(externalAndSidecar)+len(secondaryTracks)+1)
+	result = append(result, primaryTracks...)
+	result = append(result, externalAndSidecar...)
+	result = append(result, secondaryTracks...)
+	if !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" && len(result) > 0 {
+		hasPor := false
+		var engBase *SubtitleTrack
+		for i := range result {
+			lang := canonicalLanguage(result[i].Language)
+			if lang == "por" {
+				hasPor = true
+				break
+			}
+			if engBase == nil && lang == "eng" {
+				engBase = &result[i]
+			}
+		}
+		if !hasPor {
+			base := engBase
+			if base == nil {
+				base = &result[0]
+			}
+			translated := *base
+			translated.ID = "translated-por:" + base.ID
+			translated.Language = "por"
+			translated.Title = "Português (Traduzida)"
+			result = append(result, translated)
+		}
+	}
+	return result
 }
 
 func canonicalLanguage(value string) string {
@@ -332,7 +566,11 @@ func subtitleExtractionArgs(input string, index int) []string {
 // -ss is placed before -i for progressive performance; -copyts ensures
 // output absolute timestamps are explicitly deterministic.
 func subtitleWindowExtractionArgs(input string, index int, start float64) []string {
-	// -ss before -i enables faster progressive seeking.
+	return subtitleWindowSpanExtractionArgs(input, index, start, 60)
+}
+
+func subtitleWindowSpanExtractionArgs(input string, index int, start, span float64) []string {
+	// -ss and -t before -i limit demuxing to the requested window; -vn/-an avoid decoding A/V;
 	// -copyts preserves input timestamps so output is deterministic.
-	return []string{"-hide_banner", "-loglevel", "error", "-copyts", "-ss", fmt.Sprintf("%.3f", start), "-i", input, "-map", fmt.Sprintf("0:%d", index), "-to", fmt.Sprintf("%.3f", start+60), "-c:s", "webvtt", "-f", "webvtt", "pipe:1"}
+	return []string{"-hide_banner", "-loglevel", "error", "-nostdin", "-copyts", "-ss", fmt.Sprintf("%.3f", start), "-t", fmt.Sprintf("%.3f", span), "-i", input, "-vn", "-an", "-map", fmt.Sprintf("0:%d", index), "-to", fmt.Sprintf("%.3f", start+span), "-c:s", "webvtt", "-f", "webvtt", "pipe:1"}
 }

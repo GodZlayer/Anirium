@@ -1,8 +1,16 @@
+import { READ_PAGE_SIZE, forEachKeysetPage } from "./sql-registry-connection.mjs";
+
 const relationKey=row=>JSON.stringify([row.from_work_id,row.to_work_id,row.relation_type,row.provider]);
 
 export function planWorkRelations(db,rows,works) {
   const existing=new Set();
-  for (const row of db.prepare("SELECT * FROM catalog_work_relations").iterate()) existing.add(relationKey(row));
+  forEachKeysetPage(
+    db,
+    `SELECT rowid AS _cursor,* FROM catalog_work_relations ORDER BY rowid LIMIT ${READ_PAGE_SIZE}`,
+    `SELECT rowid AS _cursor,* FROM catalog_work_relations WHERE rowid>? ORDER BY rowid LIMIT ${READ_PAGE_SIZE}`,
+    "_cursor",
+    row => existing.add(relationKey(row))
+  );
   const plan=[];
   for (const work of rows) {
     const relations=JSON.parse(work.relations_v2_json || "[]");

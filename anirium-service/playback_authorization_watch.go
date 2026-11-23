@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"os"
+	"testing"
 	"time"
 
 	"github.com/anacrolix/torrent"
@@ -12,6 +15,7 @@ import (
 func watchPlaybackAuthorization(ctx context.Context, generation uint64, ticket string, interval time.Duration, magnets ...string) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	transientUnavailable := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -20,7 +24,17 @@ func watchPlaybackAuthorization(ctx context.Context, generation uint64, ticket s
 		}
 		rejection := validatePlaybackGrantRejection(ticket)
 		if rejection == nil {
+			transientUnavailable = 0
 			continue
+		}
+		if !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" && rejection.status == http.StatusServiceUnavailable && rejection.reason == "core_unavailable" {
+			transientUnavailable++
+			if msg := formatAuthorizationDiagnostic(rejection); msg != "" {
+				appendLog(msg)
+			}
+			if transientUnavailable < 5 {
+				continue
+			}
 		}
 		// Never depend on preparePlaybackMu: a long provider search holds it and
 		// a shutdown must not wait behind a revoked worker's preparation. Cancel

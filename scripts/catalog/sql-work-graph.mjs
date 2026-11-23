@@ -1,4 +1,4 @@
-import { registryConnection } from "./sql-registry-connection.mjs";
+import { registryConnection, yieldBetweenBatches } from "./sql-registry-connection.mjs";
 import { readUniverseState } from "./sql-universe-state.mjs";
 import { planUniverseProjection } from "./sql-universe-plan.mjs";
 import { planWorkRelations } from "./sql-relation-plan.mjs";
@@ -8,19 +8,16 @@ import { planWorkMetadata } from "./sql-work-metadata-plan.mjs";
 export function syncSqlWorkGraph(rows,registry,{database=process.env.CATALOG_IDENTITY_DATABASE,onPending=()=>{},onConflict=()=>{}}={}) {
   const report=resolveWorkRelations(rows,registry,{onPending}), db=registryConnection(database);
   try {
-    let plan, edges, metadata;
-    db.exec("BEGIN");
-    try {
-      const state=readUniverseState(db);
-      plan=planUniverseProjection(rows,state);edges=planWorkRelations(db,rows,state.works);
-      metadata=planWorkMetadata(rows,state.works);
-      db.exec("COMMIT");
-    } catch(error) {db.exec("ROLLBACK");throw error;}
+    const state=readUniverseState(db);
+    const plan=planUniverseProjection(rows,state);
+    const edges=planWorkRelations(db,rows,state.works);
+    const metadata=planWorkMetadata(rows,state.works);
     const commit=(items,apply)=>{
       for(let offset=0;offset<items.length;offset+=250) {
         db.exec("BEGIN IMMEDIATE");
         try {for(const item of items.slice(offset,offset+250)) apply(item);db.exec("COMMIT");}
         catch(error) {db.exec("ROLLBACK");throw error;}
+        if (offset + 250 < items.length) yieldBetweenBatches();
       }
     };
     const entity=db.prepare("INSERT INTO catalog_entities(id,kind,resolution_status,created_at,updated_at) VALUES(?,'universe','verified',?,?)");
