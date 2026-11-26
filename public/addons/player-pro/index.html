@@ -1456,6 +1456,7 @@
             episode: parseInt(params.get('ep') || '1', 10) || 1,
             season: parseInt(params.get('season') || '1', 10) || 1,
             totalEpisodes: parseInt(params.get('totalEpisodes') || '0', 10) || 0,
+            releasedEpisodes: parseInt(params.get('releasedEpisodes') || '0', 10) || 0,
             malId: parseInt(params.get('malId') || '0', 10) || 0,
             format: params.get('format') || 'TV',
             initialResumeTime: Math.floor(parseFloat(params.get('resume') || '0')) || 0,
@@ -3683,7 +3684,8 @@
             const op = skipTimes && skipTimes.op ? skipTimes.op : null;
             const ed = skipTimes && skipTimes.ed ? skipTimes.ed : null;
             const duration = getKnownEpisodeDuration();
-            const hasNextEp = state.totalEpisodes === 0 || state.episode < state.totalEpisodes;
+            const maxAvailableEp = state.releasedEpisodes > 0 ? state.releasedEpisodes : state.totalEpisodes;
+            const hasNextEp = maxAvailableEp > 0 && state.episode < maxAvailableEp;
 
             const showOp = !!(op && Number.isFinite(op.start) && Number.isFinite(op.end) && currentTime >= op.start && currentTime < op.end - 0.5);
             const showEd = !!(ed && Number.isFinite(ed.start) && Number.isFinite(ed.end) && currentTime >= ed.start && currentTime < ed.end - 0.5);
@@ -4469,8 +4471,9 @@
         function stepEpisode(delta) {
             const nextEp = state.episode + delta;
             if (nextEp < 1) return;
-            if (state.totalEpisodes > 0 && nextEp > state.totalEpisodes) {
-                console.warn('[PlayerPro] Próximo episódio ultrapassa total de episódios catalogados:', nextEp, state.totalEpisodes);
+            const maxEp = state.releasedEpisodes > 0 ? state.releasedEpisodes : state.totalEpisodes;
+            if (maxEp <= 0 || nextEp > maxEp) {
+                console.warn('[PlayerPro] Próximo episódio não disponível:', nextEp, maxEp);
                 return;
             }
             window.parent.postMessage({
@@ -5030,7 +5033,8 @@
             dom.videoTitle.innerText = `${state.title} — Episódio ${state.episode}${state.totalEpisodes > 0 ? ` / ${state.totalEpisodes}` : ''}`;
             dom.overlayHeading.innerText = `${state.title} — Episódio ${state.episode}`;
             dom.btnPrevEp.style.display = state.episode > 1 ? 'inline-flex' : 'none';
-            if (state.totalEpisodes > 0 && state.episode >= state.totalEpisodes) {
+            const maxKnownEp = state.releasedEpisodes > 0 ? state.releasedEpisodes : state.totalEpisodes;
+            if (maxKnownEp <= 0 || state.episode >= maxKnownEp) {
                 dom.btnNextEp.style.display = 'none';
             } else {
                 dom.btnNextEp.style.display = 'inline-flex';
