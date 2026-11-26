@@ -27,10 +27,13 @@ export function useSubtitleBundle(options: { enabled: boolean; endpoint: string;
         if (!controller.signal.aborted && (next.revision !== snapshot.revision || next.epoch !== snapshot.epoch)) console.info('[PlayerPro][Legendas] Lote atualizado', JSON.stringify({ epoch: next.epoch, revision: next.revision, tracks: Object.keys(next.tracks).length, ready: Object.values(next.tracks).filter(track => track.status === 'ready').length, failed: Object.values(next.tracks).filter(track => track.status === 'failed').length }));
         if (!controller.signal.aborted) { snapshot = next; setState(next); setError(''); }
       } catch (failure) {
-        if (!controller.signal.aborted) { snapshot = emptySubtitleBundle(); setState(snapshot); setError(failure instanceof Error ? failure.message : 'Legendas indisponíveis.'); }
+        if (!controller.signal.aborted) { setError(failure instanceof Error ? failure.message : 'Legendas indisponíveis.'); }
       } finally {
         clearTimeout(deadline); controller.signal.removeEventListener('abort', abort);
-        if (!controller.signal.aborted) timer = setTimeout(poll, 1000);
+        if (!controller.signal.aborted) {
+          const hasReady = Object.values(snapshot.tracks).some(track => track.status === 'ready');
+          timer = setTimeout(poll, hasReady ? 1500 : 350);
+        }
       }
     };
     void poll();
