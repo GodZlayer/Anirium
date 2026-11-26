@@ -990,6 +990,108 @@
         .hide-cursor {
             cursor: none;
         }
+
+        /* Watch Party & Live Chat Panel */
+        #party-chat-panel {
+            position: absolute;
+            top: 64px;
+            right: 16px;
+            bottom: 92px;
+            width: 300px;
+            max-width: calc(100vw - 32px);
+            background: rgba(11, 14, 21, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            backdrop-filter: blur(14px);
+            display: none;
+            flex-direction: column;
+            z-index: 48;
+            box-shadow: 0 18px 44px rgba(0, 0, 0, 0.65);
+            overflow: hidden;
+        }
+        #party-chat-panel.open { display: flex; }
+        .party-chat-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .party-room-pill {
+            font-size: 11px;
+            font-weight: 800;
+            color: #FFC766;
+            background: rgba(255, 199, 102, 0.14);
+            border: 1px solid rgba(255, 199, 102, 0.35);
+            padding: 3px 8px;
+            border-radius: 999px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .party-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .party-msg {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 10px;
+            padding: 6px 9px;
+            line-height: 1.35;
+            word-break: break-word;
+        }
+        .party-msg-author {
+            font-weight: 800;
+            color: #FFC766;
+            margin-right: 6px;
+        }
+        .party-msg-sys {
+            font-size: 11px;
+            color: #94A3B8;
+            text-align: center;
+            padding: 4px 6px;
+        }
+        .party-chat-form {
+            display: flex;
+            gap: 6px;
+            padding: 8px 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(0, 0, 0, 0.25);
+        }
+        .party-chat-input {
+            flex: 1;
+            min-width: 0;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 12px;
+            padding: 7px 10px;
+            outline: none;
+        }
+        .party-chat-input:focus { border-color: rgba(255, 199, 102, 0.6); }
+        .party-chat-send {
+            background: #FFC766;
+            color: #0B0E15;
+            border: none;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 12px;
+            padding: 0 12px;
+            cursor: pointer;
+        }
+        .party-btn-active {
+            color: #FFC766 !important;
+            background: rgba(255, 199, 102, 0.16) !important;
+            border-color: rgba(255, 199, 102, 0.45) !important;
+        }
     </style>
 </head>
 <body>
@@ -1143,6 +1245,19 @@
             <div id="subtitle-text"></div>
         </div>
 
+        <!-- Botões Flutuantes: Pular OP / ED e Próximo Episódio -->
+        <div id="skip-action-overlay" style="position: absolute; right: 24px; bottom: 96px; z-index: 45; display: none; align-items: center; gap: 10px;">
+            <button type="button" id="btn-skip-op" style="display: none; padding: 10px 18px; border-radius: 12px; border: 1px solid rgba(255,199,102,0.55); background: rgba(15,17,23,0.88); color: #FFC766; font-weight: 800; font-size: 13px; cursor: pointer; backdrop-filter: blur(12px); box-shadow: 0 8px 24px rgba(0,0,0,0.45);">
+                ⏭ Pular Abertura
+            </button>
+            <button type="button" id="btn-skip-ed" style="display: none; padding: 10px 18px; border-radius: 12px; border: 1px solid rgba(255,199,102,0.55); background: rgba(15,17,23,0.88); color: #FFC766; font-weight: 800; font-size: 13px; cursor: pointer; backdrop-filter: blur(12px); box-shadow: 0 8px 24px rgba(0,0,0,0.45);">
+                ⏭ Pular Encerramento
+            </button>
+            <button type="button" id="btn-next-ep-float" style="display: none; padding: 10px 18px; border-radius: 12px; border: 1px solid rgba(255,199,102,0.8); background: #FFC766; color: #0B0D14; font-weight: 900; font-size: 13px; cursor: pointer; box-shadow: 0 8px 24px rgba(255,199,102,0.3);">
+                Próximo Episódio ▶
+            </button>
+        </div>
+
         <!-- Painel Inferior de Controles Customizados -->
         <footer class="player-controls">
             <!-- Timeline / Progress Bar -->
@@ -1206,6 +1321,13 @@
 
                 <!-- Lado Direito: Seletores (Progresso BG, Qualidade, Áudio, Legenda) e Tela Cheia -->
                 <div class="controls-right">
+                    <!-- Watch Party / Sala Live -->
+                    <button type="button" class="ctrl-btn mono" id="wp-toggle-btn" title="Watch Party & Sala Live" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;">
+                        <span>👥 Party</span>
+                        <span id="wp-btn-badge" style="display:none;background:#7c3aed;color:#fff;border-radius:999px;padding:1px 6px;font-size:10px;">1</span>
+                        <span id="wp-live-badge" style="display:none;background:#dc2626;color:#fff;border-radius:999px;padding:1px 6px;font-size:10px;">AO VIVO</span>
+                    </button>
+
                     <!-- Progresso em Segundo Plano -->
                     <div class="popover-menu">
                         <button type="button" class="ctrl-btn mono bg-stages-btn" id="btn-bg-stages" onclick="toggleDropdown('card-bg-stages')" title="Progresso em Segundo Plano">
@@ -1213,6 +1335,22 @@
                             <span id="bg-stages-label">⚡ 0/0</span>
                         </button>
                         <div class="popover-card mono" id="card-bg-stages"></div>
+                    </div>
+
+                    <!-- Menu de Automação (OP / ED / Próximo Ep.) -->
+                    <div class="popover-menu">
+                        <button type="button" class="ctrl-btn mono" id="btn-auto-prefs" onclick="renderAutoMenu(); toggleDropdown('card-auto')" title="Automação: Pular OP / ED / Próximo Ep." style="font-size: 12px; font-weight: 800;">
+                            ⏭
+                        </button>
+                        <div class="popover-card mono" id="card-auto" style="min-width: 220px;"></div>
+                    </div>
+
+                    <!-- Watch Party & Estreia Ao Vivo (P2P BEP-10) -->
+                    <div class="popover-menu">
+                        <button type="button" class="ctrl-btn mono" id="btn-party" onclick="renderPartyMenu(); toggleDropdown('card-party')" title="Watch Party & Live Chat P2P" style="font-size: 12px; font-weight: 800;">
+                            👥
+                        </button>
+                        <div class="popover-card mono" id="card-party" style="min-width: 248px;"></div>
                     </div>
 
                     <!-- Menu de Velocidade -->
@@ -1255,6 +1393,24 @@
                 </div>
             </div>
         </footer>
+
+        <!-- Painel Lateral de Live Chat (Watch Party P2P) -->
+        <aside id="party-chat-panel" aria-label="Watch Party Live Chat">
+            <div class="party-chat-head">
+                <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                    <span id="party-room-pill" class="party-room-pill" onclick="copyPartyRoomCode()" title="Clique para copiar o código">ANR-0000</span>
+                    <span id="party-role-badge" style="font-size:10px;color:#94A3B8;font-weight:700;">HOST</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <button type="button" onclick="togglePartyChatPanel(false)" title="Minimizar chat" style="background:transparent;border:none;color:#94A3B8;cursor:pointer;font-size:13px;padding:2px 6px;">✕</button>
+                </div>
+            </div>
+            <div id="party-chat-messages" class="party-chat-messages"></div>
+            <form class="party-chat-form" onsubmit="submitPartyChat(event)">
+                <input id="party-chat-input" class="party-chat-input" type="text" maxlength="300" placeholder="Mensagem no chat P2P..." autocomplete="off" />
+                <button type="submit" class="party-chat-send">Enviar</button>
+            </form>
+        </aside>
     </div>
 
     <script>
@@ -1319,7 +1475,8 @@
                 }
             })(),
             token: params.get('token') || '',
-            playerSessionId: params.get('playerSessionId') || '',
+            playerSessionId: params.get('playerSessionId') || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? `tab-${crypto.randomUUID()}` : `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+            serviceSessionId: '',
             deviceId: params.get('deviceId') || '',
             playbackTicket: '',
             sourcesCount: 0,
@@ -1580,6 +1737,289 @@
             showActionFeedback('center', `${r}x`);
         }
         window.selectPlaybackRate = selectPlaybackRate;
+
+        // =========================================================================
+        // WATCH PARTY & LIVE CHAT P2P (BEP-10 anirium_mesh)
+        // =========================================================================
+        const partyState = {
+            active: false,
+            roomId: '',
+            author: (() => {
+                try { return localStorage.getItem('anirium_party_author') || 'Anirium'; } catch { return 'Anirium'; }
+            })(),
+            isHost: false,
+            meshPeers: 0,
+            chatOpen: false,
+            seenMsgIds: new Set(),
+            syncTimer: null,
+            applyingRemoteSync: false
+        };
+
+        function generatePartyCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = 'ANR-';
+            for (let i = 0; i < 4; i++) {
+                code += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return code;
+        }
+
+        function escapePartyHtml(str) {
+            return String(str || '').replace(/[&<>"']/g, (m) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        function updatePartyUI() {
+            const btn = document.getElementById('btn-party');
+            const panel = document.getElementById('party-chat-panel');
+            const pill = document.getElementById('party-room-pill');
+            const roleBadge = document.getElementById('party-role-badge');
+            if (btn) btn.classList.toggle('party-btn-active', partyState.active);
+            if (pill) pill.textContent = partyState.roomId || 'ANR-0000';
+            if (roleBadge) {
+                roleBadge.textContent = partyState.roomId.startsWith('live:')
+                    ? 'AO VIVO'
+                    : (partyState.isHost ? 'HOST' : 'CONVIDADO');
+            }
+            if (panel) {
+                panel.classList.toggle('open', Boolean(partyState.active && partyState.chatOpen));
+            }
+        }
+
+        function appendPartySystemMessage(text) {
+            const box = document.getElementById('party-chat-messages');
+            if (!box) return;
+            const el = document.createElement('div');
+            el.className = 'party-msg-sys';
+            el.textContent = text;
+            box.appendChild(el);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function renderPartyMenu() {
+            const card = document.getElementById('card-party');
+            if (!card) return;
+            if (partyState.active) {
+                card.innerHTML = `
+                    <div class="popover-header">
+                        <span>👥 Watch Party P2P</span>
+                        <span style="color:#FFC766;font-weight:800;">${escapePartyHtml(partyState.roomId)}</span>
+                    </div>
+                    <div style="padding:8px 10px;display:flex;flex-direction:column;gap:8px;">
+                        <button type="button" class="popover-item" onclick="togglePartyChatPanel(!partyState.chatOpen); closeAllPopovers();">
+                            <span>💬 ${partyState.chatOpen ? 'Ocultar Live Chat' : 'Abrir Live Chat'}</span>
+                        </button>
+                        <button type="button" class="popover-item" onclick="copyPartyRoomCode(); closeAllPopovers();">
+                            <span>📋 Copiar Código da Sala</span>
+                        </button>
+                        ${partyState.isHost ? `
+                        <button type="button" class="popover-item" onclick="broadcastPartySyncNow(); closeAllPopovers();">
+                            <span>🔄 Sincronizar Todos Agora</span>
+                        </button>` : ''}
+                        <button type="button" class="popover-item" style="color:#FCA5A5;" onclick="leaveWatchParty(); closeAllPopovers();">
+                            <span>🚪 Sair da Sala</span>
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            const liveRoom = `live:${state.malId || state.workId || 'anime'}:${state.episode || 1}`;
+            card.innerHTML = `
+                <div class="popover-header">
+                    <span>👥 Watch Party P2P</span>
+                    <span style="font-size:10px;color:#94A3B8;">BEP-10</span>
+                </div>
+                <div style="padding:8px 10px;display:flex;flex-direction:column;gap:8px;">
+                    <input id="party-author-input" class="party-chat-input" type="text" maxlength="24" value="${escapePartyHtml(partyState.author)}" placeholder="Seu apelido" />
+                    <button type="button" class="popover-item" onclick="createWatchParty()">
+                        <span>🎬 Criar Sala Privada</span>
+                    </button>
+                    <button type="button" class="popover-item" onclick="joinLivePremiere('${escapePartyHtml(liveRoom)}')">
+                        <span>🔴 Estreia Ao Vivo (Ep. ${state.episode || 1})</span>
+                    </button>
+                    <div style="display:flex;gap:6px;margin-top:2px;">
+                        <input id="party-join-code" class="party-chat-input" type="text" maxlength="32" placeholder="Código (ex: ANR-4K92)" style="text-transform:uppercase;" />
+                        <button type="button" class="party-chat-send" onclick="joinWatchPartyFromInput()">Entrar</button>
+                    </div>
+                </div>
+            `;
+        }
+        window.renderPartyMenu = renderPartyMenu;
+
+        function readPartyAuthorInput() {
+            const input = document.getElementById('party-author-input');
+            const name = (input ? input.value : partyState.author || 'Anirium').trim() || 'Anirium';
+            partyState.author = name.slice(0, 24);
+            try { localStorage.setItem('anirium_party_author', partyState.author); } catch {}
+            return partyState.author;
+        }
+
+        function startWatchPartySession(roomId, isHost) {
+            const author = readPartyAuthorInput();
+            partyState.seenMsgIds.clear();
+            const box = document.getElementById('party-chat-messages');
+            if (box) box.innerHTML = '';
+            wsSend({ action: 'party_join', roomId, author, isHost: Boolean(isHost) });
+            partyState.active = true;
+            partyState.roomId = roomId;
+            partyState.isHost = Boolean(isHost);
+            partyState.chatOpen = true;
+            updatePartyUI();
+            closeAllPopovers();
+            appendPartySystemMessage(isHost ? `Sala ${roomId} criada! Compartilhe o código com seus amigos.` : `Conectado à sala ${roomId} via P2P.`);
+            if (partyState.syncTimer) clearInterval(partyState.syncTimer);
+            if (isHost) {
+                broadcastPartySyncNow();
+                partyState.syncTimer = setInterval(() => {
+                    if (partyState.active && partyState.isHost) {
+                        broadcastPartySyncNow();
+                    }
+                }, 5000);
+            }
+        }
+
+        function createWatchParty() {
+            startWatchPartySession(generatePartyCode(), true);
+        }
+        window.createWatchParty = createWatchParty;
+
+        function joinLivePremiere(liveRoom) {
+            startWatchPartySession(liveRoom, false);
+        }
+        window.joinLivePremiere = joinLivePremiere;
+
+        function joinWatchPartyFromInput() {
+            const codeEl = document.getElementById('party-join-code');
+            const code = (codeEl ? codeEl.value : '').trim().toUpperCase();
+            if (!code) return;
+            startWatchPartySession(code, false);
+        }
+        window.joinWatchPartyFromInput = joinWatchPartyFromInput;
+
+        function leaveWatchParty() {
+            if (partyState.syncTimer) {
+                clearInterval(partyState.syncTimer);
+                partyState.syncTimer = null;
+            }
+            wsSend({ action: 'party_leave' });
+            partyState.active = false;
+            partyState.roomId = '';
+            partyState.isHost = false;
+            partyState.chatOpen = false;
+            updatePartyUI();
+        }
+        window.leaveWatchParty = leaveWatchParty;
+
+        function togglePartyChatPanel(open) {
+            partyState.chatOpen = Boolean(open);
+            updatePartyUI();
+        }
+        window.togglePartyChatPanel = togglePartyChatPanel;
+
+        function copyPartyRoomCode() {
+            if (!partyState.roomId) return;
+            try {
+                navigator.clipboard.writeText(partyState.roomId);
+                showActionFeedback('center', `Código ${partyState.roomId} copiado!`);
+            } catch {}
+        }
+        window.copyPartyRoomCode = copyPartyRoomCode;
+
+        function broadcastPartySyncNow() {
+            if (!partyState.active || !partyState.isHost || !dom.video) return;
+            wsSend({
+                action: 'party_sync',
+                position: getEpisodeTime(),
+                playing: !dom.video.paused,
+                playbackRate: dom.video.playbackRate || 1
+            });
+        }
+        window.broadcastPartySyncNow = broadcastPartySyncNow;
+
+        function submitPartyChat(ev) {
+            if (ev) ev.preventDefault();
+            const input = document.getElementById('party-chat-input');
+            if (!input || !partyState.active) return;
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+            wsSend({ action: 'party_chat', text });
+        }
+        window.submitPartyChat = submitPartyChat;
+
+        function handlePartyStateEvent(p) {
+            partyState.active = Boolean(p.active);
+            partyState.roomId = p.roomId || '';
+            partyState.isHost = Boolean(p.isHost);
+            partyState.meshPeers = Number(p.meshPeers || 0);
+            updatePartyUI();
+        }
+
+        function handlePartySyncEvent(p) {
+            if (!partyState.active || partyState.isHost || !dom.video) return;
+            if (p.roomId && p.roomId !== partyState.roomId) return;
+            const targetPos = Number(p.position);
+            const shouldPlay = Boolean(p.playing);
+            const targetRate = Number(p.playbackRate || 1);
+            partyState.applyingRemoteSync = true;
+            try {
+                if (Number.isFinite(targetRate) && targetRate >= 0.25 && targetRate <= 2) {
+                    dom.video.playbackRate = targetRate;
+                }
+                if (Number.isFinite(targetPos) && targetPos >= 0) {
+                    const localPos = getEpisodeTime();
+                    if (Math.abs(localPos - targetPos) > 1.5 && typeof seekTo === 'function') {
+                        seekTo(targetPos);
+                    }
+                }
+                if (shouldPlay && dom.video.paused) {
+                    dom.video.play().catch(() => {});
+                } else if (!shouldPlay && !dom.video.paused) {
+                    dom.video.pause();
+                }
+            } finally {
+                setTimeout(() => { partyState.applyingRemoteSync = false; }, 350);
+            }
+        }
+
+        function handlePartyChatEvent(p) {
+            if (!partyState.active) return;
+            if (p.roomId && p.roomId !== partyState.roomId) return;
+            const id = p.msgId || `${p.author}:${p.sentAtMs}:${p.text}`;
+            if (partyState.seenMsgIds.has(id)) return;
+            partyState.seenMsgIds.add(id);
+            const box = document.getElementById('party-chat-messages');
+            if (!box) return;
+            const el = document.createElement('div');
+            el.className = 'party-msg';
+            el.innerHTML = `<span class="party-msg-author">${escapePartyHtml(p.author || 'Anirium')}</span><span>${escapePartyHtml(p.text || '')}</span>`;
+            box.appendChild(el);
+            box.scrollTop = box.scrollHeight;
+            if (!partyState.chatOpen) {
+                partyState.chatOpen = true;
+                updatePartyUI();
+            }
+        }
+
+        const partyVideoEl = document.getElementById('video-element');
+        if (partyVideoEl) {
+            partyVideoEl.addEventListener('play', () => {
+                if (partyState.active && partyState.isHost && !partyState.applyingRemoteSync) {
+                    broadcastPartySyncNow();
+                }
+            });
+            partyVideoEl.addEventListener('pause', () => {
+                if (partyState.active && partyState.isHost && !partyState.applyingRemoteSync) {
+                    broadcastPartySyncNow();
+                }
+            });
+            partyVideoEl.addEventListener('seeked', () => {
+                if (partyState.active && partyState.isHost && !partyState.applyingRemoteSync) {
+                    broadcastPartySyncNow();
+                }
+            });
+        }
         const episodeEpoch = Date.UTC(2000, 0, 1);
         function episodeTimeFromProgramDate(date) {
             if (!date) return null;
@@ -2456,25 +2896,33 @@
             }
         });
 
+        function getKnownEpisodeDuration() {
+            const manifestDur = Number(state.manifest?.episodeDuration || 0);
+            if (Number.isFinite(manifestDur) && manifestDur > 0) return manifestDur;
+            const videoDur = Number(dom.video?.duration || 0);
+            // Nunca exibir a duração parcial da janela HLS (ex.: 4s, 8s, 12s) como duração total do episódio
+            if (Number.isFinite(videoDur) && videoDur >= 60) return videoDur;
+            return 0;
+        }
+
         dom.video.addEventListener('timeupdate', () => {
             const ct = getEpisodeTime();
-            const dur = (state.manifest?.episodeDuration && state.manifest.episodeDuration > 0)
-                ? state.manifest.episodeDuration
-                : (Number.isFinite(dom.video.duration) ? dom.video.duration : 0);
+            const dur = getKnownEpisodeDuration();
 
             // Se ainda não aplicou o tempo de retomada e o player já começou a rodar
             if (!state.hasResumed && state.initialResumeTime > 2) {
-                state.hasResumed = true;
-                const durVal = (state.manifest?.episodeDuration && state.manifest.episodeDuration > 0)
-                    ? state.manifest.episodeDuration
-                    : (Number.isFinite(dom.video.duration) ? dom.video.duration : 0);
-                if (durVal > 0 && state.initialResumeTime < durVal - 10) {
-                    console.info('[PlayerPro] Aplicando retomada exata na inicialização do stream:', state.initialResumeTime, 's');
-                    seekTo(state.initialResumeTime);
+                const durVal = getKnownEpisodeDuration();
+                if (durVal > 0) {
+                    state.hasResumed = true;
+                    // Nunca retomar nos últimos 60s (evita cair direto no final e pular em loop)
+                    if (state.initialResumeTime < durVal - 60) {
+                        console.info('[PlayerPro] Aplicando retomada exata na inicialização do stream:', state.initialResumeTime, 's');
+                        seekTo(state.initialResumeTime);
+                    }
                 }
             }
 
-            dom.timeTotal.innerText = formatTime(dur);
+            dom.timeTotal.innerText = dur > 0 ? formatTime(dur) : '--:--';
             if (!isDraggingTimeline && !state.isSeeking) {
                 dom.timeCurrent.innerText = formatTime(ct);
                 if (dur > 0) {
@@ -2651,6 +3099,7 @@
 
         function resetSubtitleCacheState(nextTrackKey = '') {
             state.loadedSubtitleTrackKey = nextTrackKey;
+            state.loadedSubtitleKey = '';
             state.completeSubtitleBlocks = new Set();
             state.subtitleBlockSlices = {};
             state.inFlightSubtitleRequests = new Map();
@@ -2659,6 +3108,8 @@
             state.parsedSubtitleCues = [];
             state.lastRenderedCueSig = '';
             subtitleRetryCooldowns = {};
+            if (dom.subtitleOverlay) dom.subtitleOverlay.style.display = 'none';
+            if (dom.subtitleText) dom.subtitleText.innerText = '';
         }
 
         function pruneInFlightSubtitleRequests() {
@@ -3056,6 +3507,7 @@
             const keepExistingCues = Boolean(options && options.keepExistingCues);
             if (force) state.userPickedSubtitle = true;
             if (!trackId || trackId === 'off') {
+                if (force) saveAccountPlayerPrefs({ subtitleEnabled: false });
                 state.selectedSubtitleTrackId = 'off';
                 state.pendingUpgradeSubtitleTrackId = '';
                 state.loadedSubtitleKey = '';
@@ -3080,6 +3532,7 @@
                 ? (state.manifest.subtitleTracks.find(t => t.id === trackId) || state.manifest.subtitleTracks[0])
                 : null;
             const targetLang = targetTrack?.language || (trackId.includes('por') || trackId.includes('pt') ? 'por' : 'und');
+            if (force) saveAccountPlayerPrefs({ subtitleEnabled: true, subtitleLang: targetLang });
 
             if (!force && !keepExistingCues && state.parsedSubtitleCues.length > 0 && state.loadedSubtitleKey) {
                 return;
@@ -3147,8 +3600,140 @@
             }
         }
 
+        const AUTO_PREFS_KEY = 'anirium_player_pro_prefs';
+        function getPlayerAccountId() {
+            try {
+                const tok = new URLSearchParams(window.location.search).get('token') || '';
+                const payloadPart = tok.split('.')[0] || '';
+                if (!payloadPart) return 'anon';
+                const decoded = JSON.parse(atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/')));
+                return String(decoded.accountId || decoded.userId || 'anon');
+            } catch {
+                return 'anon';
+            }
+        }
+        function getAccountPrefsKey() {
+            return `anirium_player_account_prefs:${getPlayerAccountId()}`;
+        }
+        function loadAccountPlayerPrefs() {
+            try {
+                return JSON.parse(localStorage.getItem(getAccountPrefsKey()) || '{}') || {};
+            } catch {
+                return {};
+            }
+        }
+        function saveAccountPlayerPrefs(patch) {
+            try {
+                const next = { ...loadAccountPlayerPrefs(), ...patch };
+                localStorage.setItem(getAccountPrefsKey(), JSON.stringify(next));
+            } catch {}
+        }
+        let autoSkippedOpEp = -1;
+        let autoSkippedEdEp = -1;
+        let autoAdvancedEp = -1;
+
+        function loadAutoPrefs() {
+            try {
+                const raw = JSON.parse(localStorage.getItem(AUTO_PREFS_KEY) || '{}');
+                return {
+                    autoSkipOp: Boolean(raw.autoSkipOp),
+                    autoSkipEd: Boolean(raw.autoSkipEd),
+                    autoNextEpisode: Boolean(raw.autoNextEpisode),
+                };
+            } catch {
+                return { autoSkipOp: false, autoSkipEd: false, autoNextEpisode: false };
+            }
+        }
+
+        function toggleAutoPref(key) {
+            const prefs = loadAutoPrefs();
+            prefs[key] = !prefs[key];
+            try { localStorage.setItem(AUTO_PREFS_KEY, JSON.stringify(prefs)); } catch {}
+            renderAutoMenu();
+        }
+
+        function renderAutoMenu() {
+            const card = document.getElementById('card-auto');
+            if (!card) return;
+            const prefs = loadAutoPrefs();
+            const row = (key, label, on) => `
+                <button type="button" class="popover-item ${on ? 'active' : ''}" onclick="toggleAutoPref('${key}')" style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+                    <span>${label}</span>
+                    <span style="font-weight:900;color:${on ? '#34D399' : 'rgba(255,255,255,0.4)'};">${on ? 'ON' : 'OFF'}</span>
+                </button>`;
+            card.innerHTML = `
+                <div class="popover-header"><span>AUTOMAÇÃO</span></div>
+                <div class="popover-scroll-area">
+                    ${row('autoSkipOp', 'Pular Abertura (OP)', prefs.autoSkipOp)}
+                    ${row('autoSkipEd', 'Pular Encerramento (ED)', prefs.autoSkipEd)}
+                    ${row('autoNextEpisode', 'Próximo Episódio', prefs.autoNextEpisode)}
+                </div>
+            `;
+        }
+
+        function updateSkipActionOverlay(currentTime) {
+            const box = document.getElementById('skip-action-overlay');
+            const btnOp = document.getElementById('btn-skip-op');
+            const btnEd = document.getElementById('btn-skip-ed');
+            const btnNext = document.getElementById('btn-next-ep-float');
+            if (!box || !btnOp || !btnEd || !btnNext) return;
+
+            const prefs = loadAutoPrefs();
+            const skipTimes = state.manifest && state.manifest.skipTimes ? state.manifest.skipTimes : null;
+            const op = skipTimes && skipTimes.op ? skipTimes.op : null;
+            const ed = skipTimes && skipTimes.ed ? skipTimes.ed : null;
+            const duration = getKnownEpisodeDuration();
+            const hasNextEp = state.totalEpisodes === 0 || state.episode < state.totalEpisodes;
+
+            const showOp = !!(op && Number.isFinite(op.start) && Number.isFinite(op.end) && currentTime >= op.start && currentTime < op.end - 0.5);
+            const showEd = !!(ed && Number.isFinite(ed.start) && Number.isFinite(ed.end) && currentTime >= ed.start && currentTime < ed.end - 0.5);
+            const nearEnd = duration > 120 && currentTime >= duration - 90;
+            const atVeryEnd = duration > 30 && currentTime >= duration - 2;
+            const showNext = hasNextEp && (showEd || nearEnd);
+
+            const isActivelyPlaying = Boolean(state.playbackTicket && state.currentStreamUrl && dom.video && !dom.video.paused && dom.video.readyState >= 2 && duration > 60);
+
+            if (isActivelyPlaying && showOp && prefs.autoSkipOp && autoSkippedOpEp !== state.episode) {
+                autoSkippedOpEp = state.episode;
+                seekTo(op.end);
+                return;
+            }
+            if (isActivelyPlaying && showEd && prefs.autoSkipEd && autoSkippedEdEp !== state.episode) {
+                autoSkippedEdEp = state.episode;
+                if (hasNextEp && prefs.autoNextEpisode && duration > 0 && ed.end >= duration - 10) {
+                    autoAdvancedEp = state.episode;
+                    stepEpisode(1);
+                } else {
+                    seekTo(ed.end);
+                }
+                return;
+            }
+            if (isActivelyPlaying && atVeryEnd && hasNextEp && prefs.autoNextEpisode && autoAdvancedEp !== state.episode) {
+                autoAdvancedEp = state.episode;
+                stepEpisode(1);
+                return;
+            }
+
+            btnOp.style.display = showOp ? 'inline-flex' : 'none';
+            btnEd.style.display = showEd ? 'inline-flex' : 'none';
+            btnNext.style.display = showNext ? 'inline-flex' : 'none';
+            box.style.display = (showOp || showEd || showNext) ? 'flex' : 'none';
+
+            if (showOp) {
+                btnOp.onclick = () => { seekTo(op.end); };
+            }
+            if (showEd) {
+                btnEd.onclick = () => { seekTo(ed.end); };
+            }
+            if (showNext) {
+                btnNext.innerText = `Próximo Ep. (${state.episode + 1}) ▶`;
+                btnNext.onclick = () => { stepEpisode(1); };
+            }
+        }
+
         let lastLoggedCueTime = -1;
         function updateSubtitleCue(currentTime) {
+            try { updateSkipActionOverlay(currentTime); } catch {}
             if (!state.selectedSubtitleTrackId || state.selectedSubtitleTrackId === 'off' || state.parsedSubtitleCues.length === 0) {
                 if (state.lastRenderedCueSig !== 'hidden') {
                     state.lastRenderedCueSig = 'hidden';
@@ -4323,13 +4908,18 @@
                                     syncStreamSelection(false);
                                 }
                             } else if (msg.event === 'subtitle_data') {
+                                if (!state.playbackTicket) return;
+                                if (msg.generation && state.playbackGeneration && Number(msg.generation) !== state.playbackGeneration) return;
                                 handleWSSubtitleData(payload);
                             } else if (msg.event === 'subtitle_pending') {
+                                if (!state.playbackTicket) return;
                                 console.info('[PlayerPro WS] Extraindo bloco de legenda...', payload?.trackId, payload?.blockStart);
                                 updateStartupStagesUI({ subtitleProgress: Math.max(state.subtitleProgress || 0, 75) });
                             } else if (msg.event === 'subtitle_error') {
+                                if (!state.playbackTicket) return;
                                 handleWSSubtitleError(payload);
                             } else if (msg.event === 'subtitle_ready') {
+                                if (!state.playbackTicket) return;
                                 if (typeof ensureSubtitlesForTime === 'function') {
                                     ensureSubtitlesForTime(getSubtitleTargetTime(), { fast: true, immediate: true });
                                 }
@@ -4364,6 +4954,18 @@
                             } else if (msg.event === 'stats') {
                                 if (msg.payload && typeof handleP2pStatsPayload === 'function') {
                                     handleP2pStatsPayload(msg.payload);
+                                }
+                            } else if (msg.event === 'party_state') {
+                                if (typeof handlePartyStateEvent === 'function') {
+                                    handlePartyStateEvent(msg.payload || {});
+                                }
+                            } else if (msg.event === 'party_sync') {
+                                if (typeof handlePartySyncEvent === 'function') {
+                                    handlePartySyncEvent(msg.payload || {});
+                                }
+                            } else if (msg.event === 'party_chat') {
+                                if (typeof handlePartyChatEvent === 'function') {
+                                    handlePartyChatEvent(msg.payload || {});
                                 }
                             }
                         } catch (e) {}
@@ -4646,5 +5248,68 @@
 
         initPlayer();
     </script>
+    <style>
+        #wp-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 320px; max-width: 92vw; background: rgba(13, 13, 18, 0.96); backdrop-filter: blur(16px); border-left: 1px solid rgba(255,255,255,0.1); z-index: 9990; transform: translateX(100%); transition: transform .22s ease; display: flex; flex-direction: column; color: #f4f4f5; font-family: system-ui, -apple-system, sans-serif; }
+        #wp-drawer.wp-open { transform: translateX(0); }
+        .wp-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); font-weight: 700; font-size: 14px; }
+        .wp-close { background: transparent; border: 0; color: #a1a1aa; font-size: 18px; cursor: pointer; }
+        .wp-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 14px; gap: 12px; }
+        .wp-btn { width: 100%; border: 0; border-radius: 10px; padding: 10px 12px; font-weight: 600; font-size: 13px; cursor: pointer; color: #fff; background: #7c3aed; }
+        .wp-btn-live { background: #dc2626; }
+        .wp-btn-ghost { background: rgba(255,255,255,0.08); color: #e4e4e7; }
+        .wp-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 9px 11px; color: #fff; font-size: 13px; }
+        .wp-pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+        .wp-pill-leader { background: rgba(124,58,237,0.25); color: #c4b5fd; }
+        .wp-pill-member { background: rgba(255,255,255,0.1); color: #d4d4d8; }
+        .wp-chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; font-size: 13px; }
+        .wp-chat-msg { background: rgba(255,255,255,0.05); border-radius: 10px; padding: 8px 10px; line-height: 1.35; word-break: break-word; }
+        .wp-chat-author { font-weight: 700; color: #c4b5fd; }
+        #wp-error { display: none; font-size: 12px; color: #fca5a5; background: rgba(220,38,38,0.15); border: 1px solid rgba(220,38,38,0.3); padding: 8px 10px; border-radius: 8px; }
+    </style>
+
+    <aside id="wp-drawer" aria-label="Watch Party e Chat">
+        <div class="wp-head">
+            <span>👥 Watch Party &amp; Live</span>
+            <button type="button" id="wp-close-btn" class="wp-close" aria-label="Fechar">✕</button>
+        </div>
+        <div class="wp-body">
+            <div id="wp-error"></div>
+
+            <div id="wp-lobby-view" style="display:flex;flex-direction:column;gap:10px;">
+                <p style="margin:0;font-size:12px;color:#a1a1aa;line-height:1.45;">
+                    Crie sua sala para assistir em grupo. Seus amigos entram pelo seu <strong>@handle</strong> na aba <strong>Salas</strong>.
+                </p>
+                <input id="wp-create-password" type="password" class="wp-input" placeholder="Senha opcional (deixe vazio para aberta)" maxlength="64" autocomplete="new-password">
+                <button type="button" id="wp-create-party-btn" class="wp-btn">Criar e Compartilhar Sala</button>
+            </div>
+
+            <div id="wp-active-view" style="display:none;flex-direction:column;gap:10px;flex:1;min-height:0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span id="wp-room-code" style="font-family:monospace;font-weight:800;letter-spacing:1px;"></span>
+                        <span id="wp-role-badge" class="wp-pill wp-pill-member">Participante</span>
+                    </div>
+                    <div style="display:flex;gap:6px;">
+                        <button type="button" id="wp-copy-code-btn" class="wp-btn wp-btn-ghost" style="width:auto;padding:5px 8px;font-size:11px;">Copiar</button>
+                        <button type="button" id="wp-leave-btn" class="wp-btn wp-btn-ghost" style="width:auto;padding:5px 8px;font-size:11px;">Sair</button>
+                    </div>
+                </div>
+                <div id="wp-status-line" style="font-size:12px;color:#a1a1aa;"></div>
+                <div id="wp-member-lock-note" style="display:none;font-size:11px;color:#d4d4d8;background:rgba(255,255,255,0.06);padding:6px 8px;border-radius:8px;">
+                    Sincronizado com o líder da sala.
+                </div>
+                <button type="button" id="wp-start-all-btn" class="wp-btn" style="display:none;">Iniciar para todos</button>
+
+                <div id="wp-chat-list" class="wp-chat-list"></div>
+
+                <form id="wp-chat-form" style="display:flex;gap:6px;">
+                    <input id="wp-chat-input" class="wp-input" placeholder="Mensagem no chat..." maxlength="500" autocomplete="off">
+                    <button type="submit" class="wp-btn" style="width:auto;padding:0 14px;">Enviar</button>
+                </form>
+            </div>
+        </div>
+    </aside>
+
+    <script src="./watch-party.js" defer></script>
 </body>
 </html>
