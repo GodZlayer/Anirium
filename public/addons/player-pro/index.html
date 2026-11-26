@@ -4505,14 +4505,19 @@
             state.subtitleTracks = Array.isArray(m.subtitleTracks) ? m.subtitleTracks : [];
             const activeTrackExists = state.subtitleTracks.some(t => t.id === state.selectedSubtitleTrackId);
             // Inicia a busca e extração de legenda imediatamente assim que o manifesto tiver faixas,
-            // em paralelo ao preparo do vídeo para abrir já legendado.
+            // respeitando a última preferência salva por conta.
+            const accountPrefs = loadAccountPlayerPrefs();
+            if (!state.userPickedSubtitle && accountPrefs.subtitleEnabled === false) {
+                state.selectedSubtitleTrackId = 'off';
+            }
             if (state.selectedSubtitleTrackId !== 'off' && state.subtitleTracks.length > 0) {
-                const porTracks = state.subtitleTracks.filter(t => canonicalSubLang(t.language) === 'por');
-                const bestPorTrack = porTracks.length > 0 ? selectBestSubtitleTrack(porTracks) : null;
+                const prefLang = accountPrefs.subtitleLang ? canonicalSubLang(accountPrefs.subtitleLang) : 'por';
+                const prefTracks = state.subtitleTracks.filter(t => canonicalSubLang(t.language) === prefLang);
+                const bestPorTrack = prefTracks.length > 0 ? selectBestSubtitleTrack(prefTracks) : null;
                 const currentTrack = state.subtitleTracks.find(t => t.id === state.selectedSubtitleTrackId);
-                const currentIsPt = Boolean(currentTrack && canonicalSubLang(currentTrack.language) === 'por');
+                const currentIsPt = Boolean(currentTrack && canonicalSubLang(currentTrack.language) === prefLang);
                 if (!state.selectedSubtitleTrackId || (!activeTrackExists && state.parsedSubtitleCues.length === 0 && !isFetchingSubtitle)) {
-                    const best = selectBestSubtitleTrack(state.subtitleTracks);
+                    const best = bestPorTrack || selectBestSubtitleTrack(state.subtitleTracks);
                     if (best) {
                         state.selectedSubtitleTrackId = best.id;
                         fetchSubtitleTrack(best.id, false);
