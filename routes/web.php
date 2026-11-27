@@ -1,22 +1,32 @@
 <?php
 
 use App\Http\Controllers\AgeVerificationController;
+use App\Http\Controllers\AniriumPlusTrialController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogGraphController;
 use App\Http\Controllers\CatalogLibraryController;
 use App\Http\Controllers\CatalogPreviewController;
 use App\Http\Controllers\CatalogSearchController;
+use App\Http\Controllers\CatalogSyncController;
+use App\Http\Controllers\EfiPaymentController;
 use App\Http\Controllers\LobbyController;
+use App\Http\Controllers\RealtimeStreamController;
 use App\Http\Controllers\ServiceSessionController;
 use App\Http\Controllers\TelemetryDeviceController;
+use App\Http\Controllers\WatchPartyController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LobbyController::class, 'index'])->name('lobby');
 
+Route::get('/api/catalog/version', [CatalogSyncController::class, 'version'])->middleware('throttle:300,1')->name('catalog.version');
+Route::get('/api/catalog/snapshot', [CatalogSyncController::class, 'snapshot'])->middleware('throttle:60,1')->name('catalog.snapshot');
+Route::get('/api/catalog/delta', [CatalogSyncController::class, 'delta'])->middleware('throttle:120,1')->name('catalog.delta');
+Route::get('/api/catalog/explore', [CatalogSyncController::class, 'explore'])->middleware('throttle:300,1')->name('catalog.explore');
 Route::get('/api/catalog/feed', [CatalogSearchController::class, 'feed'])->middleware('throttle:300,1');
 Route::get('/api/account/library', CatalogLibraryController::class)->middleware('throttle:300,1');
 Route::get('/api/catalog/search', CatalogSearchController::class)->middleware('throttle:300,1');
+Route::get('/api/catalog/entities', [CatalogGraphController::class, 'searchEntities'])->middleware('throttle:300,1');
 Route::get('/api/catalog/work/{reference}', [CatalogSearchController::class, 'work'])->middleware('throttle:300,1');
 Route::get('/api/catalog/graph/work/{id}', [CatalogGraphController::class, 'work'])->middleware('throttle:300,1');
 Route::get('/api/catalog/graph/episode/{id}', [CatalogGraphController::class, 'episode'])->middleware('throttle:300,1');
@@ -52,6 +62,9 @@ Route::post('/api/session/register-device', [TelemetryDeviceController::class, '
 Route::post('/api/telemetry/events', [TelemetryDeviceController::class, 'recordEvents'])->name('telemetry.events');
 Route::post('/api/dev/simulate-login', [TelemetryDeviceController::class, 'simulateLogin'])->name('dev.simulate_login');
 
+// Stream SSE em tempo real (confirmações de ações, comentários ao vivo, progresso, Pix, Watch Party)
+Route::get('/api/stream', [RealtimeStreamController::class, 'stream'])->name('realtime.stream');
+
 // PreferÃªncias Relacionais e DiscussÃµes ComunitÃ¡rias por ID de Entidade
 Route::post('/api/entity/preference', [TelemetryDeviceController::class, 'setEntityPreference'])->name('entity.set_preference');
 Route::get('/api/entity/preferences', [TelemetryDeviceController::class, 'getEntityPreferences'])->name('entity.get_preferences');
@@ -77,11 +90,35 @@ Route::post('/api/addons/install', [TelemetryDeviceController::class, 'installUs
 Route::post('/api/addons/uninstall', [TelemetryDeviceController::class, 'uninstallUserAddon'])->name('addons.uninstall');
 
 // SessÃ£o e ValidaÃ§Ã£o do Anirium+ Service (Daemon Local na porta 4004)
+Route::get('/api/anirium-plus/status', [AniriumPlusTrialController::class, 'status'])->name('anirium-plus.status');
+Route::get('/api/anirium-plus/pricing', [EfiPaymentController::class, 'pricing'])->name('anirium-plus.pricing');
+Route::get('/api/anirium-plus/lookup-user', [EfiPaymentController::class, 'lookupUser'])->middleware('throttle:60,1')->name('anirium-plus.lookup_user');
+Route::post('/api/anirium-plus/trial', [AniriumPlusTrialController::class, 'activate'])->name('anirium-plus.trial.activate');
+Route::post('/api/anirium-plus/pix', [EfiPaymentController::class, 'createPixCharge'])->name('anirium-plus.pix.create');
+Route::post('/api/anirium-plus/checkout', [EfiPaymentController::class, 'createCheckoutLink'])->name('anirium-plus.checkout.create');
+Route::get('/api/anirium-plus/pix/{txid}', [EfiPaymentController::class, 'checkStatus'])->name('anirium-plus.pix.status');
+Route::get('/api/anirium-plus/keys', [EfiPaymentController::class, 'myKeys'])->name('anirium-plus.keys.index');
+Route::post('/api/anirium-plus/keys/redeem', [EfiPaymentController::class, 'redeemKey'])->middleware('throttle:20,1')->name('anirium-plus.keys.redeem');
+Route::post('/api/webhooks/efi/pix', [EfiPaymentController::class, 'webhook'])
+    ->withoutMiddleware('web')
+    ->name('webhooks.efi.pix');
 Route::get('/api/service/session', [ServiceSessionController::class, 'getSession'])->name('service.session');
 Route::get('/api/service/session/validate', [ServiceSessionController::class, 'validateSession'])
     ->withoutMiddleware('web')
     ->name('service.session.validate');
 Route::post('/api/service/playback/context', [ServiceSessionController::class, 'playbackContext'])->withoutMiddleware('web')->name('service.playback.context');
+Route::post('/api/service/session/heartbeat', [ServiceSessionController::class, 'heartbeat'])
+    ->withoutMiddleware('web')
+    ->name('service.session.heartbeat');
+Route::get('/api/admin/service-sessions', [ServiceSessionController::class, 'adminIndex'])
+    ->middleware('throttle:60,1')
+    ->name('admin.service_sessions.index');
+Route::get('/api/service/nodes', [ServiceSessionController::class, 'listNodes'])
+    ->middleware('throttle:60,1')
+    ->name('service.nodes.index');
+Route::post('/api/service/nodes', [ServiceSessionController::class, 'announceNode'])
+    ->middleware('throttle:60,1')
+    ->name('service.nodes.announce');
 Route::delete('/api/service/session', [ServiceSessionController::class, 'releaseSession'])->name('service.session.release');
 Route::get('/download/service', function () {
     $path = public_path('downloads/anirium-service.exe');
@@ -91,6 +128,19 @@ Route::get('/download/service', function () {
 
     return response()->json(['error' => 'not_found'], 404);
 })->name('service.download');
+
+// Watch Party & Salas de Lançamento Live (Exclusivo Anirium+)
+Route::prefix('/api/watch-party')->middleware('throttle:180,1')->group(function () {
+    Route::get('/history', [WatchPartyController::class, 'history'])->name('watch_party.history');
+    Route::get('/live-schedule', [WatchPartyController::class, 'liveSchedule'])->name('watch_party.live_schedule');
+    Route::get('/by-handle/{handle}', [WatchPartyController::class, 'findByHandle'])->name('watch_party.by_handle');
+    Route::post('/rooms', [WatchPartyController::class, 'create'])->name('watch_party.create');
+    Route::post('/rooms/{code}/join', [WatchPartyController::class, 'join'])->name('watch_party.join');
+    Route::get('/rooms/{code}', [WatchPartyController::class, 'state'])->name('watch_party.state');
+    Route::post('/rooms/{code}/control', [WatchPartyController::class, 'control'])->name('watch_party.control');
+    Route::post('/rooms/{code}/messages', [WatchPartyController::class, 'sendMessage'])->name('watch_party.messages');
+    Route::post('/rooms/{code}/leave', [WatchPartyController::class, 'leave'])->name('watch_party.leave');
+});
 
 // AutenticaÃ§Ã£o Google OAuth Oficial (anirium.com.br)
 Route::match(['get', 'post'], '/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');

@@ -8,16 +8,37 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Sincronizador contínuo de exibição e episódios reais via AniList (horários exatos & novos episódios)
+// Grade semanal de animes e eventuais adiamentos (1x/dia de madrugada)
 Schedule::command('catalog:sync-airing')
-    ->hourlyAt(10)
+    ->dailyAt('04:00')
     ->withoutOverlapping(30)
     ->runInBackground()
     ->sendOutputTo(storage_path('logs/catalog-airing-sync.log'));
 
-// Coletor canônico completo: coleta snapshots, descobre novas obras, valida e publica atomicamente
+// Coletor canônico completo: descobre novas obras e republica o índice SQLite (1x/semana no domingo)
 Schedule::command('catalog:candidate auto')
-    ->dailyAt('07:25')
+    ->weeklyOn(0, '05:30')
     ->withoutOverlapping(180)
     ->runInBackground()
     ->sendOutputTo(storage_path('logs/catalog-candidate.log'));
+
+// Curadoria canônica de Universos unindo Anime + Mangá + Novel (1x/semana no domingo após coleta)
+Schedule::command('catalog:curate-universes')
+    ->weeklyOn(0, '07:00')
+    ->withoutOverlapping(60)
+    ->runInBackground()
+    ->sendOutputTo(storage_path('logs/catalog-curate-universes.log'));
+
+// Enriquecimento de literatura (capítulos/volumes/limpeza de agenda) após lançamentos semanais (1x/semana na segunda)
+Schedule::command('catalog:enrich-literature --limit=500')
+    ->weeklyOn(1, '05:00')
+    ->withoutOverlapping(45)
+    ->runInBackground()
+    ->sendOutputTo(storage_path('logs/catalog-literature-enrich.log'));
+
+// Tradução autônoma contínua de sinopses pendentes (diário às 03:00)
+Schedule::command('catalog:translate-synopses --limit=500')
+    ->dailyAt('03:00')
+    ->withoutOverlapping(60)
+    ->runInBackground()
+    ->sendOutputTo(storage_path('logs/catalog-translate-synopses.log'));

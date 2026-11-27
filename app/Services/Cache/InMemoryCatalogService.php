@@ -2,7 +2,6 @@
 
 namespace App\Services\Cache;
 
-use App\Support\CatalogSearch;
 use App\Support\LocaleResolver;
 use App\Support\SynopsisTranslator;
 use Illuminate\Support\Facades\Cache;
@@ -29,6 +28,9 @@ class InMemoryCatalogService
             $roll = [];
             $todayKey = $daysOrder[$currentDayIdx];
             foreach ($calendar[$todayKey] ?? [] as $item) {
+                if (($item['media'] ?? 'anime') !== 'anime') {
+                    continue;
+                }
                 $time = $item['time'] ?? 'TBA';
                 if ($time !== 'TBA' && $time <= $nowTimeStr) {
                     $roll[] = $item;
@@ -41,7 +43,7 @@ class InMemoryCatalogService
                 $prevKey = $daysOrder[$prevIdx];
                 $prevItems = array_values(array_filter(
                     $calendar[$prevKey] ?? [],
-                    fn ($item) => ! empty($item['time']) && $item['time'] !== 'TBA'
+                    fn ($item) => ($item['media'] ?? 'anime') === 'anime' && ! empty($item['time']) && $item['time'] !== 'TBA'
                 ));
                 usort($prevItems, fn ($a, $b) => strcmp($b['time'] ?? '', $a['time'] ?? ''));
                 $roll = array_merge($roll, $prevItems);
@@ -97,6 +99,7 @@ class InMemoryCatalogService
             $rowsQuery = DB::table('catalog_work_schedules as s')
                 ->join('catalog_works as w', 'w.id', '=', 's.work_id')
                 ->join('catalog_work_assets as a', 'a.work_id', '=', 's.work_id')
+                ->where('w.media', 'anime')
                 ->whereNotNull('a.image_url');
 
             if (! $allowAdult) {
@@ -130,15 +133,22 @@ class InMemoryCatalogService
     {
         $scope = $allowAdult ? 'adult' : 'safe';
 
-        return Cache::remember("catalog:calendar:by_day:canonical_full:v2:{$scope}", self::TTL_SECONDS, function () use ($allowAdult) {
+        return Cache::remember("catalog:calendar:by_day:ssot:v3:{$scope}", self::TTL_SECONDS, function () use ($allowAdult) {
             $dayMap = [
                 'monday' => 'mondays',
+                'mondays' => 'mondays',
                 'tuesday' => 'tuesdays',
+                'tuesdays' => 'tuesdays',
                 'wednesday' => 'wednesdays',
+                'wednesdays' => 'wednesdays',
                 'thursday' => 'thursdays',
+                'thursdays' => 'thursdays',
                 'friday' => 'fridays',
+                'fridays' => 'fridays',
                 'saturday' => 'saturdays',
+                'saturdays' => 'saturdays',
                 'sunday' => 'sundays',
+                'sundays' => 'sundays',
             ];
 
             $calendar = [
@@ -151,106 +161,67 @@ class InMemoryCatalogService
                 'sundays' => [],
             ];
 
-            try {
-                $catalogSearch = app(CatalogSearch::class);
-                $allItems = [];
-                $page = 1;
-                do {
-                    $feed = $catalogSearch->feed('calendar', $page, $allowAdult);
-                    $pageItems = $feed['items'] ?? [];
-                    if (empty($pageItems)) {
-                        break;
-                    }
-                    $allItems = array_merge($allItems, $pageItems);
-                    $totalPages = $feed['pages'] ?? 1;
-                    $page++;
-                } while ($page <= $totalPages && $page <= 10);
+            // Fonte Única de Verdade (SSOT): consulta direta às tabelas relacionais
+            $rows = DB::table('catalog_work_schedules as s')
+                ->join('catalog_works as w', 'w.id', '=', 's.work_id')
+                ->join('catalog_work_assets as a', 'a.work_id', '=', 'w.id')
+                ->whereNotNull('s.airing_day')
+                ->where('s.airing_day', '!=', '')
+                ->whereNotNull('a.image_url')
+                ->where('a.image_url', '!=', '')
+                ->whereRaw("UPPER(COALESCE(w.status, '')) IN ('RELEASING', 'PUBLISHING', 'CURRENT')")
+                ->where(function ($q) {
+                    // Ignora agendas sintéticas antigas de literatura (horário 00:00)
+                    $q->where('w.media', 'anime')
+                        ->orWhere(function ($lit) {
+                            $lit->whereIn('w.media', ['manga', 'novel'])
+                                ->whereNotNull('s.airing_time')
+                                ->where('s.airing_time', '!=', '00:00');
+                        });
+                })
+                ->when(! $allowAdult, fn ($q) => $q->where('w.is_adult', 0))
+                ->select(
+                    'w.id',
+                    'w.title',
+                    'w.format',
+                    'w.media',
+                    'w.is_adult',
+                    's.airing_day',
+                    's.airing_time',
+                    's.latest_episode_num',
+                    'a.image_url'
+                )
+                ->get();
 
-                foreach ($allItems as $it) {
-                    $rawDay = $it['airing_day'] ?? null;
-                    if (! $rawDay) {
-                        continue;
-                    }
-
-                    $cleanDay = strtolower(trim($rawDay));
-                    $dayKey = $dayMap[$cleanDay] ?? null;
-                    if (! $dayKey) {
-                        continue;
-                    }
-
-                    $img = null;
-                    if (! empty($it['images_json'])) {
-                        $d = json_decode($it['images_json'], true);
-                        $img = $d['jpg']['large_image_url'] ?? $d['jpg']['image_url'] ?? null;
-                    }
-
-                    $workId = $it['work_id'] ?? $it['catalog_key'] ?? $it['id'];
-                    $workId = str_replace('work:', '', $workId);
-
-                    $calendar[$dayKey][] = [
-                        'id' => $workId,
-                        'title' => $it['title'] ?? 'Obra da Temporada',
-                        'image' => $img,
-                        'format' => $it['format'] ?? 'TV',
-                        'time' => $it['airing_time'] ?? 'TBA',
-                        'episode' => $it['latest_episode_num'] ?? 1,
-                        'is_adult' => (bool) ($it['is_adult'] ?? false),
-                    ];
+            foreach ($rows as $row) {
+                $cleanDay = strtolower(trim((string) ($row->airing_day ?? '')));
+                $dayKey = $dayMap[$cleanDay] ?? null;
+                if (! $dayKey) {
+                    continue;
                 }
 
-                // Ordena cada dia pelo horário de exibição
-                foreach ($calendar as $key => &$dayItems) {
-                    usort($dayItems, function ($a, $b) {
-                        return strcmp($a['time'] ?? '99:99', $b['time'] ?? '99:99');
-                    });
-                }
-                unset($dayItems);
-
-                return $calendar;
-            } catch (\Throwable $e) {
-                // Em caso de falha no índice, usa a consulta relacional como fallback
-                $daysMapping = [
-                    'mondays' => 'Monday',
-                    'tuesdays' => 'Tuesday',
-                    'wednesdays' => 'Wednesday',
-                    'thursdays' => 'Thursday',
-                    'fridays' => 'Friday',
-                    'saturdays' => 'Saturday',
-                    'sundays' => 'Sunday',
+                $isAnime = strtolower((string) ($row->media ?? 'anime')) === 'anime';
+                $calendar[$dayKey][] = [
+                    'id' => (string) $row->id,
+                    'title' => (string) ($row->title ?? 'Obra da Temporada'),
+                    'image' => $row->image_url ?: null,
+                    'format' => strtoupper((string) ($row->format ?: ($isAnime ? 'TV' : 'MANGA'))),
+                    'media' => $isAnime ? 'anime' : 'literature',
+                    'unit_label' => $isAnime ? 'Ep.' : 'Cap.',
+                    'time' => $row->airing_time ?: 'TBA',
+                    'episode' => max(1, (int) ($row->latest_episode_num ?? 1)),
+                    'is_adult' => (bool) ($row->is_adult ?? false),
                 ];
-
-                foreach ($daysMapping as $key => $dayName) {
-                    $worksQuery = DB::table('catalog_work_schedules as s')
-                        ->join('catalog_works as w', 'w.id', '=', 's.work_id')
-                        ->join('catalog_work_assets as a', 'a.work_id', '=', 's.work_id')
-                        ->where('s.airing_day', $dayName)
-                        ->whereNotNull('a.image_url');
-
-                    if (! $allowAdult) {
-                        $worksQuery->where('w.is_adult', 0);
-                    }
-
-                    $works = $worksQuery
-                        ->orderBy('s.airing_time', 'ASC')
-                        ->get(['w.id', 'w.title', 'w.format', 'w.is_adult', 'a.image_url', 's.airing_time', 's.latest_episode_num']);
-
-                    $items = [];
-                    foreach ($works as $w) {
-                        $items[] = [
-                            'id' => $w->id,
-                            'title' => $this->resolveWorkTitle($w->id, $w->title),
-                            'image' => $w->image_url,
-                            'format' => $w->format ?? 'ANIME',
-                            'time' => $w->airing_time ?? 'TBA',
-                            'episode' => $w->latest_episode_num ?? 1,
-                            'is_adult' => (bool) ($w->is_adult ?? false),
-                        ];
-                    }
-                    $calendar[$key] = $items;
-                }
-
-                return $calendar;
             }
+
+            foreach ($calendar as $key => &$dayItems) {
+                usort($dayItems, function ($a, $b) {
+                    return strcmp($a['time'] ?? '99:99', $b['time'] ?? '99:99');
+                });
+            }
+            unset($dayItems);
+
+            return $calendar;
         });
     }
 

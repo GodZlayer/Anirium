@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\LocksCatalogPipeline;
+use App\Support\CatalogRevisionRecorder;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Console\Isolatable;
 use Illuminate\Http\Client\ConnectionException;
@@ -211,12 +212,7 @@ GQL;
         ));
 
         $indexUpdated = $this->updatePublishedIndexes($entries, $matchedWorkIds);
-        Cache::forget('catalog:home:hero:3latest:canonical:v2');
-        Cache::forget('catalog:calendar:by_day:canonical_full');
-        Cache::forget('catalog:home:hero:3latest:canonical:v3:safe');
-        Cache::forget('catalog:home:hero:3latest:canonical:v3:adult');
-        Cache::forget('catalog:calendar:by_day:canonical_full:v2:safe');
-        Cache::forget('catalog:calendar:by_day:canonical_full:v2:adult');
+        app(CatalogRevisionRecorder::class)->recordBatch('catalog:sync-airing', $matchedWorkIds, 'upsert', 'work');
         $this->info(sprintf('Índices publicados atualizados (%d entradas).', $indexUpdated));
         $this->info('Sincronização concluída com sucesso.');
 

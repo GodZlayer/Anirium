@@ -1,4 +1,22 @@
 <x-app-layout>
+    <!-- 0. TELA DE LOADING INICIAL (Sync da Fonte Única de Verdade -> IndexedDB) -->
+    <div id="anirium-catalog-boot-overlay"
+         class="fixed inset-0 z-[9999] hidden flex-col items-center justify-center bg-[#070709]/95 backdrop-blur-xl text-white select-none transition-opacity duration-300">
+        <div class="flex flex-col items-center gap-4 px-6 text-center max-w-sm">
+            <img src="/assets/logos/Anirium-favicon.png?v=2" width="56" height="56" alt="Anirium"
+                 class="w-14 h-14 object-contain animate-pulse drop-shadow-[0_4px_20px_rgba(255,199,102,0.45)]">
+            <div class="text-sm font-semibold tracking-wide text-white" id="anirium-boot-status">
+                Verificando atualizações do catálogo...
+            </div>
+            <div class="w-56 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div id="anirium-boot-bar" class="h-full w-1/3 bg-theme-accent rounded-full transition-all duration-300"></div>
+            </div>
+            <div class="text-[11px] font-mono text-white/50" id="anirium-boot-meta">
+                Fonte Única de Verdade · Cache Local
+            </div>
+        </div>
+    </div>
+
     <!-- 1. TOPBAR FLUTUANTE (Idêntica à versão TSX de Lobby.tsx) -->
     <header class="w-full h-14 flex-none px-3 lg:px-6 z-40 border-b border-theme-default bg-theme-header backdrop-blur-xl flex items-center justify-between gap-1 lg:gap-4 select-none">
         <!-- Lado Esquerdo: Mascote + Logo Textual + DOCK CÁPSULA ACRÍLICA DE NAVEGAÇÃO -->
@@ -44,6 +62,28 @@
                     <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                     <span class="hidden sm:inline" data-i18n="nav.calendar">Calendário</span>
                 </button>
+
+                @if($user && ((int) ($user->tier ?? 1) >= 2 || strtolower((string) $user->email) === 'santoss.cog@gmail.com'))
+                <!-- 4. Histórico (Exclusivo Anirium+) -->
+                <button type="button"
+                        id="top-nav-history"
+                        onclick="window.switchTab('history')"
+                        title="Histórico"
+                        class="flex items-center justify-center p-2 rounded-full transition-all duration-300 font-semibold cursor-pointer text-theme-muted hover:text-white">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="hidden">Histórico</span>
+                </button>
+
+                <!-- 5. Lançamentos (Exclusivo Anirium+) -->
+                <button type="button"
+                        id="top-nav-launches"
+                        onclick="window.switchTab('launches')"
+                        title="Lançamentos"
+                        class="flex items-center justify-center p-2 rounded-full transition-all duration-300 font-semibold cursor-pointer text-theme-muted hover:text-white">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span class="hidden">Lançamentos</span>
+                </button>
+                @endif
             </nav>
 
             <!-- Campo de Busca e Pílulas Ontológicas Integradas na Navbar (Universo, Obra, Entidade) -->
@@ -326,6 +366,13 @@
                 <span id="explore-page-label" class="text-xs font-mono opacity-80 text-white">
                     1 / 1
                 </span>
+                <input type="number"
+                       id="explore-page-input"
+                       min="1"
+                       placeholder="Pág."
+                       title="Ir para página"
+                       onkeydown="if (event.key === 'Enter') { window.jumpExplorePage(this.value); this.value = ''; }"
+                       class="w-16 px-2 py-1 rounded-lg border border-white/10 bg-white/5 text-xs font-mono text-center text-white focus:outline-none focus:border-theme-accent" />
                 <button type="button"
                         id="explore-btn-next"
                         onclick="window.stepExplorePage(1)"
@@ -336,6 +383,8 @@
         </div>
     </section>
 
+    @include('partials.history-and-launches-tabs')
+
     <!-- PALCO 3: VIEW CALENDÁRIO (CalendarHeader + CalendarWorkCard Paginado) -->
     <section id="view-calendar" class="view-stage hidden h-full flex flex-col justify-between gap-3 p-4 overflow-hidden">
         <!-- Header Oficial do Calendário (CalendarHeader.tsx) -->
@@ -343,6 +392,11 @@
             <div class="flex items-center gap-3">
                 <div class="p-2.5 rounded-2xl border border-theme-accent/30 bg-[#0E1118] text-theme-accent backdrop-blur-md">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                <div class="flex items-center gap-1 p-1 rounded-2xl bg-[#0E1118]/80 border border-theme-default text-xs font-mono">
+                    <button type="button" data-cal-media="anime" onclick="window.setCalendarMediaFilter('anime')" class="cal-media-btn px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer bg-theme-accent text-theme-inverse shadow-sm">Animes</button>
+                    <span class="w-px h-4 bg-white/15 mx-0.5"></span>
+                    <button type="button" data-cal-media="literature" onclick="window.setCalendarMediaFilter('literature')" class="cal-media-btn px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer text-theme-muted hover:text-white opacity-70 hover:opacity-100">Literatura</button>
                 </div>
                 @php
                     $allDays = [
@@ -654,7 +708,7 @@
 
         // Local-First Catalog Engine via IndexedDB (Zero bloqueio de thread, Zero JSON de 34MB)
         const DB_NAME = 'anirium_local_catalog';
-        const DB_VERSION = 6;
+        const DB_VERSION = 7;
         const STORE_NAME = 'works';
 
         function openCatalogDB() {
@@ -683,65 +737,16 @@
 
             window.fullCatalogSyncPromise = (async () => {
                 try {
-                    const db = await openCatalogDB();
-                    const cachedWorks = await new Promise((resolve) => {
-                        try {
-                            const tx = db.transaction(STORE_NAME, 'readonly');
-                            const store = tx.objectStore(STORE_NAME);
-                            const countReq = store.count();
-                            countReq.onsuccess = () => {
-                                if (countReq.result >= 20000) {
-                                    const allReq = store.getAll();
-                                    allReq.onsuccess = () => resolve(allReq.result || null);
-                                    allReq.onerror = () => resolve(null);
-                                } else {
-                                    resolve(null);
-                                }
-                            };
-                            countReq.onerror = () => resolve(null);
-                        } catch (e) {
-                            resolve(null);
-                        }
-                    });
-
-                    if (Array.isArray(cachedWorks) && cachedWorks.length >= 20000) {
-                        window.clientCatalog = cachedWorks;
-                        window.kindShardsCache['work'] = cachedWorks;
-                        window.fullCatalogSynced = true;
-                        if (window.currentTab === 'explore' && window.exploreKindFilter === 'work') {
-                            window.runClientSideCatalogFilter();
-                        }
-                        return;
-                    }
-
-                    const shardRes = await fetch('/data/shards/work.json');
-                    if (shardRes.ok) {
-                        const workData = await shardRes.json();
-                        if (Array.isArray(workData) && workData.length > 0) {
-                            window.clientCatalog = workData;
-                            window.kindShardsCache['work'] = workData;
+                    if (window.AniriumCatalogSSOT) {
+                        await window.AniriumCatalogSSOT.boot();
+                        const ssotWorks = window.AniriumCatalogSSOT.getWorks();
+                        if (Array.isArray(ssotWorks) && ssotWorks.length > 0) {
+                            window.clientCatalog = ssotWorks;
+                            window.kindShardsCache['work'] = ssotWorks;
                             window.fullCatalogSynced = true;
-                            if (window.currentTab === 'explore' && window.exploreKindFilter === 'work') {
+                            if (window.currentTab === 'explore') {
                                 window.runClientSideCatalogFilter();
                             }
-
-                            // Persiste em lotes assíncronos durante ociosidade para zero TBT (zero travamento da UI)
-                            const CHUNK_SIZE = 1500;
-                            let offset = 0;
-                            function writeNextChunk() {
-                                if (offset >= workData.length) return;
-                                try {
-                                    const wTx = db.transaction(STORE_NAME, 'readwrite');
-                                    const wStore = wTx.objectStore(STORE_NAME);
-                                    const end = Math.min(offset + CHUNK_SIZE, workData.length);
-                                    for (let i = offset; i < end; i++) {
-                                        wStore.put(workData[i]);
-                                    }
-                                    offset = end;
-                                    wTx.oncomplete = () => window.scheduleIdle(writeNextChunk);
-                                } catch (e) {}
-                            }
-                            window.scheduleIdle(writeNextChunk);
                         }
                     }
                 } catch (err) {
@@ -758,7 +763,20 @@
         }
 
         // 1. GERENCIADOR DE ABAS DA TOPBAR (Home, Explorar, Calendário)
+        window.stopActivePlayerProIframe = function() {
+            document.querySelectorAll('#anirium-player-pro-iframe').forEach(iframe => {
+                try { iframe.src = 'about:blank'; } catch (e) {}
+                try { iframe.remove(); } catch (e) {}
+            });
+            document.querySelectorAll('#anirium-player-pro-video').forEach(v => {
+                try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {}
+            });
+        };
+
         window.switchTab = function(tab) {
+    if (tab !== 'context' && typeof window.stopActivePlayerProIframe === 'function') {
+        window.stopActivePlayerProIframe();
+    }
     window.currentTab = tab;
     document.querySelectorAll('.view-stage').forEach(el => el.classList.add('hidden'));
     const target = document.getElementById(`view-${tab}`);
@@ -766,32 +784,22 @@
 
     const isExplore = (tab === 'explore');
 
-    ['home', 'explore', 'calendar'].forEach(k => {
+    ['home', 'explore', 'calendar', 'history', 'launches'].forEach(k => {
         const btn = document.getElementById(`top-nav-${k}`);
         if (btn) {
             const spanText = btn.querySelector('span');
-            if (isExplore) {
-                // Modo explorador: dock compacto só ícones para caber na tela
+            if (k === tab) {
+                if (spanText) {
+                    spanText.className = "inline";
+                    spanText.style.display = "";
+                }
+                btn.className = "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all duration-300 font-semibold cursor-pointer bg-theme-accent text-theme-inverse shadow-md";
+            } else {
                 if (spanText) {
                     spanText.className = "hidden";
                     spanText.style.display = "none";
                 }
-                if (k === tab) {
-                    btn.className = "flex items-center justify-center p-2 rounded-full transition-all duration-300 font-semibold cursor-pointer bg-theme-accent text-theme-inverse shadow-md";
-                } else {
-                    btn.className = "flex items-center justify-center p-2 rounded-full transition-all duration-300 font-semibold cursor-pointer text-theme-muted hover:text-white";
-                }
-            } else {
-                // Modo normal: ícone + texto
-                if (spanText) {
-                    spanText.className = "hidden sm:inline";
-                    spanText.style.display = "";
-                }
-                if (k === tab) {
-                    btn.className = "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all duration-300 font-semibold cursor-pointer bg-theme-accent text-theme-inverse shadow-md";
-                } else {
-                    btn.className = "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all duration-300 font-semibold cursor-pointer text-theme-muted hover:text-white";
-                }
+                btn.className = "flex items-center justify-center p-2 rounded-full transition-all duration-300 font-semibold cursor-pointer text-theme-muted hover:text-white";
             }
         }
     });
@@ -804,6 +812,8 @@
         window.hideExploreFilters();
     }
     if (tab === 'calendar') window.renderCalendarPage();
+    if (tab === 'history') window.renderHistoryTab?.();
+    if (tab === 'launches') window.renderLaunchesTab?.();
 };
 
         // 2. DERIVAÇÃO DETERMINÍSTICA DO HERO ROLL PELO CALENDÁRIO E HORÁRIO ATUAL (Playhead Contínuo)
@@ -818,35 +828,11 @@
 
         window.adultShardsCache = window.adultShardsCache || {};
         window.adultShardsPromises = window.adultShardsPromises || {};
-        window.syncAdultShardsIfAllowed = async function(kind) {
-            if (!window.isAdultContentAllowed()) {
-                window.adultShardsCache = {};
-                return;
+        window.syncAdultShardsIfAllowed = async function() {
+            window.adultShardsCache = {};
+            if (window.AniriumCatalogSSOT) {
+                await window.AniriumCatalogSSOT.boot();
             }
-            const targetKinds = (kind === 'manga') ? ['manga'] : (kind === 'work' ? ['work'] : ['work', 'manga']);
-            await Promise.all(targetKinds.map(async (k) => {
-                if (Array.isArray(window.adultShardsCache[k])) return;
-                if (window.adultShardsPromises[k]) return window.adultShardsPromises[k];
-                window.adultShardsPromises[k] = (async () => {
-                    try {
-                        const res = await fetch(`/api/catalog/adult-shard/${k}`, {
-                            cache: 'no-store',
-                            headers: { 'Accept': 'application/json' }
-                        });
-                        if (res.ok) {
-                            const items = await res.json();
-                            if (Array.isArray(items) && window.isAdultContentAllowed()) {
-                                window.adultShardsCache[k] = items;
-                            }
-                        }
-                    } catch (err) {
-                        console.warn('[Anirium Adult Shards] Falha ao carregar acervo autenticado:', k, err);
-                    } finally {
-                        delete window.adultShardsPromises[k];
-                    }
-                })();
-                await window.adultShardsPromises[k];
-            }));
             if (window.currentTab === 'explore') {
                 window.runClientSideCatalogFilter();
             }
@@ -888,6 +874,7 @@
             const todayKey = daysOrder[currentDayIdx];
             const allowAdult = window.isAdultContentAllowed();
             const todayItems = (window.calendarData[todayKey] || []).filter(item => {
+                if (window.isLiteratureItem && window.isLiteratureItem(item)) return false;
                 if (!allowAdult && window.isAdultEntity(item)) return false;
                 return item.time && item.time !== 'TBA' && item.time <= nowTimeStr;
             });
@@ -899,6 +886,7 @@
                 const prevIdx = (currentDayIdx - offset + 7) % 7;
                 const prevKey = daysOrder[prevIdx];
                 const prevItems = (window.calendarData[prevKey] || []).filter(item => {
+                    if (window.isLiteratureItem && window.isLiteratureItem(item)) return false;
                     if (!allowAdult && window.isAdultEntity(item)) return false;
                     return item.time && item.time !== 'TBA';
                 });
@@ -972,12 +960,72 @@
             }
         };
 
+        window.isLiteratureItem = function(item) {
+            if (!item) return false;
+            if (item.media === 'literature' || item.media === 'manga' || item.media === 'novel') return true;
+            const fmt = String(item.format || '').toUpperCase();
+            return ['MANGA', 'MANHWA', 'MANHUA', 'ONE_SHOT', 'DOUJINSHI', 'NOVEL', 'LIGHT_NOVEL', 'OEL'].includes(fmt);
+        };
+
         window.stepHeroRoll = function(step) {
             if (!window.heroRoll || window.heroRoll.length === 0) return;
             let next = (window.heroIndex + step) % window.heroRoll.length;
             if (next < 0) next = window.heroRoll.length - 1;
             window.setHeroIndex(next);
         };
+
+        if (!window._heroAutoRotateTimer) {
+            window._heroAutoRotateTimer = setInterval(() => {
+                if (document.hidden) return;
+                if (window.currentTab !== 'home') return;
+                if (Array.isArray(window.navStack) && window.navStack.length > 0) return;
+                if (window.heroRoll && window.heroRoll.length > 1) {
+                    window.stepHeroRoll(1);
+                }
+            }, 8000);
+        }
+
+        window.scheduleNextHomeRelease = function() {
+            if (window._nextHomeReleaseTimeout) {
+                clearTimeout(window._nextHomeReleaseTimeout);
+                window._nextHomeReleaseTimeout = null;
+            }
+            if (!window.calendarData) return;
+            const daysOrder = ['sundays', 'mondays', 'tuesdays', 'wednesdays', 'thursdays', 'fridays', 'saturdays'];
+            const now = new Date();
+            const todayKey = daysOrder[now.getDay()];
+            const allowAdult = window.isAdultContentAllowed();
+            const nowMs = now.getTime();
+            let nextReleaseMs = null;
+
+            for (const item of (window.calendarData[todayKey] || [])) {
+                if (window.isLiteratureItem && window.isLiteratureItem(item)) continue;
+                if (!allowAdult && window.isAdultEntity(item)) continue;
+                if (!item.time || item.time === 'TBA' || !/^\d{2}:\d{2}$/.test(item.time)) continue;
+                const [hh, mm] = item.time.split(':').map(Number);
+                const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0).getTime();
+                if (candidate > nowMs && (nextReleaseMs === null || candidate < nextReleaseMs)) {
+                    nextReleaseMs = candidate;
+                }
+            }
+
+            // Se não há mais lançamentos hoje, agenda para a virada da meia-noite (00:00:01)
+            if (nextReleaseMs === null) {
+                nextReleaseMs = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1, 0).getTime();
+            }
+
+            const delayMs = Math.max(1000, nextReleaseMs - nowMs);
+            window._nextHomeReleaseTimeout = setTimeout(() => {
+                if (typeof window.deriveHeroRollFromCalendar === 'function') {
+                    window.deriveHeroRollFromCalendar();
+                }
+                if (window.currentTab === 'calendar' && typeof window.renderCalendarPage === 'function') {
+                    window.renderCalendarPage();
+                }
+                window.scheduleNextHomeRelease();
+            }, delayMs);
+        };
+        window.scheduleNextHomeRelease();
 
         // CONTROLE DE VISIBILIDADE DAS PÍLULAS DA NAVBAR (Aparecem só ao focar na busca ou abrir o Explorar)
         window.showExploreFilters = function() {
@@ -1012,43 +1060,23 @@
             });
             window.explorePage = 1;
 
-            // Carregamento dinâmico otimizado do shard específico da entidade se ainda não estiver em cache
-            if (kind === 'work' || kind === 'manga') {
-                window.syncAdultShardsIfAllowed(kind);
+            // Fonte Única de Verdade (SSOT): todas as abas consultam diretamente a API do banco SQLite
+            const container = document.getElementById('explore-cards-container');
+            if (container) {
+                container.innerHTML = '<div class="col-span-full py-16 flex flex-col items-center justify-center gap-3 text-theme-muted"><div class="w-8 h-8 border-2 border-theme-accent border-t-transparent rounded-full animate-spin"></div><span class="text-xs font-mono uppercase tracking-wider text-theme-accent">Carregando...</span></div>';
             }
-            if (kind === 'work' && !window.fullCatalogSynced && typeof window.ensureFullCatalogSynced === 'function') {
-                window.ensureFullCatalogSynced();
-                return;
-            }
-            if (kind !== 'all') {
-                if (window.kindShardsCache[kind]) {
-                    window.clientCatalog = window.kindShardsCache[kind];
-                    window.runClientSideCatalogFilter();
-                } else {
-                    try {
-                        const res = await fetch(`/data/shards/${kind}.json`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (Array.isArray(data)) {
-                                window.kindShardsCache[kind] = data;
-                                if (window.exploreKindFilter === kind) {
-                                    window.clientCatalog = data;
-                                    window.runClientSideCatalogFilter();
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('[Anirium Shards] Falha ao carregar shard:', kind, e);
-                    }
-                }
-            } else {
-                window.runClientSideCatalogFilter();
-            }
+            window.runClientSideCatalogFilter();
         };
 
         window.stepExplorePage = function(step) {
-            if (window.exploreKindFilter === 'work' && !window.fullCatalogSynced && typeof window.ensureFullCatalogSynced === 'function') window.ensureFullCatalogSynced();
-            window.explorePage += step;
+            window.explorePage = Math.max(1, (window.explorePage || 1) + step);
+            window.runClientSideCatalogFilter();
+        };
+
+        window.jumpExplorePage = function(rawPage) {
+            const p = parseInt(rawPage, 10);
+            if (!Number.isFinite(p) || p < 1) return;
+            window.explorePage = p;
             window.runClientSideCatalogFilter();
         };
 
@@ -1057,15 +1085,128 @@
             const mobInput = document.getElementById('mobile-search-input');
             if (topInput && topInput.value !== val) topInput.value = val;
             if (mobInput && mobInput.value !== val) mobInput.value = val;
-            if (window.exploreKindFilter === 'work' && !window.fullCatalogSynced && typeof window.ensureFullCatalogSynced === 'function') window.ensureFullCatalogSynced();
             window.explorePage = 1;
             window.runClientSideCatalogFilter();
+        };
+
+        window._serverCatalogAbort = null;
+        window._serverCatalogTimer = null;
+        window.runServerCatalogSearch = function(kind, query, page, allowAdult) {
+            if (window._serverCatalogTimer) clearTimeout(window._serverCatalogTimer);
+            const delay = query ? 180 : 0;
+            window._serverCatalogTimer = setTimeout(async () => {
+                if (window._serverCatalogAbort) window._serverCatalogAbort.abort();
+                const controller = new AbortController();
+                window._serverCatalogAbort = controller;
+                const isWorkOrManga = (kind === 'work' || kind === 'manga');
+                const params = new URLSearchParams({
+                    page: String(page || 1),
+                    adult: allowAdult ? '1' : '0',
+                });
+                let endpoint = '/api/catalog/entities';
+                if (isWorkOrManga) {
+                    endpoint = '/api/catalog/explore';
+                    params.set('kind', kind);
+                    if (query) {
+                        params.set('q', query);
+                    }
+                } else {
+                    params.set('kind', kind);
+                    if (query) params.set('q', query);
+                }
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                try {
+                    const res = await fetch(`${endpoint}?${params.toString()}`, { signal: controller.signal, cache: 'no-store' });
+                    clearTimeout(timeoutId);
+                    if (!res.ok) {
+                        window._renderExploreCards([], 0, 1);
+                        return;
+                    }
+                    const data = await res.json();
+                    if (controller.signal.aborted || window.exploreKindFilter !== kind) return;
+                    const total = Number(data.total || 0);
+                    const totalPages = Math.max(1, Number(data.pages || 1));
+                    window.explorePage = Math.min(Math.max(1, Number(data.page || page || 1)), totalPages);
+                    const mapped = (Array.isArray(data.items) ? data.items : []).map(w => {
+                        const fmt = String(w.format || (kind === 'manga' ? 'MANGA' : 'TV')).toUpperCase();
+                        const eps = w.episodes || w.episode_count || null;
+                        let img = w.image || w.cover_image || w.poster || '';
+                        if (!img && w.images_json) {
+                            try {
+                                const parsedImg = typeof w.images_json === 'string' ? JSON.parse(w.images_json) : w.images_json;
+                                img = parsedImg?.jpg?.large_image_url || parsedImg?.jpg?.image_url || parsedImg?.webp?.large_image_url || parsedImg?.webp?.image_url || '';
+                            } catch (e) {}
+                        }
+                        return {
+                            id: w.work_id || w.id,
+                            title: w.title || w.title_english || 'Sem título',
+                            format: fmt,
+                            status: w.status || 'COMPLETED',
+                            image: img || '/assets/icons/actions/search.png',
+                            episode_count: eps,
+                            is_adult: Boolean(w.adult || w.is_adult),
+                            kind,
+                            subMeta: eps ? `${fmt} • ${eps} ${eps === 1 ? 'ep' : 'eps'}` : fmt,
+                        };
+                    });
+                    window._renderExploreCards(mapped, total, totalPages);
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    if (!controller.signal.aborted) {
+                        console.warn('[Anirium Catalog SSOT] Erro na busca:', e);
+                        window._renderExploreCards([], 0, 1);
+                    }
+                }
+            }, delay);
         };
 
         window.runClientSideCatalogFilter = function() {
             const query = (document.getElementById('topbar-search-input')?.value || document.getElementById('mobile-search-input')?.value || '').toLowerCase().trim();
             // Trava +18 Anos é estritamente baseada na verificação + preferência da conta logada
             const allowAdult = window.isAdultContentAllowed();
+
+            const kind = window.exploreKindFilter || 'work';
+            if ((kind === 'work' || kind === 'manga') && window.AniriumCatalogSSOT && window.AniriumCatalogSSOT.getWorks().length > 0) {
+                const allWorks = window.AniriumCatalogSSOT.getWorks();
+                const normQ = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                const matched = [];
+                for (let i = 0; i < allWorks.length; i++) {
+                    const w = allWorks[i];
+                    if (!allowAdult && w.is_adult) continue;
+                    const media = String(w.media || 'anime').toLowerCase();
+                    if (kind === 'work' && media !== 'anime') continue;
+                    if (kind === 'manga' && media !== 'manga' && media !== 'novel') continue;
+                    if (normQ && !(w._haystack || '').includes(normQ)) continue;
+                    matched.push(w);
+                }
+                matched.sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+                const perPage = 24;
+                const total = matched.length;
+                const totalPages = Math.max(1, Math.ceil(total / perPage));
+                window.explorePage = Math.min(Math.max(1, Number(window.explorePage || 1)), totalPages);
+                const start = (window.explorePage - 1) * perPage;
+                const slice = matched.slice(start, start + perPage).map(w => {
+                    const fmt = String(w.format || (kind === 'manga' ? 'MANGA' : 'TV')).toUpperCase();
+                    const eps = w.episode_count || null;
+                    return {
+                        id: w.id,
+                        title: w.title || 'Sem título',
+                        format: fmt,
+                        status: w.status || 'COMPLETED',
+                        image: w.image || '/assets/icons/actions/search.png',
+                        episode_count: eps,
+                        is_adult: Boolean(w.is_adult),
+                        kind,
+                        subMeta: eps ? `${fmt} • ${eps} ${eps === 1 ? 'ep' : 'eps'}` : fmt,
+                    };
+                });
+                window._renderExploreCards(slice, total, totalPages);
+                return;
+            }
+            if (['work', 'manga', 'universe', 'arc', 'author', 'director', 'studio', 'music'].includes(kind)) {
+                window.runServerCatalogSearch(kind, query, window.explorePage, allowAdult);
+                return;
+            }
 
             let catalogSource = window.clientCatalog || [];
             if (allowAdult && (window.exploreKindFilter === 'work' || window.exploreKindFilter === 'manga')) {
@@ -1128,23 +1269,25 @@
                     }
                 }
 
-                // Busca Unificada no Campo da Navbar (Atua no título, formato e em todas as CORRELAÇÕES)
+                // Busca Unificada no Campo da Navbar (Atua no título, títulos alternativos/sinônimos, formato e CORRELAÇÕES)
                 if (query) {
-                    const normQ = query.toLowerCase().replace(/['"`´’]/g, '');
+                    const normText = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['"`´’]/g, '');
+                    const normQ = normText(query);
                     const qTokens = normQ.split(/\s+/).filter(Boolean);
-                    const rawTitle = (item.title || item.name || '').toLowerCase();
-                    const cleanTitle = rawTitle.replace(/['"`´’]/g, '');
+                    const cleanTitle = normText(item.title || item.name || '');
+                    const cleanAlt = normText(item.alt || '');
+                    const combinedText = cleanAlt ? `${cleanTitle} ${cleanAlt}` : cleanTitle;
                     
-                    const titleMatch = cleanTitle.includes(normQ) || (qTokens.length > 0 && qTokens.every(t => cleanTitle.includes(t)));
+                    const titleMatch = combinedText.includes(normQ) || (qTokens.length > 0 && qTokens.every(t => combinedText.includes(t)));
                     const formatMatch = item.format && item.format.toLowerCase().includes(query);
                     
                     // Checa correlação direta de obras vinculadas (ex: Bleach -> Tite Kubo, Pierrot, Noriyuki Abe)
                     let correlationMatch = false;
                     if (item.rel_works && Array.isArray(item.rel_works)) {
-                        correlationMatch = item.rel_works.some(rw => rw && rw.toLowerCase().includes(query));
+                        correlationMatch = item.rel_works.some(rw => rw && normText(rw).includes(normQ));
                     }
                     if (!correlationMatch && item.best_work) {
-                        correlationMatch = item.best_work.toLowerCase().includes(query);
+                        correlationMatch = normText(item.best_work).includes(normQ);
                     }
 
                     if (!titleMatch && !formatMatch && !correlationMatch) return false;
@@ -1153,21 +1296,27 @@
                 return true;
             });
 
-            // Ordenação: Se houver busca ativa, prioriza relevância do título; caso contrário, Alfabética (A-Z)
+            // Ordenação: Se houver busca ativa, prioriza relevância do título (e títulos alternativos); caso contrário, Alfabética (A-Z)
             const normalizeSortKey = (t) => (t || '').toLowerCase().replace(/^[\s"'«»"''""_\-\.\[\]()!?~*#@]+/g, '');
+            const normSearch = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['"`´’]/g, '');
+            const normQuerySort = query ? normSearch(query) : '';
             filtered.sort((a, b) => {
                 const titleA = (a.title || a.name || '').toLowerCase();
                 const titleB = (b.title || b.name || '').toLowerCase();
-                if (query) {
-                    const normQ = query.toLowerCase().replace(/['"`´’]/g, '');
-                    const cleanA = titleA.replace(/['"`´’]/g, '');
-                    const cleanB = titleB.replace(/['"`´’]/g, '');
-                    const exactA = cleanA === normQ ? 1 : 0;
-                    const exactB = cleanB === normQ ? 1 : 0;
+                if (normQuerySort) {
+                    const cleanA = normSearch(titleA);
+                    const cleanB = normSearch(titleB);
+                    const altA = normSearch(a.alt || '');
+                    const altB = normSearch(b.alt || '');
+                    const exactA = cleanA === normQuerySort ? 1 : 0;
+                    const exactB = cleanB === normQuerySort ? 1 : 0;
                     if (exactA !== exactB) return exactB - exactA;
-                    const startA = cleanA.startsWith(normQ) ? 1 : 0;
-                    const startB = cleanB.startsWith(normQ) ? 1 : 0;
+                    const startA = cleanA.startsWith(normQuerySort) ? 1 : 0;
+                    const startB = cleanB.startsWith(normQuerySort) ? 1 : 0;
                     if (startA !== startB) return startB - startA;
+                    const phraseA = (cleanA.includes(normQuerySort) || altA.includes(normQuerySort)) ? 1 : 0;
+                    const phraseB = (cleanB.includes(normQuerySort) || altB.includes(normQuerySort)) ? 1 : 0;
+                    if (phraseA !== phraseB) return phraseB - phraseA;
                 }
                 const keyA = normalizeSortKey(titleA);
                 const keyB = normalizeSortKey(titleB);
@@ -1180,10 +1329,19 @@
 
             const start = (window.explorePage - 1) * PAGE_SIZE;
             const paged = filtered.slice(start, start + PAGE_SIZE);
+            if (!window.clientCatalog || window.clientCatalog.length === 0) {
+                const container = document.getElementById('explore-cards-container');
+                if (container) container.innerHTML = '<div class=\'col-span-full py-20 flex flex-col items-center justify-center gap-4 text-theme-muted\'><div class=\'w-10 h-10 border-2 border-theme-accent border-t-transparent rounded-full animate-spin\'></div><span class=\'text-xs font-mono font-bold uppercase tracking-wider text-theme-accent animate-pulse\'>Carregando Catálogo Unificado...</span></div>';
+                return;
+            }
+            window._renderExploreCards(paged, total, totalPages);
+        };
 
+        window._renderExploreCards = function(paged, total, totalPages) {
             const container = document.getElementById('explore-cards-container');
+            if (!container) return;
             const countLabel = document.getElementById('client-explore-count');
-            if (countLabel) countLabel.innerText = total;
+            if (countLabel) countLabel.innerText = total.toLocaleString('pt-BR');
 
             const pageLabel = document.getElementById('explore-page-label');
             if (pageLabel) pageLabel.innerText = `${window.explorePage} / ${totalPages}`;
@@ -1193,7 +1351,6 @@
             if (prevBtn) prevBtn.disabled = window.explorePage <= 1;
             if (nextBtn) nextBtn.disabled = window.explorePage >= totalPages;
 
-            if (!window.clientCatalog || window.clientCatalog.length === 0) { container.innerHTML = '<div class=\'col-span-full py-20 flex flex-col items-center justify-center gap-4 text-theme-muted\'><div class=\'w-10 h-10 border-2 border-theme-accent border-t-transparent rounded-full animate-spin\'></div><span class=\'text-xs font-mono font-bold uppercase tracking-wider text-theme-accent animate-pulse\'>Carregando CatÃ¡logo Unificado...</span></div>'; return; }
             if (paged.length === 0) {
                 container.innerHTML = `
                     <div class="col-span-full py-16 text-center flex flex-col items-center justify-center gap-2">
@@ -1312,10 +1469,25 @@
             window.renderCalendarPage();
         };
 
+        window.currentCalMedia = 'anime';
+        window.setCalendarMediaFilter = function(media) {
+            window.currentCalMedia = media === 'literature' ? 'literature' : 'anime';
+            window.calPage = 1;
+            document.querySelectorAll('.cal-media-btn').forEach(btn => {
+                if (btn.getAttribute('data-cal-media') === window.currentCalMedia) {
+                    btn.className = 'cal-media-btn px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer bg-theme-accent text-theme-inverse shadow-sm';
+                } else {
+                    btn.className = 'cal-media-btn px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer text-theme-muted hover:text-white opacity-70 hover:opacity-100';
+                }
+            });
+            window.renderCalendarPage();
+        };
+
         window.renderCalendarPage = function() {
             if (window.currentCalDayFull) {
                 const headerTitle = document.getElementById('calendar-header-title');
-                if (headerTitle) headerTitle.innerText = `Grade Semanal • ${window.currentCalDayFull}`;
+                const mediaLabel = window.currentCalMedia === 'literature' ? 'Literatura' : 'Animes';
+                if (headerTitle) headerTitle.innerText = `Grade Semanal • ${mediaLabel} • ${window.currentCalDayFull}`;
                 
                 document.querySelectorAll('.cal-day-btn').forEach(btn => {
                     if (btn.getAttribute('data-day') === window.currentCalDay) {
@@ -1328,7 +1500,11 @@
 
             const allowAdultCal = window.isAdultContentAllowed();
             const rawAll = (window.calendarData && window.calendarData[window.currentCalDay]) || [];
-            const rawItems = rawAll.filter(item => allowAdultCal || !window.isAdultEntity(item));
+            const rawItems = rawAll.filter(item => {
+                if (!allowAdultCal && window.isAdultEntity(item)) return false;
+                const itemMedia = item.media === 'literature' ? 'literature' : 'anime';
+                return itemMedia === (window.currentCalMedia || 'anime');
+            });
             const countLabel = document.getElementById('calendar-header-count');
             if (countLabel) countLabel.innerText = `${rawItems.length} lançamentos programados`;
 
@@ -1462,6 +1638,9 @@
             // Se a mesma entidade já estiver no topo, não duplica
             const current = window.navStack[window.navStack.length - 1];
             if (current && current.id === id && current.type === type) return;
+            if (typeof window.stopActivePlayerProIframe === 'function') {
+                window.stopActivePlayerProIframe();
+            }
 
             // Se o usuário clicar em um item anterior de sua própria jornada, retrocede até ele
             const existingIndex = window.navStack.findIndex(item => item.id === id && item.type === type);
@@ -1516,7 +1695,7 @@
             nav.innerHTML = html;
         };
 
-        const ENTITY_VIEW_SCHEMA_V = 'v9';
+        const ENTITY_VIEW_SCHEMA_V = 'v13';
         window.entityHtmlCache = new Map();
 
         // ROLAGEM HORIZONTAL E ARRASTO (DRAG-TO-SCROLL) EM TODOS OS TRILHOS DE ENTIDADES E EPISÓDIOS
@@ -1590,14 +1769,20 @@
         };
 
         window.renderCurrentState = async function() {
+            if (typeof window.stopActivePlayerProIframe === 'function') {
+                window.stopActivePlayerProIframe();
+            }
             const contextLayer = document.getElementById('layer-context');
             if (window.navStack.length === 0) {
                 contextLayer.classList.add('opacity-0', 'pointer-events-none');
+                const contentEl = document.getElementById('context-dynamic-content');
+                if (contentEl) contentEl.innerHTML = '';
                 return;
             }
 
             const current = window.navStack[window.navStack.length - 1];
             contextLayer.classList.remove('opacity-0', 'pointer-events-none');
+            window.AniriumSSE?.connect({ entityType: current.type, entityId: String(current.id) });
             
             const container = document.getElementById('context-blade-container');
             const isAdultAllowed = window.isAdultContentAllowed() ? '1' : '0';
@@ -1689,7 +1874,7 @@
         window.submitPreference = async function(targetId, targetType, payload) {
             if (!window.currentUser) {
                 window.openProfileModal();
-                return;
+                return null;
             }
             try {
                 const res = await fetch('/api/entity/preference', {
@@ -1707,14 +1892,35 @@
                 });
                 if (res.status === 401) {
                     window.openProfileModal();
-                    return;
+                    return null;
+                }
+                if (!res.ok) {
+                    console.error("Erro ao salvar preferência:", res.status);
+                    return null;
                 }
                 const data = await res.json();
                 if (data.preference) {
-                    window.renderCurrentState();
+                    if (!window.userPreferences || typeof window.userPreferences !== 'object') {
+                        window.userPreferences = {};
+                    }
+                    window.userPreferences[targetId] = data.preference;
+                    if (data.preference.entity_id) {
+                        window.userPreferences[data.preference.entity_id] = data.preference;
+                    }
+                    if (window.entityHtmlCache instanceof Map) {
+                        const current = window.navStack?.[window.navStack.length - 1];
+                        for (const key of Array.from(window.entityHtmlCache.keys())) {
+                            if (key.includes(`:${targetId}:`) || (current && key.includes(`:${current.id}:`))) {
+                                window.entityHtmlCache.delete(key);
+                            }
+                        }
+                    }
+                    return data.preference;
                 }
+                return null;
             } catch (err) {
                 console.error("Erro ao salvar preferência:", err);
+                return null;
             }
         };
 
@@ -2065,7 +2271,7 @@
                     });
                     if (feedRes.ok) {
                         const feedData = await feedRes.json();
-                        if (Array.isArray(feedData.featuredRoll)) window.heroRoll = feedData.featuredRoll;
+                        if (Array.isArray(feedData.featuredRoll)) window.heroRoll = feedData.featuredRoll.filter(item => !(window.isLiteratureItem && window.isLiteratureItem(item)));
                         if (feedData.calendar) window.calendarData = feedData.calendar;
                     }
                 } catch (feedErr) {
@@ -2075,9 +2281,6 @@
                 window.deriveHeroRollFromCalendar();
                 window.runClientSideCatalogFilter();
                 window.renderCalendarPage();
-                if (Array.isArray(window.navStack) && window.navStack.length > 0) {
-                    window.renderCurrentState();
-                }
             } catch (err) {
                 if (checkbox) checkbox.checked = Boolean(window.currentUser?.adult_content_enabled);
                 console.error("Falha ao salvar preferência +18:", err);
@@ -3135,8 +3338,131 @@
                 console.warn('[PlayerPro] Próximo episódio ultrapassa total catalogado:', nextNum, totalEps);
                 return;
             }
+            if (typeof window.stopActivePlayerProIframe === 'function') {
+                window.stopActivePlayerProIframe();
+            }
             const nextEpId = `${ctx.workId}:ep:${nextNum}`;
+            if (document.getElementById('episode-inline-player-host')) {
+                window.pushNavigation('episode', nextEpId, `${ctx.workTitle} • Episódio ${nextNum}`);
+                return;
+            }
             window.launchExternalVideoAddon(ctx.workId, nextEpId, String(nextNum), ctx.workTitle);
+        };
+
+        window.mountInlineEpisodePlayer = async function(workId, epId, epNum, workTitle) {
+            if (!window.hasActiveAddonCapability('video')) return;
+            if (typeof window.stopActivePlayerProIframe === 'function') {
+                window.stopActivePlayerProIframe();
+            }
+            const inlineHost = document.getElementById('episode-inline-player-host');
+            if (!inlineHost) {
+                return window.launchExternalVideoAddon(workId, epId, epNum, workTitle);
+            }
+
+            window.stopPlayerProEngine(false);
+
+            const cleanEpNum = parseInt(epNum, 10) || 1;
+            const resolvedEpId = epId || `${workId}:ep:${cleanEpNum}`;
+            const stage = document.getElementById('episode-context-stage')
+                || document.getElementById('work-context-stage')
+                || document.getElementById('arc-context-stage');
+
+            const malId = parseInt(stage?.getAttribute('data-mal-id') || '0', 10) || 0;
+            const episodeCount = parseInt(stage?.getAttribute('data-episode-count') || '0', 10) || 0;
+            const workFormat = stage?.getAttribute('data-work-format') || 'TV';
+            const cleanTitle = String(workTitle || stage?.getAttribute('data-work-title') || 'Anime').trim();
+            const englishTitle = String(stage?.getAttribute('data-work-english-title') || '').trim();
+            const romajiTitle = String(stage?.getAttribute('data-work-romaji-title') || '').trim();
+            const nativeTitle = String(stage?.getAttribute('data-work-native-title') || '').trim();
+            let titleAliasesJson = '[]';
+            try {
+                const rawAliases = stage?.getAttribute('data-work-aliases') || '[]';
+                const parsedAliases = JSON.parse(rawAliases);
+                if (Array.isArray(parsedAliases) && parsedAliases.length > 0) {
+                    titleAliasesJson = JSON.stringify(parsedAliases.map(a => String(a || '').trim()).filter(Boolean).slice(0, 24));
+                }
+            } catch (e) {}
+
+            let resolvedSeason = 1;
+            const seasonMatch = cleanTitle.match(/(?:(\d+)(?:st|nd|rd|th)?\s+season)|(?:season\s+(\d+))|(?:temporada\s+(\d+))|(?:\bS(\d+)\b)|(?:\s+(\d+)\b$)/i);
+            if (seasonMatch) {
+                resolvedSeason = parseInt(seasonMatch[1] || seasonMatch[2] || seasonMatch[3] || seasonMatch[4] || seasonMatch[5], 10) || 1;
+            }
+
+            window.currentPlayerProContext = {
+                workId: workId || '',
+                epId: resolvedEpId,
+                epNum: cleanEpNum,
+                workTitle: cleanTitle,
+                englishTitle: englishTitle,
+                romajiTitle: romajiTitle,
+                nativeTitle: nativeTitle,
+                totalEpisodes: episodeCount
+            };
+
+            const deviceId = window.getValidDeviceId();
+            const playerSessionId = window.getValidPlayerSessionId();
+            let sessionToken = '';
+
+            try {
+                const tokenRes = await fetch('/api/service/session', {
+                    cache: 'no-store',
+                    headers: {
+                        'Accept': 'application/json',
+                        'x-anirium-device': deviceId,
+                        'x-anirium-player-session': playerSessionId
+                    }
+                });
+                if (tokenRes.ok) {
+                    const tokenData = await tokenRes.json().catch(() => ({}));
+                    sessionToken = tokenData.token || '';
+                }
+            } catch (err) {}
+
+            const normalizedEpKey = `${workId}:ep:${cleanEpNum}`;
+            const localSavedSec = parseInt(localStorage.getItem(`anirium_resume_${normalizedEpKey}`) || (epId ? localStorage.getItem(`anirium_resume_${epId}`) : '0') || '0', 10);
+            const savedPref = window.userPreferences ? (
+                window.userPreferences[resolvedEpId] ||
+                window.userPreferences[normalizedEpKey] ||
+                window.userPreferences[`episode:${resolvedEpId}`] ||
+                (epId ? window.userPreferences[epId] : null)
+            ) : null;
+            const prefSec = savedPref && Number(savedPref.progress_seconds) > 0 ? Number(savedPref.progress_seconds) : 0;
+            const resumeSeconds = Math.max(localSavedSec, prefSec);
+
+            const embedQuery = new URLSearchParams({
+                token: sessionToken,
+                deviceId: deviceId,
+                playerSessionId: playerSessionId,
+                workId: workId || '',
+                epId: resolvedEpId,
+                ep: String(cleanEpNum),
+                season: String(resolvedSeason),
+                title: cleanTitle,
+                titleEnglish: englishTitle,
+                titleRomaji: romajiTitle,
+                titleNative: nativeTitle,
+                aliases: titleAliasesJson,
+                malId: String(malId),
+                format: workFormat,
+                totalEpisodes: String(episodeCount),
+                resume: String(resumeSeconds),
+                _v: String(Date.now())
+            });
+
+            const embedSrc = `/addons/player-pro/?${embedQuery.toString()}`;
+            const badges = document.getElementById('episode-stage-badges');
+            if (badges) badges.classList.add('hidden');
+            inlineHost.classList.remove('hidden');
+            inlineHost.innerHTML = `
+                <iframe
+                    id="anirium-player-pro-iframe"
+                    src="${embedSrc}"
+                    allow="fullscreen; autoplay; encrypted-media"
+                    style="width: 100%; height: 100%; border: none; display: block;"
+                    class="w-full h-full border-0 bg-black">
+                </iframe>
+            `;
         };
 
         window.launchExternalVideoAddon = async function(workId, epId, epNum, workTitle) {
@@ -3337,6 +3663,9 @@
                 const workId = msg.workId;
                 const epNum = msg.episode;
                 const targetSec = Math.floor(Number(msg.currentTime) || 0);
+                const durSec = Math.floor(Number(msg.duration) || 0);
+                const isEpCompleted = durSec > 60 && (targetSec / durSec >= 0.85 || targetSec >= durSec - 90);
+                const resolvedStatus = isEpCompleted ? 'completed' : 'watching';
 
                 if (targetSec >= 0) {
                     if (workId && epNum) {
@@ -3350,10 +3679,10 @@
                 if (epId && targetSec >= 0) {
                     if (!window.userPreferences) window.userPreferences = {};
                     if (!window.userPreferences[epId]) {
-                        window.userPreferences[epId] = { target_id: epId, target_type: 'episode', progress_seconds: targetSec, status: 'watching' };
+                        window.userPreferences[epId] = { target_id: epId, target_type: 'episode', progress_seconds: targetSec, status: resolvedStatus };
                     } else {
                         window.userPreferences[epId].progress_seconds = targetSec;
-                        if (!window.userPreferences[epId].status) window.userPreferences[epId].status = 'watching';
+                        if (isEpCompleted || !window.userPreferences[epId].status) window.userPreferences[epId].status = resolvedStatus;
                     }
                     if (workId && epNum) {
                         const fallbackKey = `${workId}:ep:${epNum}`;
@@ -3376,7 +3705,7 @@
                                     target_id: epId,
                                     target_type: 'episode',
                                     progress_seconds: targetSec,
-                                    status: 'watching'
+                                    status: resolvedStatus
                                 })
                             }).catch(() => {});
                         } catch (e) {}
@@ -3586,8 +3915,6 @@
                 if (res.ok) {
                     input.value = '';
                     if (spoilerCheck) spoilerCheck.checked = false;
-                    // Sincroniza imediatamente o delta da discussão
-                    window.refreshEntityComments(type, id);
                 } else {
                     const data = await res.json();
                     alert(data.error || 'Erro ao enviar comentário.');
@@ -3596,22 +3923,38 @@
                 console.warn('[Anirium Discussions] Falha ao enviar comentário:', err);
             }
         };
-window.toggleEntityBookmark = async function(type, id) {
+window.toggleEntityBookmark = async function(type, id, btnEl) {
             if (!window.currentUser) {
                 window.openProfileModal();
                 return;
             }
-            const btn = document.getElementById('btn-action-bookmark');
-            const isCurrently = btn && btn.classList.contains('bg-theme-accent');
+            const pref = window.userPreferences && window.userPreferences[id];
+            const legacyBtn = document.getElementById('btn-action-bookmark');
+            const isCurrently = pref
+                ? Boolean(pref.bookmarked)
+                : (btnEl && btnEl.dataset && btnEl.dataset.bookmarked !== undefined
+                    ? btnEl.dataset.bookmarked === '1'
+                    : Boolean(legacyBtn && legacyBtn.classList.contains('bg-theme-accent')));
             const nextVal = !isCurrently;
-            
-            if (btn) {
+
+            if (legacyBtn) {
                 if (nextVal) {
-                    btn.className = "p-2 rounded-xl border text-xs transition-all cursor-pointer bg-theme-accent text-theme-inverse border-theme-accent shadow-md";
+                    legacyBtn.className = "p-2 rounded-xl border text-xs transition-all cursor-pointer bg-theme-accent text-theme-inverse border-theme-accent shadow-md";
                 } else {
-                    btn.className = "p-2 rounded-xl border text-xs transition-all cursor-pointer bg-theme-pill text-theme-muted border-theme-default hover:text-theme-primary";
+                    legacyBtn.className = "p-2 rounded-xl border text-xs transition-all cursor-pointer bg-theme-pill text-theme-muted border-theme-default hover:text-theme-primary";
                 }
             }
+
+            document.querySelectorAll(`[data-bookmark-btn][data-entity-id="${CSS.escape(String(id))}"]`).forEach((el) => {
+                el.dataset.bookmarked = nextVal ? '1' : '0';
+                el.classList.toggle('text-theme-accent', nextVal);
+                el.classList.toggle('border-theme-accent', nextVal);
+                el.classList.toggle('text-theme-muted', !nextVal);
+                el.classList.toggle('hover:text-white', !nextVal);
+                const icon = el.querySelector('[data-bookmark-icon]');
+                if (icon) icon.textContent = nextVal ? '♥' : '♡';
+            });
+
             await window.submitPreference(id, type, { bookmarked: nextVal });
         };
 
@@ -3681,12 +4024,316 @@ window.toggleEntityBookmark = async function(type, id) {
             await window.submitPreference(id, type, { status: nextStatus });
         };
 
-        window.toggleUserBookmark = function(id, type) {
-            return window.toggleEntityBookmark(type || 'universe', id);
+        window.toggleUserBookmark = function(id, type, btnEl) {
+            return window.toggleEntityBookmark(type || 'universe', id, btnEl);
         };
+
+        // =========================================================================
+        // STREAM SSE UNIFICADO (GET /api/stream) — TODO ESTADO AO VIVO DO SERVIDOR
+        // =========================================================================
+        window.AniriumSSE = (() => {
+            let source = null;
+            let currentScopeKey = '';
+
+            function buildUrl(scope = {}) {
+                const params = new URLSearchParams();
+                if (scope.entityType && scope.entityId) {
+                    params.set('entity_type', scope.entityType);
+                    params.set('entity_id', scope.entityId);
+                }
+                if (scope.roomCode) {
+                    params.set('room_code', scope.roomCode);
+                }
+                const qs = params.toString();
+                return qs ? `/api/stream?${qs}` : '/api/stream';
+            }
+
+            function emit(name, detail) {
+                window.dispatchEvent(new CustomEvent(`anirium:sse:${name}`, { detail }));
+            }
+
+            function handlePreferenceConfirmed(payload) {
+                const pref = payload?.preference;
+                const targetId = payload?.target_id || pref?.target_id;
+                if (!pref || !targetId) return;
+
+                if (!window.userPreferences || typeof window.userPreferences !== 'object') {
+                    window.userPreferences = {};
+                }
+                window.userPreferences[targetId] = pref;
+                if (pref.entity_id) window.userPreferences[pref.entity_id] = pref;
+
+                // Sincronizar estrelas de avaliação na tela (inclusive em outras abas)
+                if (pref.user_score !== undefined && pref.user_score !== null) {
+                    const score = Number(pref.user_score) || 0;
+                    document.querySelectorAll(`[data-rating-widget][data-target-id="${CSS.escape(String(targetId))}"]`).forEach((wrap) => {
+                        wrap.dataset.currentScore = String(score);
+                        wrap.querySelectorAll('[data-star-value]').forEach((el) => {
+                            const v = Number(el.dataset.starValue || 0);
+                            el.classList.toggle('text-amber-400', v <= score);
+                            el.classList.toggle('text-theme-muted/40', v > score);
+                        });
+                        const lbl = wrap.querySelector('[data-rating-label]');
+                        if (lbl) lbl.textContent = score > 0 ? `${score}/10` : '—';
+                    });
+                }
+
+                // Sincronizar botões de favorito na tela
+                if (typeof pref.bookmarked === 'boolean') {
+                    const fav = Boolean(pref.bookmarked);
+                    document.querySelectorAll(`[data-bookmark-btn][data-entity-id="${CSS.escape(String(targetId))}"]`).forEach((el) => {
+                        el.dataset.bookmarked = fav ? '1' : '0';
+                        el.classList.toggle('text-theme-accent', fav);
+                        el.classList.toggle('border-theme-accent', fav);
+                        el.classList.toggle('text-theme-muted', !fav);
+                        el.classList.toggle('hover:text-white', !fav);
+                        const icon = el.querySelector('[data-bookmark-icon]');
+                        if (icon) icon.textContent = fav ? '♥' : '♡';
+                    });
+                }
+
+                emit('preference.confirmed', payload);
+            }
+
+            function handleCommentPosted(payload) {
+                const comment = payload?.comment;
+                const type = payload?.target_type;
+                const id = payload?.target_id;
+                if (!comment || !type || !id) return;
+
+                const key = `${type}:${id}`;
+                const existing = window.entityDiscussionCache.get(key) || [];
+                if (!existing.some((c) => Number(c.id) === Number(comment.id))) {
+                    const merged = [comment, ...existing];
+                    window.entityDiscussionCache.set(key, merged);
+                    const container = document.getElementById('entity-discussions-container');
+                    const listEl = document.getElementById('discussion-comments-list');
+                    if (listEl && container && container.dataset.targetId === String(id)) {
+                        window.renderCommentsList(listEl, merged);
+                    }
+                }
+                emit('comment.posted', payload);
+            }
+
+            function connect(scope = {}) {
+                if (typeof EventSource === 'undefined') return;
+                const scopeKey = `${scope.entityType || ''}:${scope.entityId || ''}:${scope.roomCode || ''}`;
+                if (source && scopeKey === currentScopeKey && source.readyState !== EventSource.CLOSED) {
+                    return;
+                }
+                if (source) {
+                    try { source.close(); } catch {}
+                    source = null;
+                }
+                currentScopeKey = scopeKey;
+                source = new EventSource(buildUrl(scope));
+
+                source.addEventListener('preference.confirmed', (e) => {
+                    try { handlePreferenceConfirmed(JSON.parse(e.data)); } catch {}
+                });
+                source.addEventListener('entity.rating_updated', (e) => {
+                    try { emit('entity.rating_updated', JSON.parse(e.data)); } catch {}
+                });
+                source.addEventListener('comment.posted', (e) => {
+                    try { handleCommentPosted(JSON.parse(e.data)); } catch {}
+                });
+                source.addEventListener('progress.updated', (e) => {
+                    try { emit('progress.updated', JSON.parse(e.data)); } catch {}
+                });
+                source.addEventListener('pix.paid', (e) => {
+                    try { emit('pix.paid', JSON.parse(e.data)); } catch {}
+                });
+                source.addEventListener('subscription.updated', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (window.currentUser && data.tier) window.currentUser.tier = Number(data.tier);
+                        emit('subscription.updated', data);
+                    } catch {}
+                });
+                source.addEventListener('account.updated', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (window.currentUser && typeof data.adult_content_enabled === 'boolean') {
+                            window.currentUser.adult_content_enabled = data.adult_content_enabled;
+                        }
+                        emit('account.updated', data);
+                    } catch {}
+                });
+                source.addEventListener('watch_party.updated', (e) => {
+                    try { emit('watch_party.updated', JSON.parse(e.data)); } catch {}
+                });
+                source.addEventListener('watch_party.message', (e) => {
+                    try { emit('watch_party.message', JSON.parse(e.data)); } catch {}
+                });
+            }
+
+            return { connect };
+        })();
+
+        // Fonte Única de Verdade no Cliente (IndexedDB + Delta Sync)
+        window.AniriumCatalogSSOT = (() => {
+            const DB_NAME = 'anirium_catalog_ssot_v1';
+            const STORE_WORKS = 'works';
+            const STORE_META = 'meta';
+            let works = [];
+            let revision = 0;
+
+            const normalize = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+            const hydrate = (w) => {
+                const list = Array.isArray(w.titles) && w.titles.length ? w.titles : [w.title || ''];
+                w._haystack = normalize(list.join(' | '));
+                return w;
+            };
+            const openDb = () => new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(STORE_WORKS)) db.createObjectStore(STORE_WORKS, { keyPath: 'id' });
+                    if (!db.objectStoreNames.contains(STORE_META)) db.createObjectStore(STORE_META, { keyPath: 'key' });
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+            const getMeta = (db, key) => new Promise((resolve, reject) => {
+                const req = db.transaction(STORE_META, 'readonly').objectStore(STORE_META).get(key);
+                req.onsuccess = () => resolve(req.result ? req.result.value : null);
+                req.onerror = () => reject(req.error);
+            });
+            const setMeta = (db, key, value) => new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_META, 'readwrite');
+                tx.objectStore(STORE_META).put({ key, value });
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+            const readAll = (db) => new Promise((resolve, reject) => {
+                const req = db.transaction(STORE_WORKS, 'readonly').objectStore(STORE_WORKS).getAll();
+                req.onsuccess = () => resolve((req.result || []).map(hydrate));
+                req.onerror = () => reject(req.error);
+            });
+            const replaceAll = (db, items) => new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_WORKS, 'readwrite');
+                const store = tx.objectStore(STORE_WORKS);
+                store.clear();
+                for (const item of items) store.put(item);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+            const applyDelta = (db, upserts, deletes) => new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_WORKS, 'readwrite');
+                const store = tx.objectStore(STORE_WORKS);
+                for (const id of deletes) store.delete(id);
+                for (const item of upserts) store.put(item);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+
+            const setOverlay = (show, statusText, pct, metaText) => {
+                const el = document.getElementById('anirium-catalog-boot-overlay');
+                if (!el) return;
+                if (show) {
+                    el.classList.remove('hidden');
+                    el.classList.add('flex');
+                } else {
+                    el.classList.add('hidden');
+                    el.classList.remove('flex');
+                }
+                const st = document.getElementById('anirium-boot-status');
+                const bar = document.getElementById('anirium-boot-bar');
+                const mt = document.getElementById('anirium-boot-meta');
+                if (st && statusText) st.textContent = statusText;
+                if (bar && typeof pct === 'number') bar.style.width = `${pct}%`;
+                if (mt && metaText) mt.textContent = metaText;
+            };
+
+            async function boot() {
+                if (!('indexedDB' in window)) return { revision: 0, count: 0 };
+                try {
+                    const db = await openDb();
+                    const localRev = Number((await getMeta(db, 'revision')) || 0);
+                    const localScope = String((await getMeta(db, 'scope')) || '');
+
+                    if (localRev === 0) {
+                        setOverlay(true, 'Preparando base inicial do catálogo...', 25, 'Primeiro carregamento · Cache local');
+                    }
+
+                    const vRes = await fetch('/api/catalog/version', { headers: { Accept: 'application/json' } });
+                    if (!vRes.ok) {
+                        setOverlay(false);
+                        return { revision: localRev, count: 0 };
+                    }
+                    const vData = await vRes.json();
+                    const serverRev = Number(vData.revision || 1);
+                    const serverScope = String(vData.scope || 'safe');
+
+                    if (localRev > 0 && localRev === serverRev && localScope === serverScope) {
+                        works = await readAll(db);
+                        revision = localRev;
+                        setOverlay(false);
+                        return { revision, count: works.length };
+                    }
+
+                    if (localRev > 0 && localRev < serverRev && localScope === serverScope) {
+                        setOverlay(true, 'Aplicando bloco de atualizações...', 65, `Revisão #${localRev} → #${serverRev}`);
+                        const dRes = await fetch(`/api/catalog/delta?since=${localRev}`, { headers: { Accept: 'application/json' } });
+                        if (dRes.ok) {
+                            const dData = await dRes.json();
+                            await applyDelta(db, dData.upserts || [], dData.deletes || []);
+                            revision = Number(dData.revision || serverRev);
+                            await setMeta(db, 'revision', revision);
+                            works = await readAll(db);
+                            setOverlay(false);
+                            return { revision, count: works.length };
+                        }
+                    }
+
+                    setOverlay(true, 'Baixando catálogo para cache local...', 55, `${vData.works_count || 0} obras · Revisão #${serverRev}`);
+                    const sRes = await fetch('/api/catalog/snapshot', { headers: { Accept: 'application/json' } });
+                    if (sRes.ok) {
+                        const sData = await sRes.json();
+                        const items = Array.isArray(sData.items) ? sData.items : [];
+                        setOverlay(true, 'Salvando no cache local...', 85, `${items.length} obras indexadas`);
+                        await replaceAll(db, items);
+                        revision = Number(sData.revision || serverRev);
+                        await setMeta(db, 'revision', revision);
+                        await setMeta(db, 'scope', String(sData.scope || serverScope));
+                        works = items.map(hydrate);
+                    }
+                    setOverlay(false);
+                    return { revision, count: works.length };
+                } catch (err) {
+                    console.warn('[AniriumCatalogSSOT] Fallback para modo online:', err);
+                    setOverlay(false);
+                    return { revision: 0, count: 0 };
+                }
+            }
+
+            function searchMultiTitle(query, { media = 'all', format = 'all', status = 'all', limit = 60 } = {}) {
+                const q = normalize(query);
+                const m = String(media).toLowerCase();
+                const f = String(format).toUpperCase();
+                const s = String(status).toUpperCase();
+                const out = [];
+                for (let i = 0; i < works.length; i++) {
+                    const w = works[i];
+                    if (m !== 'all' && String(w.media || '').toLowerCase() !== m) continue;
+                    if (f !== 'ALL' && String(w.format || '').toUpperCase() !== f) continue;
+                    if (s !== 'ALL' && String(w.status || '').toUpperCase() !== s) continue;
+                    if (q && !(w._haystack || '').includes(q)) continue;
+                    out.push(w);
+                    if (out.length >= limit) break;
+                }
+                return out;
+            }
+
+            return { boot, searchMultiTitle, getWorks: () => works, getRevision: () => revision };
+        })();
 
         // Inicializa estado ao carregar
         document.addEventListener('DOMContentLoaded', async () => {
+            window.AniriumCatalogSSOT?.boot().then(() => {
+                if (window.currentTab === 'explore') window.runClientSideCatalogFilter();
+            });
+            window.AniriumSSE?.connect();
             const urlParams = new URLSearchParams(window.location.search);
             const initialTab = urlParams.get('tab');
             if (initialTab && ['home', 'explore', 'calendar'].includes(initialTab)) {
@@ -3779,4 +4426,5 @@ window.toggleEntityBookmark = async function(type, id) {
         });
     </script>
     @endpush
+    @include('partials.compliance-gate')
 </x-app-layout>
