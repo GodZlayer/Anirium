@@ -14,25 +14,27 @@ class CurateUniversesCommand extends Command
 
     public function handle(): int
     {
+        @ini_set('memory_limit', '1024M');
         $dryRun = (bool) $this->option('dry-run');
         $this->info('Iniciando curadoria de Universos Canônicos...');
 
         $pdo = DB::connection()->getPdo();
 
-        // 1. Carregar obras válidas de Anime
-        $this->line('1. Carregando animes oficiais...');
-        $stmtWorks = $pdo->query("SELECT id, title, format, episode_count FROM catalog_works WHERE media='anime'");
+        // 1. Carregar obras oficiais (excluindo DOUJINSHI e OTHER que fundem franquias distintas por crossovers)
+        $this->line('1. Carregando obras oficiais (anime, manga, novel)...');
+        $stmtWorks = $pdo->query("SELECT id, title, format, episode_count FROM catalog_works WHERE media IN ('anime', 'manga', 'novel') AND UPPER(COALESCE(format, '')) NOT IN ('DOUJINSHI', 'OTHER') AND LOWER(COALESCE(title, '')) NOT LIKE '% dj - %'");
         $works = [];
         while ($row = $stmtWorks->fetch(\PDO::FETCH_ASSOC)) {
             $works[$row['id']] = $row;
         }
         $validAnimeIds = array_keys($works);
         $validAnimeSet = array_flip($validAnimeIds);
-        $this->info('Total de Animes oficiais carregados: '.count($works));
+        $this->info('Total de Obras oficiais carregadas: '.count($works));
 
-        // 2. Carregar relações canônicas
+        // 2. Carregar relações canônicas (incluindo adaptation entre anime/mangá/novel)
         $this->line('2. Carregando relações canônicas...');
         $canonicalRelations = [
+            'adaptation', 'source', 'alternative', 'main', 'contains', 'series', 'remake', 'reboot', 'expansion',
             'sequel', 'prequel', 'parent', 'parent_story', 'full_story',
             'side_story', 'spin_off', 'alternative_version', 'alternative_setting', 'compilation', 'summary',
         ];
@@ -101,10 +103,10 @@ class CurateUniversesCommand extends Command
         // 4. Executar Limpeza e Inserção Atômica
         $this->line('4. Aplicando limpeza e reestruturação atômica...');
 
+        // Desativar foreign keys ANTES da transação (SQLite ignora PRAGMA foreign_keys dentro de transação)
+        $pdo->exec('PRAGMA foreign_keys = OFF');
         $pdo->beginTransaction();
         try {
-            // Desativar foreign keys temporariamente para truncar universos com velocidade
-            $pdo->exec('PRAGMA foreign_keys = OFF');
 
             $this->line('   -> Limpando catalog_universe_works...');
             $pdo->exec('DELETE FROM catalog_universe_works');

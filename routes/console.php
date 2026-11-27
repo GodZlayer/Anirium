@@ -29,10 +29,10 @@ Schedule::command('catalog:curate-universes')
     ->runInBackground()
     ->sendOutputTo(storage_path('logs/catalog-curate-universes.log'));
 
-// Enriquecimento de literatura (capítulos/volumes/limpeza de agenda) após lançamentos semanais (1x/semana na segunda)
-Schedule::command('catalog:enrich-literature --limit=500')
-    ->weeklyOn(1, '05:00')
-    ->withoutOverlapping(45)
+// Força-tarefa contínua de enriquecimento de literatura (capítulos, volumes e capas) com checkpoint retomável
+Schedule::command('catalog:enrich-literature --limit=2000')
+    ->hourly()
+    ->withoutOverlapping(55)
     ->runInBackground()
     ->sendOutputTo(storage_path('logs/catalog-literature-enrich.log'));
 
@@ -42,3 +42,10 @@ Schedule::command('catalog:translate-synopses --limit=500')
     ->withoutOverlapping(60)
     ->runInBackground()
     ->sendOutputTo(storage_path('logs/catalog-translate-synopses.log'));
+
+// Exporta base SQLite pública enxuta (.sqlite.gz) após sincronização diária da grade
+Schedule::command('catalog:export-public-db')
+    ->dailyAt('04:20')
+    ->withoutOverlapping(30)
+    ->runInBackground()
+    ->sendOutputTo(storage_path('logs/catalog-export-public-db.log'));

@@ -400,6 +400,8 @@ class CatalogGraphController extends Controller
                 $workObj = (object) ($result['entity'] ?? []);
                 $arcsObj = collect($result['arcs'] ?? [])->map(fn ($a) => (object) $a);
                 $episodesObj = collect($result['episodes'] ?? [])->map(fn ($e) => (object) $e);
+                $episodeProgressMap = $this->buildEpisodeProgressMap($user, $realId, $episodesObj);
+                $workProgress = $this->summarizeWorkProgress($pref, $episodeProgressMap, max($episodesObj->count(), (int) ($workObj->episode_count ?? 0)));
 
                 return response()->view('partials.context-card', [
                     'work' => $workObj,
@@ -415,11 +417,14 @@ class CatalogGraphController extends Controller
                     'titleAliases' => $titleAliases,
                     'arcs' => $arcsObj,
                     'episodes' => $episodesObj,
+                    'episodeProgressMap' => $episodeProgressMap,
+                    'workProgress' => $workProgress,
+                    'isAniriumPlus' => (bool) ($user && (int) $user->tier >= 2),
                     'isLiked' => (bool) ($pref->liked ?? false),
                     'isBookmarked' => (bool) ($pref->bookmarked ?? false),
                     'userScore' => $pref->user_score ?? null,
                     'userStatus' => $pref->status ?? null,
-                    'isWatched' => ($pref->status ?? '') === 'completed',
+                    'isWatched' => ($pref->status ?? '') === 'completed' || $workProgress['status'] === 'completed',
                 ]);
             }
 
@@ -656,6 +661,8 @@ class CatalogGraphController extends Controller
                     ->first();
             }
 
+            $workProgressMap = $this->buildUniverseWorkProgressMap($user, $works->concat($mangas));
+
             return response()->view('partials.entities.universe-view', [
                 'universe' => $universe,
                 'works' => $works,
@@ -668,6 +675,8 @@ class CatalogGraphController extends Controller
                 'totalEpisodes' => $totalEpisodes,
                 'totalChapters' => $totalChapters,
                 'totalVolumes' => $totalVolumes,
+                'workProgressMap' => $workProgressMap,
+                'isAniriumPlus' => (bool) ($user && (int) $user->tier >= 2),
                 'isLiked' => (bool) ($pref->liked ?? false),
                 'isBookmarked' => (bool) ($pref->bookmarked ?? false),
                 'userScore' => $pref->user_score ?? null,
@@ -1434,6 +1443,34 @@ class CatalogGraphController extends Controller
                     $viewData['currentArc'] = $currentArc;
                 }
 
+                $user = $request->user();
+                $epNum = (int) ($episode->number ?? 1);
+                $epPref = null;
+                if ($user) {
+                    $candidateIds = array_values(array_unique(array_filter([
+                        (string) ($episode->id ?? ''),
+                        "{$episode->work_id}:ep:{$epNum}",
+                        "{$episode->work_id}:ep-{$epNum}",
+                        "episode:{$episode->work_id}:ep-{$epNum}",
+                    ])));
+                    $epPref = DB::table('user_entity_preferences')
+                        ->where('user_id', $user->id)
+                        ->whereIn('target_id', $candidateIds)
+                        ->first();
+                }
+
+                $epProgressEntry = ($viewData['episodeProgressMap'] ?? [])[$epNum] ?? null;
+                $viewData['isLiked'] = (bool) ($epPref->liked ?? false);
+                $viewData['isBookmarked'] = (bool) ($epPref->bookmarked ?? false);
+                $viewData['userScore'] = $epPref->user_score ?? null;
+                $viewData['userStatus'] = $epPref->status ?? null;
+                $viewData['isWatched'] = ($epPref->status ?? '') === 'completed' || (($epProgressEntry['status'] ?? '') === 'completed');
+                $viewData['episodeProgress'] = $epProgressEntry ?? [
+                    'status' => ($epPref->status ?? '') === 'completed' ? 'completed' : (((int) ($epPref->progress_seconds ?? 0) > 0 || ($epPref->status ?? '') === 'watching') ? 'partial' : 'none'),
+                    'percent' => ($epPref->status ?? '') === 'completed' ? 100 : ((int) ($epPref->progress_seconds ?? 0) > 0 ? min(99, max(5, (int) round(((int) $epPref->progress_seconds / 1440) * 100))) : 0),
+                    'progress_seconds' => (int) ($epPref->progress_seconds ?? 0),
+                ];
+
                 return response()->view('partials.entities.episode-view', $viewData);
             }
         }
@@ -1463,5 +1500,441 @@ class CatalogGraphController extends Controller
         }
 
         return response()->file($path, ['Content-Type' => 'application/json']);
+    }
+
+    /**
+     * @return array<int, array{status: string, percent: int, progress_seconds: int}>
+     */
+    private function buildEpisodeProgressMap($user, string $workId, $episodes): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        $epIdToNum = [];
+        foreach ($episodes as $ep) {
+            if (! empty($ep->id) && isset($ep->number)) {
+                $epIdToNum[(string) $ep->id] = (int) $ep->number;
+            }
+        }
+
+        $rows = DB::table('user_entity_preferences')
+            ->where('user_id', $user->id)
+            ->where(function ($q) use ($workId, $epIdToNum) {
+                $q->where('target_id', 'like', "%{$workId}:ep%")
+                    ->orWhere('target_id', 'like', "episode:{$workId}:%");
+                if (! empty($epIdToNum)) {
+                    $q->orWhereIn('target_id', array_keys($epIdToNum));
+                }
+            })
+            ->get(['target_id', 'status', 'progress_seconds']);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $tid = (string) $row->target_id;
+            $epNum = $epIdToNum[$tid] ?? null;
+            if ($epNum === null && preg_match('/ep[:-](\d+)$/i', $tid, $m)) {
+                $epNum = (int) $m[1];
+            }
+            if ($epNum === null || $epNum <= 0) {
+                continue;
+            }
+
+            $seconds = (int) ($row->progress_seconds ?? 0);
+            $isCompleted = ($row->status ?? '') === 'completed';
+            $isPartial = ! $isCompleted && (($row->status ?? '') === 'watching' || $seconds > 0);
+            $status = $isCompleted ? 'completed' : ($isPartial ? 'partial' : 'none');
+            if ($status === 'none') {
+                continue;
+            }
+
+            $percent = $isCompleted ? 100 : ($seconds > 0 ? min(99, max(8, (int) round(($seconds / 1440) * 100))) : 35);
+
+            // Preserve 'completed' if multiple key formats exist for the same episode
+            if (isset($map[$epNum]) && $map[$epNum]['status'] === 'completed') {
+                continue;
+            }
+
+            $map[$epNum] = [
+                'status' => $status,
+                'percent' => $percent,
+                'progress_seconds' => $seconds,
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param  array<int, array{status: string, percent: int, progress_seconds: int}>  $episodeProgressMap
+     * @return array{status: string, watched: int, total: int, percent: int}
+     */
+    private function summarizeWorkProgress($workPref, array $episodeProgressMap, int $totalEpisodes): array
+    {
+        $watched = 0;
+        $hasPartial = false;
+        foreach ($episodeProgressMap as $entry) {
+            if (($entry['status'] ?? '') === 'completed') {
+                $watched++;
+            } elseif (($entry['status'] ?? '') === 'partial') {
+                $hasPartial = true;
+            }
+        }
+
+        $total = max($totalEpisodes, $watched);
+        $workStatus = (string) ($workPref->status ?? '');
+
+        if ($workStatus === 'completed' || ($total > 0 && $watched >= $total)) {
+            return [
+                'status' => 'completed',
+                'watched' => $total > 0 ? $total : max(1, $watched),
+                'total' => $total,
+                'percent' => 100,
+            ];
+        }
+
+        if ($watched > 0 || $hasPartial || $workStatus === 'watching') {
+            $percent = $total > 0 ? min(99, max(8, (int) round(($watched / $total) * 100))) : 25;
+
+            return [
+                'status' => 'partial',
+                'watched' => $watched,
+                'total' => $total,
+                'percent' => $percent,
+            ];
+        }
+
+        return [
+            'status' => 'none',
+            'watched' => 0,
+            'total' => $total,
+            'percent' => 0,
+        ];
+    }
+
+    /**
+     * @return array<string, array{status: string, watched: int, total: int, percent: int}>
+     */
+    private function buildUniverseWorkProgressMap($user, $works): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        $workIds = collect($works)->pluck('id')->filter()->map(fn ($id) => (string) $id)->unique()->values()->all();
+        if (empty($workIds)) {
+            return [];
+        }
+
+        $workPrefs = DB::table('user_entity_preferences')
+            ->where('user_id', $user->id)
+            ->whereIn('target_id', $workIds)
+            ->get(['target_id', 'status', 'progress_seconds'])
+            ->keyBy('target_id');
+
+        $episodeRows = DB::table('user_entity_preferences')
+            ->where('user_id', $user->id)
+            ->where(function ($q) use ($workIds) {
+                foreach ($workIds as $wid) {
+                    $q->orWhere('target_id', 'like', "%{$wid}:ep%")
+                        ->orWhere('target_id', 'like', "episode:{$wid}:%");
+                }
+            })
+            ->get(['target_id', 'status', 'progress_seconds']);
+
+        $epByWork = [];
+        foreach ($episodeRows as $row) {
+            $tid = (string) $row->target_id;
+            foreach ($workIds as $wid) {
+                if (str_contains($tid, $wid) && preg_match('/ep[:-](\d+)$/i', $tid, $m)) {
+                    $epNum = (int) $m[1];
+                    $isCompleted = ($row->status ?? '') === 'completed';
+                    $isPartial = ! $isCompleted && (($row->status ?? '') === 'watching' || (int) ($row->progress_seconds ?? 0) > 0);
+                    if ($isCompleted) {
+                        $epByWork[$wid][$epNum] = 'completed';
+                    } elseif ($isPartial && ($epByWork[$wid][$epNum] ?? '') !== 'completed') {
+                        $epByWork[$wid][$epNum] = 'partial';
+                    }
+                    break;
+                }
+            }
+        }
+
+        $result = [];
+        foreach ($works as $w) {
+            $wid = (string) ($w->id ?? '');
+            if ($wid === '') {
+                continue;
+            }
+            $total = max(0, (int) ($w->episode_count ?? $w->chapter_count ?? 0));
+            $watched = 0;
+            $hasPartial = false;
+            foreach ($epByWork[$wid] ?? [] as $st) {
+                if ($st === 'completed') {
+                    $watched++;
+                } elseif ($st === 'partial') {
+                    $hasPartial = true;
+                }
+            }
+            $pref = $workPrefs->get($wid);
+            $workStatus = (string) ($pref->status ?? '');
+
+            if ($workStatus === 'completed' || ($total > 0 && $watched >= $total)) {
+                $result[$wid] = [
+                    'status' => 'completed',
+                    'watched' => $total > 0 ? $total : max(1, $watched),
+                    'total' => $total,
+                    'percent' => 100,
+                ];
+            } elseif ($watched > 0 || $hasPartial || $workStatus === 'watching') {
+                $percent = $total > 0 ? min(99, max(8, (int) round(($watched / $total) * 100))) : 25;
+                $result[$wid] = [
+                    'status' => 'partial',
+                    'watched' => $watched,
+                    'total' => $total,
+                    'percent' => $percent,
+                ];
+            } else {
+                $result[$wid] = [
+                    'status' => 'none',
+                    'watched' => 0,
+                    'total' => $total,
+                    'percent' => 0,
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    public function searchEntities(Request $request): JsonResponse
+    {
+        $input = $request->validate([
+            'kind' => ['required', 'in:universe,arc,author,director,studio,music'],
+            'q' => ['nullable', 'string', 'max:160'],
+            'page' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
+            'adult' => ['sometimes', 'boolean'],
+        ]);
+
+        $kind = $input['kind'];
+        $query = trim((string) ($input['q'] ?? ''));
+        $page = max(1, (int) ($input['page'] ?? 1));
+        $limit = 12;
+        $offset = ($page - 1) * $limit;
+        $allowAdult = (bool) $request->user()?->canAccessAdultContent() && $request->boolean('adult');
+        $cleanQuery = preg_replace("/['’`´]/u", '', $query) ?? $query;
+        $like = $cleanQuery !== '' ? '%'.str_replace(['%', '_'], ['\\%', '\\_'], $cleanQuery).'%' : null;
+
+        // Obras que dão match no termo pesquisado (2 queries rápidas sem subquery correlacionada)
+        $matchedWorkIds = [];
+        if ($like !== null) {
+            $idsByTitle = DB::table('catalog_works')
+                ->where('title', 'LIKE', $like)
+                ->when(! $allowAdult, fn ($q) => $q->where('is_adult', 0))
+                ->limit(150)
+                ->pluck('id')
+                ->all();
+
+            $idsByLocalized = DB::table('catalog_entity_titles')
+                ->where('title', 'LIKE', $like)
+                ->limit(150)
+                ->pluck('entity_id')
+                ->all();
+
+            $matchedWorkIds = array_values(array_unique(array_merge($idsByTitle, $idsByLocalized)));
+        }
+
+        if ($kind === 'universe') {
+            if ($like !== null) {
+                $universeIdsByTitle = DB::table('catalog_entity_titles')
+                    ->where('title', 'LIKE', $like)
+                    ->whereIn('entity_id', DB::table('catalog_universes')->select('id'))
+                    ->limit(100)
+                    ->pluck('entity_id')
+                    ->all();
+
+                $universeIdsByWork = $matchedWorkIds !== []
+                    ? DB::table('catalog_universe_works')
+                        ->whereIn('work_id', $matchedWorkIds)
+                        ->distinct()
+                        ->pluck('universe_id')
+                        ->all()
+                    : [];
+
+                $universeIds = array_values(array_unique(array_merge($universeIdsByTitle, $universeIdsByWork)));
+                if ($universeIds === []) {
+                    return response()->json(['items' => [], 'total' => 0, 'page' => $page, 'pages' => 1]);
+                }
+
+                $base = DB::table('catalog_universe_works as uw')
+                    ->join('catalog_works as w', 'w.id', '=', 'uw.work_id')
+                    ->whereIn('uw.universe_id', $universeIds)
+                    ->when(! $allowAdult, fn ($q) => $q->where('w.is_adult', 0))
+                    ->groupBy('uw.universe_id')
+                    ->havingRaw('COUNT(DISTINCT uw.work_id) >= 2');
+            } else {
+                $base = DB::table('catalog_universe_works as uw')
+                    ->join('catalog_works as w', 'w.id', '=', 'uw.work_id')
+                    ->when(! $allowAdult, fn ($q) => $q->where('w.is_adult', 0))
+                    ->groupBy('uw.universe_id')
+                    ->havingRaw('COUNT(DISTINCT uw.work_id) >= 2');
+            }
+
+            $total = $query === ''
+                ? (int) Cache::remember('catalog:entities:total:universe:'.($allowAdult ? 'adult' : 'safe'), 3600, fn () => (int) DB::query()->fromSub((clone $base)->select('uw.universe_id'), 'u')->count())
+                : (int) DB::query()->fromSub((clone $base)->select('uw.universe_id'), 'u')->count();
+            $rows = (clone $base)
+                ->leftJoin('catalog_work_assets as a', 'a.work_id', '=', 'w.id')
+                ->leftJoin('catalog_entity_titles as ut', 'ut.entity_id', '=', 'uw.universe_id')
+                ->selectRaw('uw.universe_id as id, COALESCE(MIN(ut.title), MIN(w.title)) as title, MAX(a.image_url) as image, COUNT(DISTINCT uw.work_id) as works_count')
+                ->orderBy('title', 'ASC')
+                ->limit($limit)
+                ->offset($offset)
+                ->get();
+
+            $items = $rows->map(fn ($r) => [
+                'id' => $r->id,
+                'title' => $r->title ?: 'Universo',
+                'format' => 'UNIVERSO',
+                'status' => 'CANON',
+                'image' => $r->image ?: '/assets/icons/actions/search.png',
+                'works_count' => (int) $r->works_count,
+                'kind' => 'universe',
+                'subMeta' => ((int) $r->works_count).' obras',
+            ])->values()->all();
+        } elseif ($kind === 'arc') {
+            if ($like !== null) {
+                $idsByName = DB::table('catalog_arcs')->where('title', 'LIKE', $like)->limit(200)->pluck('id')->all();
+                $idsByRel = $matchedWorkIds !== []
+                    ? DB::table('catalog_arc_works')->whereIn('work_id', $matchedWorkIds)->distinct()->pluck('arc_id')->all()
+                    : [];
+                $arcIds = array_values(array_unique(array_merge($idsByName, $idsByRel)));
+                $base = $arcIds !== [] ? DB::table('catalog_arcs as ar')->whereIn('ar.id', $arcIds) : DB::table('catalog_arcs as ar')->whereRaw('1 = 0');
+            } else {
+                $base = DB::table('catalog_arcs as ar');
+            }
+            $total = (int) (clone $base)->count();
+            $rows = (clone $base)
+                ->select('ar.id', 'ar.title', 'ar.classification')
+                ->orderBy('ar.title', 'ASC')
+                ->limit($limit)
+                ->offset($offset)
+                ->get();
+            $items = $rows->map(fn ($r) => [
+                'id' => $r->id,
+                'title' => $r->title ?: 'Arco',
+                'format' => 'ARC',
+                'status' => strtoupper((string) ($r->classification ?: 'CANON')),
+                'image' => '/assets/icons/actions/search.png',
+                'kind' => 'arc',
+                'subMeta' => strtoupper((string) ($r->classification ?: 'ARC')),
+            ])->values()->all();
+        } elseif ($kind === 'author' || $kind === 'director') {
+            $roles = $kind === 'author' ? ['role_author', 'role_writer'] : ['role_director'];
+            if ($like !== null) {
+                $idsByName = DB::table('catalog_creators as c')
+                    ->where(fn ($sub) => $sub->where('c.name', 'LIKE', $like)->orWhere('c.native_name', 'LIKE', $like))
+                    ->whereExists(fn ($sub) => $sub->select(DB::raw(1))->from('catalog_work_creators as wc')->whereColumn('wc.creator_id', 'c.id')->whereIn('wc.role_id', $roles))
+                    ->limit(200)
+                    ->pluck('c.id')
+                    ->all();
+                $idsByRel = $matchedWorkIds !== []
+                    ? DB::table('catalog_work_creators')
+                        ->whereIn('work_id', $matchedWorkIds)
+                        ->whereIn('role_id', $roles)
+                        ->distinct()
+                        ->pluck('creator_id')
+                        ->all()
+                    : [];
+                $creatorIds = array_values(array_unique(array_merge($idsByName, $idsByRel)));
+                $base = $creatorIds !== [] ? DB::table('catalog_creators as c')->whereIn('c.id', $creatorIds) : DB::table('catalog_creators as c')->whereRaw('1 = 0');
+            } else {
+                $base = DB::table('catalog_creators as c')
+                    ->whereExists(function ($sub) use ($roles) {
+                        $sub->select(DB::raw(1))
+                            ->from('catalog_work_creators as wc')
+                            ->whereColumn('wc.creator_id', 'c.id')
+                            ->whereIn('wc.role_id', $roles);
+                    });
+            }
+            $total = (int) (clone $base)->count();
+            $rows = (clone $base)
+                ->select('c.id', 'c.name', 'c.image_url')
+                ->orderBy('c.name', 'ASC')
+                ->limit($limit)
+                ->offset($offset)
+                ->get();
+            $items = $rows->map(fn ($r) => [
+                'id' => $r->id,
+                'title' => $r->name ?: ucfirst($kind),
+                'format' => strtoupper($kind),
+                'status' => 'CREATOR',
+                'image' => $r->image_url ?: '/assets/icons/actions/search.png',
+                'kind' => $kind,
+                'role' => $kind,
+                'subMeta' => strtoupper($kind),
+            ])->values()->all();
+        } elseif ($kind === 'studio') {
+            if ($like !== null) {
+                $idsByName = DB::table('catalog_studios')->where('name', 'LIKE', $like)->limit(200)->pluck('id')->all();
+                $idsByRel = $matchedWorkIds !== []
+                    ? DB::table('catalog_work_studios')->whereIn('work_id', $matchedWorkIds)->distinct()->pluck('studio_id')->all()
+                    : [];
+                $studioIds = array_values(array_unique(array_merge($idsByName, $idsByRel)));
+                $base = $studioIds !== [] ? DB::table('catalog_studios as s')->whereIn('s.id', $studioIds) : DB::table('catalog_studios as s')->whereRaw('1 = 0');
+            } else {
+                $base = DB::table('catalog_studios as s');
+            }
+            $total = (int) (clone $base)->count();
+            $rows = (clone $base)
+                ->select('s.id', 's.name', 's.image_url')
+                ->orderBy('s.name', 'ASC')
+                ->limit($limit)
+                ->offset($offset)
+                ->get();
+            $items = $rows->map(fn ($r) => [
+                'id' => $r->id,
+                'title' => $r->name ?: 'Estúdio',
+                'format' => 'STUDIO',
+                'status' => 'STUDIO',
+                'image' => $r->image_url ?: '/assets/icons/actions/search.png',
+                'kind' => 'studio',
+                'subMeta' => 'STUDIO',
+            ])->values()->all();
+        } else {
+            if ($like !== null) {
+                $idsByName = DB::table('catalog_tracks')->where('title', 'LIKE', $like)->limit(200)->pluck('id')->all();
+                $idsByRel = $matchedWorkIds !== []
+                    ? DB::table('catalog_work_tracks')->whereIn('work_id', $matchedWorkIds)->distinct()->pluck('track_id')->all()
+                    : [];
+                $trackIds = array_values(array_unique(array_merge($idsByName, $idsByRel)));
+                $base = $trackIds !== [] ? DB::table('catalog_tracks as t')->whereIn('t.id', $trackIds) : DB::table('catalog_tracks as t')->whereRaw('1 = 0');
+            } else {
+                $base = DB::table('catalog_tracks as t');
+            }
+            $total = (int) (clone $base)->count();
+            $rows = (clone $base)
+                ->select('t.id', 't.title', 't.track_type')
+                ->orderBy('t.title', 'ASC')
+                ->limit($limit)
+                ->offset($offset)
+                ->get();
+            $items = $rows->map(fn ($r) => [
+                'id' => $r->id,
+                'title' => $r->title ?: 'Música',
+                'format' => strtoupper((string) ($r->track_type ?: 'MUSIC')),
+                'status' => 'TRACK',
+                'image' => '/assets/icons/actions/search.png',
+                'kind' => 'music',
+                'subMeta' => strtoupper((string) ($r->track_type ?: 'MUSIC')),
+            ])->values()->all();
+        }
+
+        return response()->json([
+            'items' => $items,
+            'total' => $total,
+            'page' => $page,
+            'pages' => max(1, (int) ceil($total / $limit)),
+        ]);
     }
 }

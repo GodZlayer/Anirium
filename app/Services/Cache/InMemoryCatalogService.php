@@ -133,7 +133,8 @@ class InMemoryCatalogService
     {
         $scope = $allowAdult ? 'adult' : 'safe';
 
-        return Cache::remember("catalog:calendar:by_day:ssot:v3:{$scope}", self::TTL_SECONDS, function () use ($allowAdult) {
+        // TTL curto (5 min) para que episódios sejam liberados automaticamente pelo relógio (air_date_utc <= now)
+        return Cache::remember("catalog:calendar:by_day:ssot:v3:{$scope}", 300, function () use ($allowAdult) {
             $dayMap = [
                 'monday' => 'mondays',
                 'mondays' => 'mondays',
@@ -193,6 +194,22 @@ class InMemoryCatalogService
                 )
                 ->get();
 
+            $workIds = $rows->pluck('id')->all();
+            $airedByClock = [];
+            if ($workIds !== []) {
+                $nowTs = time();
+                $epRows = DB::table('catalog_episodes')
+                    ->whereIn('work_id', $workIds)
+                    ->whereNotNull('air_date_utc')
+                    ->whereRaw('unixepoch(air_date_utc) <= ?', [$nowTs])
+                    ->groupBy('work_id')
+                    ->selectRaw('work_id, MAX(number) as max_ep')
+                    ->get();
+                foreach ($epRows as $epRow) {
+                    $airedByClock[(string) $epRow->work_id] = (int) $epRow->max_ep;
+                }
+            }
+
             foreach ($rows as $row) {
                 $cleanDay = strtolower(trim((string) ($row->airing_day ?? '')));
                 $dayKey = $dayMap[$cleanDay] ?? null;
@@ -201,15 +218,18 @@ class InMemoryCatalogService
                 }
 
                 $isAnime = strtolower((string) ($row->media ?? 'anime')) === 'anime';
+                $workId = (string) $row->id;
+                $episodeNum = max(1, (int) ($row->latest_episode_num ?? 1), (int) ($airedByClock[$workId] ?? 0));
+
                 $calendar[$dayKey][] = [
-                    'id' => (string) $row->id,
+                    'id' => $workId,
                     'title' => (string) ($row->title ?? 'Obra da Temporada'),
                     'image' => $row->image_url ?: null,
                     'format' => strtoupper((string) ($row->format ?: ($isAnime ? 'TV' : 'MANGA'))),
                     'media' => $isAnime ? 'anime' : 'literature',
                     'unit_label' => $isAnime ? 'Ep.' : 'Cap.',
                     'time' => $row->airing_time ?: 'TBA',
-                    'episode' => max(1, (int) ($row->latest_episode_num ?? 1)),
+                    'episode' => $episodeNum,
                     'is_adult' => (bool) ($row->is_adult ?? false),
                 ];
             }

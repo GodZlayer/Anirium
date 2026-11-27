@@ -97,39 +97,39 @@
                        onclick="window.showExploreFilters();"
                        oninput="window.syncSearch(this.value)">
 
-                <!-- Pílulas Ontológicas Canônicas do Explorador de Entidades (Visíveis apenas ao focar busca ou abrir Explorar) -->
+                <!-- Pílulas Ontológicas Canônicas do Explorador de Entidades (Compactas: só expande a selecionada) -->
                 <div id="topbar-pills-container" class="{{ $initialTab === 'explore' ? 'flex' : 'hidden' }} items-center gap-1 pl-2 border-l border-white/10 text-[11px] font-mono overflow-x-auto no-scrollbar">
-    <button type="button" onclick="window.setExploreKind('universe')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap" data-kind="universe" title="Universo" data-i18n-title="entity.universe">
+    <button type="button" onclick="window.setExploreKind('universe')" class="explore-kind-btn flex items-center justify-center gap-1.5 p-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="universe" title="Universo" data-i18n-title="entity.universe">
         <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></svg>
-        <span class="hidden md:inline" data-i18n="entity.universe">Universo</span>
+        <span class="explore-kind-label hidden" data-i18n="entity.universe">Universo</span>
     </button>
-    <button type="button" onclick="window.setExploreKind('work')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm whitespace-nowrap" data-kind="work" title="Obra" data-i18n-title="entity.work">
+    <button type="button" onclick="window.setExploreKind('work')" class="explore-kind-btn flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm whitespace-nowrap shrink-0" data-kind="work" title="Obra" data-i18n-title="entity.work">
         <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="2" y="7" width="20" height="15" rx="2" stroke-width="2"/><polyline stroke-width="2" points="17 2 12 7 7 2"/></svg>
-        <span class="hidden md:inline" data-i18n="entity.work">Obra</span>
+        <span class="explore-kind-label inline" data-i18n="entity.work">Obra</span>
     </button>
-    <button type="button" onclick="window.setExploreKind('manga')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap" data-kind="manga" title="Mangá" data-i18n-title="entity.manga">
+    <button type="button" onclick="window.setExploreKind('manga')" class="explore-kind-btn flex items-center justify-center gap-1.5 p-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="manga" title="Mangá" data-i18n-title="entity.manga">
         <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-        <span class="hidden md:inline" data-i18n="entity.manga">Mangá</span>
+        <span class="explore-kind-label hidden" data-i18n="entity.manga">Mangá</span>
     </button>
-    <button type="button" onclick="window.setExploreKind('arc')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap" data-kind="arc" title="Arco" data-i18n-title="entity.arc">
+    <button type="button" onclick="window.setExploreKind('arc')" class="explore-kind-btn flex items-center justify-center gap-1.5 p-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="arc" title="Arco" data-i18n-title="entity.arc">
         <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon stroke-width="2" points="12 2 2 7 12 12 22 7 12 2"/><polyline stroke-width="2" points="2 17 12 22 22 17"/><polyline stroke-width="2" points="2 12 12 17 22 12"/></svg>
-        <span class="hidden md:inline" data-i18n="entity.arc">Arco</span>
+        <span class="explore-kind-label hidden" data-i18n="entity.arc">Arco</span>
     </button>
-    <button type="button" onclick="window.setExploreKind('author')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap" data-kind="author" title="Autor" data-i18n-title="entity.author">
+    <button type="button" onclick="window.setExploreKind('author')" class="explore-kind-btn flex items-center justify-center gap-1.5 p-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="author" title="Autor" data-i18n-title="entity.author">
         <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l7-7 3 3-7 7-3-3z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="11" cy="11" r="2" stroke-width="2"/></svg>
-        <span class="hidden md:inline" data-i18n="entity.author">Autor</span>
+        <span class="explore-kind-label hidden" data-i18n="entity.author">Autor</span>
     </button>
-    <button type="button" onclick="window.setExploreKind('director')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap" data-kind="director" title="Diretor" data-i18n-title="entity.director">
+    <button type="button" onclick="window.setExploreKind('director')" class="explore-kind-btn flex items-center justify-center gap-1.5 p-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="director" title="Diretor" data-i18n-title="entity.director">
         <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="2" y="4" width="20" height="16" rx="2" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4l3 5m4-5l3 5m4-5l3 5M2 9h20"/></svg>
-        <span class="hidden md:inline" data-i18n="entity.director">Diretor</span>
+        <span class="explore-kind-label hidden" data-i18n="entity.director">Diretor</span>
     </button>
-    <button type="button" onclick="window.setExploreKind('studio')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap" data-kind="studio" title="Produtora" data-i18n-title="entity.studio">
+    <button type="button" onclick="window.setExploreKind('studio')" class="explore-kind-btn flex items-center justify-center gap-1.5 p-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="studio" title="Produtora" data-i18n-title="entity.studio">
         <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 22V4a2 2 0 012-2h8a2 2 0 012 2v18M2 22h20M9 6h1m4 0h1M9 10h1m4 0h1M9 14h1m4 0h1M9 18h1m4 0h1"/></svg>
-        <span class="hidden md:inline" data-i18n="entity.studio">Produtora</span>
+        <span class="explore-kind-label hidden" data-i18n="entity.studio">Produtora</span>
     </button>
-    <button type="button" onclick="window.setExploreKind('music')" class="explore-kind-btn flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap" data-kind="music" title="Música" data-i18n-title="entity.music">
+    <button type="button" onclick="window.setExploreKind('music')" class="explore-kind-btn flex items-center justify-center gap-1.5 p-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0" data-kind="music" title="Música" data-i18n-title="entity.music">
         <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
-        <span class="hidden md:inline" data-i18n="entity.music">Música</span>
+        <span class="explore-kind-label hidden" data-i18n="entity.music">Música</span>
     </button>
 </div>
 </div>
@@ -1052,10 +1052,22 @@
         window.setExploreKind = async function(kind) {
             window.exploreKindFilter = kind;
             document.querySelectorAll('.explore-kind-btn').forEach(btn => {
+                const isTopbar = Boolean(btn.closest('#topbar-pills-container'));
+                const label = btn.querySelector('.explore-kind-label') || btn.querySelector('span');
                 if (btn.getAttribute('data-kind') === kind) {
-                    btn.className = "explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 md:py-1 rounded-full font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm whitespace-nowrap shrink-0";
+                    btn.className = "explore-kind-btn flex items-center justify-center gap-1.5 px-2.5 py-1.5 md:py-1 rounded-full font-bold transition-all bg-theme-accent text-theme-inverse shadow-sm whitespace-nowrap shrink-0";
+                    if (label) {
+                        label.classList.remove('hidden');
+                        label.classList.add('inline');
+                    }
                 } else {
-                    btn.className = "explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 md:py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0";
+                    btn.className = isTopbar
+                        ? "explore-kind-btn flex items-center justify-center gap-1.5 p-1.5 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0"
+                        : "explore-kind-btn flex items-center gap-1.5 px-2.5 py-1.5 md:py-1 rounded-full font-bold transition-all text-theme-muted hover:text-white opacity-60 whitespace-nowrap shrink-0";
+                    if (isTopbar && label) {
+                        label.classList.add('hidden');
+                        label.classList.remove('inline');
+                    }
                 }
             });
             window.explorePage = 1;
@@ -1166,41 +1178,10 @@
             const allowAdult = window.isAdultContentAllowed();
 
             const kind = window.exploreKindFilter || 'work';
-            if ((kind === 'work' || kind === 'manga') && window.AniriumCatalogSSOT && window.AniriumCatalogSSOT.getWorks().length > 0) {
-                const allWorks = window.AniriumCatalogSSOT.getWorks();
-                const normQ = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                const matched = [];
-                for (let i = 0; i < allWorks.length; i++) {
-                    const w = allWorks[i];
-                    if (!allowAdult && w.is_adult) continue;
-                    const media = String(w.media || 'anime').toLowerCase();
-                    if (kind === 'work' && media !== 'anime') continue;
-                    if (kind === 'manga' && media !== 'manga' && media !== 'novel') continue;
-                    if (normQ && !(w._haystack || '').includes(normQ)) continue;
-                    matched.push(w);
-                }
-                matched.sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
-                const perPage = 24;
-                const total = matched.length;
-                const totalPages = Math.max(1, Math.ceil(total / perPage));
-                window.explorePage = Math.min(Math.max(1, Number(window.explorePage || 1)), totalPages);
-                const start = (window.explorePage - 1) * perPage;
-                const slice = matched.slice(start, start + perPage).map(w => {
-                    const fmt = String(w.format || (kind === 'manga' ? 'MANGA' : 'TV')).toUpperCase();
-                    const eps = w.episode_count || null;
-                    return {
-                        id: w.id,
-                        title: w.title || 'Sem título',
-                        format: fmt,
-                        status: w.status || 'COMPLETED',
-                        image: w.image || '/assets/icons/actions/search.png',
-                        episode_count: eps,
-                        is_adult: Boolean(w.is_adult),
-                        kind,
-                        subMeta: eps ? `${fmt} • ${eps} ${eps === 1 ? 'ep' : 'eps'}` : fmt,
-                    };
-                });
-                window._renderExploreCards(slice, total, totalPages);
+            if ((kind === 'work' || kind === 'manga') && window.AniriumCatalogSSOT && window.AniriumCatalogSSOT.isReady()) {
+                const res = window.AniriumCatalogSSOT.queryExploreSql(kind, query, window.explorePage || 1, allowAdult);
+                window.explorePage = res.page;
+                window._renderExploreCards(res.items, res.total, res.pages);
                 return;
             }
             if (['work', 'manga', 'universe', 'arc', 'author', 'director', 'studio', 'music'].includes(kind)) {
@@ -4170,62 +4151,14 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
             return { connect };
         })();
 
-        // Fonte Única de Verdade no Cliente (IndexedDB + Delta Sync)
+        // Fonte Única de Verdade no Cliente (SQLite WASM + OPFS/IndexedDB + Delta Sync — Zero JSON)
         window.AniriumCatalogSSOT = (() => {
-            const DB_NAME = 'anirium_catalog_ssot_v1';
-            const STORE_WORKS = 'works';
-            const STORE_META = 'meta';
-            let works = [];
+            const BIN_DB_NAME = 'anirium_sqlite_bin_v5';
+            const BIN_STORE = 'files';
+            const FILE_KEY = 'catalog-public-v5.sqlite';
+            let sqlDb = null;
             let revision = 0;
-
-            const normalize = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-            const hydrate = (w) => {
-                const list = Array.isArray(w.titles) && w.titles.length ? w.titles : [w.title || ''];
-                w._haystack = normalize(list.join(' | '));
-                return w;
-            };
-            const openDb = () => new Promise((resolve, reject) => {
-                const req = indexedDB.open(DB_NAME, 1);
-                req.onupgradeneeded = () => {
-                    const db = req.result;
-                    if (!db.objectStoreNames.contains(STORE_WORKS)) db.createObjectStore(STORE_WORKS, { keyPath: 'id' });
-                    if (!db.objectStoreNames.contains(STORE_META)) db.createObjectStore(STORE_META, { keyPath: 'key' });
-                };
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
-            });
-            const getMeta = (db, key) => new Promise((resolve, reject) => {
-                const req = db.transaction(STORE_META, 'readonly').objectStore(STORE_META).get(key);
-                req.onsuccess = () => resolve(req.result ? req.result.value : null);
-                req.onerror = () => reject(req.error);
-            });
-            const setMeta = (db, key, value) => new Promise((resolve, reject) => {
-                const tx = db.transaction(STORE_META, 'readwrite');
-                tx.objectStore(STORE_META).put({ key, value });
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
-            const readAll = (db) => new Promise((resolve, reject) => {
-                const req = db.transaction(STORE_WORKS, 'readonly').objectStore(STORE_WORKS).getAll();
-                req.onsuccess = () => resolve((req.result || []).map(hydrate));
-                req.onerror = () => reject(req.error);
-            });
-            const replaceAll = (db, items) => new Promise((resolve, reject) => {
-                const tx = db.transaction(STORE_WORKS, 'readwrite');
-                const store = tx.objectStore(STORE_WORKS);
-                store.clear();
-                for (const item of items) store.put(item);
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
-            const applyDelta = (db, upserts, deletes) => new Promise((resolve, reject) => {
-                const tx = db.transaction(STORE_WORKS, 'readwrite');
-                const store = tx.objectStore(STORE_WORKS);
-                for (const id of deletes) store.delete(id);
-                for (const item of upserts) store.put(item);
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
+            let bootPromise = null;
 
             const setOverlay = (show, statusText, pct, metaText) => {
                 const el = document.getElementById('anirium-catalog-boot-overlay');
@@ -4241,91 +4174,707 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 const bar = document.getElementById('anirium-boot-bar');
                 const mt = document.getElementById('anirium-boot-meta');
                 if (st && statusText) st.textContent = statusText;
-                if (bar && typeof pct === 'number') bar.style.width = `${pct}%`;
+                if (bar && typeof pct === 'number') bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
                 if (mt && metaText) mt.textContent = metaText;
             };
 
-            async function boot() {
-                if (!('indexedDB' in window)) return { revision: 0, count: 0 };
+            const loadSqlJs = () => new Promise((resolve, reject) => {
+                if (typeof window.initSqlJs === 'function') {
+                    window.initSqlJs({ locateFile: f => `/wasm/${f}` }).then(resolve, reject);
+                    return;
+                }
+                const s = document.createElement('script');
+                s.src = '/wasm/sql-wasm.js';
+                s.async = true;
+                s.onload = () => window.initSqlJs({ locateFile: f => `/wasm/${f}` }).then(resolve, reject);
+                s.onerror = () => reject(new Error('Falha ao carregar sql-wasm.js'));
+                document.head.appendChild(s);
+            });
+
+            const openBinIdb = () => new Promise((resolve, reject) => {
+                const req = indexedDB.open(BIN_DB_NAME, 1);
+                req.onupgradeneeded = () => {
+                    if (!req.result.objectStoreNames.contains(BIN_STORE)) req.result.createObjectStore(BIN_STORE);
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+
+            const readCachedBytes = async () => {
                 try {
-                    const db = await openDb();
-                    const localRev = Number((await getMeta(db, 'revision')) || 0);
-                    const localScope = String((await getMeta(db, 'scope')) || '');
-
-                    if (localRev === 0) {
-                        setOverlay(true, 'Preparando base inicial do catálogo...', 25, 'Primeiro carregamento · Cache local');
+                    if (navigator.storage?.getDirectory) {
+                        const root = await navigator.storage.getDirectory();
+                        const handle = await root.getFileHandle(FILE_KEY);
+                        const file = await handle.getFile();
+                        const buf = await file.arrayBuffer();
+                        if (buf.byteLength > 4096) return new Uint8Array(buf);
                     }
+                } catch (_) {}
+                try {
+                    const idb = await openBinIdb();
+                    return await new Promise((resolve) => {
+                        const req = idb.transaction(BIN_STORE, 'readonly').objectStore(BIN_STORE).get(FILE_KEY);
+                        req.onsuccess = () => resolve(req.result instanceof Uint8Array ? req.result : null);
+                        req.onerror = () => resolve(null);
+                    });
+                } catch (_) {
+                    return null;
+                }
+            };
 
-                    const vRes = await fetch('/api/catalog/version', { headers: { Accept: 'application/json' } });
-                    if (!vRes.ok) {
-                        setOverlay(false);
-                        return { revision: localRev, count: 0 };
+            const writeCachedBytes = async (bytes) => {
+                try {
+                    if (navigator.storage?.getDirectory) {
+                        const root = await navigator.storage.getDirectory();
+                        const handle = await root.getFileHandle(FILE_KEY, { create: true });
+                        const writable = await handle.createWritable();
+                        await writable.write(bytes);
+                        await writable.close();
+                        return;
                     }
-                    const vData = await vRes.json();
-                    const serverRev = Number(vData.revision || 1);
-                    const serverScope = String(vData.scope || 'safe');
+                } catch (_) {}
+                try {
+                    const idb = await openBinIdb();
+                    await new Promise((resolve, reject) => {
+                        const tx = idb.transaction(BIN_STORE, 'readwrite');
+                        tx.objectStore(BIN_STORE).put(bytes, FILE_KEY);
+                        tx.oncomplete = () => resolve();
+                        tx.onerror = () => reject(tx.error);
+                    });
+                } catch (_) {}
+            };
 
-                    if (localRev > 0 && localRev === serverRev && localScope === serverScope) {
-                        works = await readAll(db);
-                        revision = localRev;
-                        setOverlay(false);
-                        return { revision, count: works.length };
+            const downloadAndGunzip = async (url) => {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`SQLite HTTP ${res.status}`);
+                const total = Number(res.headers.get('content-length') || 0);
+                let received = 0;
+                const chunks = [];
+                if (res.body && typeof res.body.getReader === 'function') {
+                    const reader = res.body.getReader();
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        chunks.push(value);
+                        received += value.byteLength;
+                        const mb = (received / 1048576).toFixed(1);
+                        const pct = total > 0 ? Math.round((received / total) * 75) + 10 : 45;
+                        setOverlay(true, 'Baixando base SQLite para cache local...', pct, total > 0 ? `${mb} MB / ${(total / 1048576).toFixed(1)} MB` : `${mb} MB baixados`);
                     }
+                } else {
+                    chunks.push(new Uint8Array(await res.arrayBuffer()));
+                }
+                setOverlay(true, 'Descompactando e montando SQLite local...', 90, 'Preparando índices instantâneos...');
+                const blob = new Blob(chunks);
+                if (typeof DecompressionStream === 'function') {
+                    const ds = new DecompressionStream('gzip');
+                    const decompressed = await new Response(blob.stream().pipeThrough(ds)).arrayBuffer();
+                    return new Uint8Array(decompressed);
+                }
+                return new Uint8Array(await blob.arrayBuffer());
+            };
 
-                    if (localRev > 0 && localRev < serverRev && localScope === serverScope) {
-                        setOverlay(true, 'Aplicando bloco de atualizações...', 65, `Revisão #${localRev} → #${serverRev}`);
-                        const dRes = await fetch(`/api/catalog/delta?since=${localRev}`, { headers: { Accept: 'application/json' } });
-                        if (dRes.ok) {
-                            const dData = await dRes.json();
-                            await applyDelta(db, dData.upserts || [], dData.deletes || []);
-                            revision = Number(dData.revision || serverRev);
-                            await setMeta(db, 'revision', revision);
-                            works = await readAll(db);
-                            setOverlay(false);
-                            return { revision, count: works.length };
+            const applyDeltaToSqlite = (upserts, deletes) => {
+                if (!sqlDb) return;
+                sqlDb.run('BEGIN TRANSACTION;');
+                try {
+                    for (const id of deletes) {
+                        sqlDb.run('DELETE FROM works WHERE id = ?;', [id]);
+                        sqlDb.run('DELETE FROM schedules WHERE work_id = ?;', [id]);
+                    }
+                    const stmtWork = sqlDb.prepare('INSERT OR REPLACE INTO works (id, media, title, format, status, episode_count, is_adult, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?);');
+                    const stmtSched = sqlDb.prepare('INSERT OR REPLACE INTO schedules (work_id, airing_day, airing_time, latest_episode_num) VALUES (?, ?, ?, ?);');
+                    for (const w of upserts) {
+                        stmtWork.run([w.id, w.media || 'anime', w.title || '', w.format || null, w.status || null, w.episode_count ?? null, w.is_adult ? 1 : 0, w.image || null]);
+                        if (w.airing_day && ['RELEASING', 'PUBLISHING', 'CURRENT'].includes(String(w.status || '').toUpperCase())) {
+                            stmtSched.run([w.id, String(w.airing_day).toLowerCase(), w.airing_time || null, w.latest_episode_num || 1]);
                         }
                     }
-
-                    setOverlay(true, 'Baixando catálogo para cache local...', 55, `${vData.works_count || 0} obras · Revisão #${serverRev}`);
-                    const sRes = await fetch('/api/catalog/snapshot', { headers: { Accept: 'application/json' } });
-                    if (sRes.ok) {
-                        const sData = await sRes.json();
-                        const items = Array.isArray(sData.items) ? sData.items : [];
-                        setOverlay(true, 'Salvando no cache local...', 85, `${items.length} obras indexadas`);
-                        await replaceAll(db, items);
-                        revision = Number(sData.revision || serverRev);
-                        await setMeta(db, 'revision', revision);
-                        await setMeta(db, 'scope', String(sData.scope || serverScope));
-                        works = items.map(hydrate);
-                    }
-                    setOverlay(false);
-                    return { revision, count: works.length };
+                    stmtWork.free();
+                    stmtSched.free();
+                    sqlDb.run('COMMIT;');
                 } catch (err) {
-                    console.warn('[AniriumCatalogSSOT] Fallback para modo online:', err);
-                    setOverlay(false);
-                    return { revision: 0, count: 0 };
+                    sqlDb.run('ROLLBACK;');
+                    throw err;
+                }
+            };
+
+            async function boot() {
+                if (sqlDb) return { revision, ready: true };
+                if (bootPromise) return bootPromise;
+                bootPromise = (async () => {
+                    try {
+                        const vRes = await fetch('/api/catalog/version', { headers: { Accept: 'application/json' } });
+                        const vData = vRes.ok ? await vRes.json() : { revision: 1, db_url: '/data/catalog-public.sqlite.gz' };
+                        const serverRev = Number(vData.revision || 1);
+                        const dbUrl = String(vData.db_url || '/data/catalog-public.sqlite.gz');
+
+                        let bytes = await readCachedBytes();
+                        const SQL = await loadSqlJs();
+
+                        if (!bytes) {
+                            setOverlay(true, 'Baixando base SQLite inicial...', 10, 'Primeiro acesso · Cache permanente');
+                            bytes = await downloadAndGunzip(dbUrl);
+                            await writeCachedBytes(bytes);
+                        }
+
+                        sqlDb = new SQL.Database(bytes);
+                        const metaRes = sqlDb.exec("SELECT value FROM meta WHERE key = 'revision' LIMIT 1;");
+                        const localRev = Number(metaRes?.[0]?.values?.[0]?.[0] || 1);
+                        revision = localRev;
+
+                        if (localRev < serverRev) {
+                            setOverlay(true, 'Aplicando atualizações incrementais...', 85, `Revisão #${localRev} → #${serverRev}`);
+                            const dRes = await fetch(`/api/catalog/delta?since=${localRev}`, { headers: { Accept: 'application/json' } });
+                            if (dRes.ok) {
+                                const dData = await dRes.json();
+                                applyDeltaToSqlite(dData.upserts || [], dData.deletes || []);
+                                revision = Number(dData.revision || serverRev);
+                                sqlDb.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('revision', ?);", [String(revision)]);
+                                await writeCachedBytes(sqlDb.export());
+                            }
+                        }
+
+                        setOverlay(false);
+                        return { revision, ready: true };
+                    } catch (err) {
+                        console.warn('[AniriumCatalogSSOT] Fallback para API online:', err);
+                        setOverlay(false);
+                        return { revision: 0, ready: false };
+                    } finally {
+                        bootPromise = null;
+                    }
+                })();
+                return bootPromise;
+            }
+
+            const countCache = new Map();
+
+            const extractSearchTokens = (raw) => {
+                return String(raw || '')
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase()
+                    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+                    .trim()
+                    .split(/\s+/)
+                    .filter(t => t.length >= 2)
+                    .slice(0, 6);
+            };
+
+            function queryExploreSql(kind, query, page = 1, allowAdult = false) {
+                const t0 = performance.now();
+                const perPage = 24;
+                const safePage = Math.max(1, Number(page || 1));
+                const offset = (safePage - 1) * perPage;
+                const mediaSql = kind === 'manga' ? "w.media IN ('manga', 'novel')" : "w.media = 'anime'";
+                const adultSql = allowAdult ? '' : ' AND w.is_adult = 0';
+                const visibilitySql = kind === 'manga'
+                    ? " AND UPPER(COALESCE(w.format, '')) NOT IN ('DOUJINSHI', 'OTHER')"
+                    : " AND w.image_url IS NOT NULL AND w.image_url != ''";
+                const q = String(query || '').trim();
+                const tokens = q !== '' ? extractSearchTokens(q) : [];
+
+                let sql = '';
+                let countSql = '';
+                let params = [];
+
+                if (tokens.length > 0) {
+                    const intersectParts = [];
+                    for (const tok of tokens) {
+                        intersectParts.push('SELECT DISTINCT work_id FROM search_tokens WHERE token >= ? AND token < ?');
+                        params.push(tok, `${tok}\uffff`);
+                    }
+                    const cte = `WITH matched AS (${intersectParts.join(' INTERSECT ')})`;
+                    sql = `${cte}
+                           SELECT w.id, w.title, w.format, w.status, w.episode_count, w.is_adult, w.image_url
+                           FROM matched m
+                           INNER JOIN works w ON w.id = m.work_id
+                           WHERE ${mediaSql}${adultSql}${visibilitySql}
+                           ORDER BY w.title ASC
+                           LIMIT ${perPage} OFFSET ${offset};`;
+                    countSql = `${cte}
+                                SELECT COUNT(*) AS c
+                                FROM matched m
+                                INNER JOIN works w ON w.id = m.work_id
+                                WHERE ${mediaSql}${adultSql}${visibilitySql};`;
+                } else {
+                    const whereClause = `WHERE ${mediaSql}${adultSql}${visibilitySql}`;
+                    sql = `SELECT w.id, w.title, w.format, w.status, w.episode_count, w.is_adult, w.image_url
+                           FROM works w ${whereClause}
+                           ORDER BY w.title ASC
+                           LIMIT ${perPage} OFFSET ${offset};`;
+                    countSql = `SELECT COUNT(*) AS c FROM works w ${whereClause};`;
+                }
+
+                let total = 0;
+                const cacheKey = tokens.length === 0 ? `count:${kind}:${allowAdult ? 1 : 0}` : null;
+                if (cacheKey && countCache.has(cacheKey)) {
+                    total = countCache.get(cacheKey);
+                } else {
+                    if (cacheKey) {
+                        const mRes = sqlDb.exec(`SELECT value FROM meta WHERE key = '${cacheKey}' LIMIT 1;`);
+                        const pre = Number(mRes?.[0]?.values?.[0]?.[0] || 0);
+                        if (pre > 0) {
+                            total = pre;
+                            countCache.set(cacheKey, total);
+                        }
+                    }
+                    if (total === 0) {
+                        const cStmt = sqlDb.prepare(countSql);
+                        cStmt.bind(params);
+                        if (cStmt.step()) total = Number(cStmt.getAsObject().c || 0);
+                        cStmt.free();
+                        if (cacheKey) countCache.set(cacheKey, total);
+                    }
+                }
+
+                const stmt = sqlDb.prepare(sql);
+                stmt.bind(params);
+                const rows = [];
+                while (stmt.step()) rows.push(stmt.getAsObject());
+                stmt.free();
+
+                const slice = rows.map(w => {
+                    const fmt = String(w.format || (kind === 'manga' ? 'MANGA' : 'TV')).toUpperCase();
+                    const eps = w.episode_count ? Number(w.episode_count) : null;
+                    return {
+                        id: w.id,
+                        title: w.title || 'Sem título',
+                        format: fmt,
+                        status: w.status || 'COMPLETED',
+                        image: w.image_url || '/assets/icons/actions/search.png',
+                        episode_count: eps,
+                        is_adult: Boolean(w.is_adult),
+                        kind,
+                        subMeta: eps ? `${fmt} • ${eps} ${eps === 1 ? 'ep' : 'eps'}` : fmt,
+                    };
+                });
+                const totalPages = Math.max(1, Math.ceil(total / perPage));
+                window.__lastExploreMs = Math.round((performance.now() - t0) * 10) / 10;
+                return {
+                    items: slice,
+                    page: Math.min(safePage, totalPages),
+                    pages: totalPages,
+                    total,
+                };
+            }
+
+            return {
+                boot,
+                isReady: () => Boolean(sqlDb),
+                queryExploreSql,
+                getWorks: () => [],
+                getRevision: () => revision,
+            };
+        })();
+
+        // Cliente Global de Watch Party (Ponte SSE + Player Pro / anirium-service P2P + Chat ao Vivo)
+        window.AniriumWatchParty = (() => {
+            const csrf = '{{ csrf_token() }}';
+            let activeCode = null;
+            let activeRoom = null;
+            let roomEventSource = null;
+            let applyingRemoteSync = false;
+
+            const ensureDrawer = () => {
+                let drawer = document.getElementById('anirium-wp-drawer');
+                if (drawer) return drawer;
+                drawer = document.createElement('aside');
+                drawer.id = 'anirium-wp-drawer';
+                drawer.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99990;width:320px;max-width:92vw;border-radius:16px;border:1px solid rgba(139,92,246,0.35);background:rgba(13,13,19,0.96);color:#f4f4f5;display:none;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.8);';
+                drawer.innerHTML = `
+                    <div class="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-violet-950/30">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <span id="wp-drawer-title" class="text-xs font-bold text-white truncate">Watch Party</span>
+                                <span id="wp-drawer-badge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">P2P</span>
+                            </div>
+                            <div id="wp-drawer-meta" class="text-[11px] text-zinc-400 truncate mt-0.5">Sincronizado via anirium-service</div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button type="button" id="wp-copy-link" title="Copiar link da sala" class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-semibold text-white">Link</button>
+                            <button type="button" id="wp-leave-btn" title="Sair da sala" class="px-2 py-1 rounded-lg bg-red-600/80 hover:bg-red-500 text-[11px] font-semibold text-white">Sair</button>
+                        </div>
+                    </div>
+                    <div id="wp-messages-list" class="h-56 overflow-y-auto px-3.5 py-2.5 space-y-2 text-xs"></div>
+                    <form id="wp-chat-form" class="flex gap-1.5 p-2.5 border-t border-white/10 bg-black/40">
+                        <input id="wp-chat-input" type="text" maxlength="500" placeholder="Mensagem na sala..." class="flex-1 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 outline-none focus:border-violet-500">
+                        <button type="submit" class="rounded-lg bg-violet-600 hover:bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white">Enviar</button>
+                    </form>
+                `;
+                document.body.appendChild(drawer);
+
+                drawer.querySelector('#wp-copy-link')?.addEventListener('click', () => {
+                    if (!activeCode) return;
+                    const url = `${window.location.origin}/?party=${encodeURIComponent(activeCode)}`;
+                    navigator.clipboard?.writeText(url);
+                    const btn = drawer.querySelector('#wp-copy-link');
+                    if (btn) { btn.textContent = 'Copiado!'; setTimeout(() => { btn.textContent = 'Link'; }, 1500); }
+                });
+                drawer.querySelector('#wp-leave-btn')?.addEventListener('click', () => leaveRoom());
+                drawer.querySelector('#wp-chat-form')?.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const inp = drawer.querySelector('#wp-chat-input');
+                    const text = (inp?.value || '').trim();
+                    if (!text || !activeCode) return;
+                    inp.value = '';
+                    await sendMessage(text);
+                });
+                return drawer;
+            };
+
+            const appendMessage = (msg) => {
+                const lists = [document.getElementById('wp-messages-list'), document.getElementById('wp-theater-messages')].filter(Boolean);
+                const who = msg.userHandle ? `@${msg.userHandle}` : (msg.user?.handle ? `@${msg.user.handle}` : (msg.userName || msg.user?.name || 'Membro'));
+                for (const list of lists) {
+                    const row = document.createElement('div');
+                    row.className = 'rounded-lg bg-white/[0.04] px-2.5 py-1.5';
+                    row.innerHTML = `<span class="font-semibold text-violet-300">${who}:</span> <span class="text-zinc-200 break-words"></span>`;
+                    row.querySelector('span:last-child').textContent = msg.body || msg.message || '';
+                    list.appendChild(row);
+                    list.scrollTop = list.scrollHeight;
+                }
+            };
+
+            let syncCountdownTimer = null;
+
+            const ensureTheaterModal = () => {
+                let modal = document.getElementById('anirium-wp-theater-modal');
+                if (modal) return modal;
+                modal = document.createElement('div');
+                modal.id = 'anirium-wp-theater-modal';
+                modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#060609;color:#f4f4f5;display:none;flex-direction:row;overflow:hidden;';
+                modal.innerHTML = `
+                    <div class="flex-1 flex flex-col min-w-0 relative bg-black">
+                        <div class="h-12 px-4 border-b border-white/10 bg-[#0c0c12] flex items-center justify-between gap-3 shrink-0">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0"></span>
+                                <span id="wp-theater-title" class="text-sm font-bold text-white truncate">Sala Watch Party</span>
+                                <span id="wp-theater-phase-badge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 shrink-0">SYNC P2P</span>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-mono text-amber-300" title="Avaliar episódio">
+                                    <span>★</span>
+                                    <select id="wp-theater-score" class="bg-transparent text-white outline-none cursor-pointer text-[11px]">
+                                        <option value="" class="bg-[#0c0c12]">Nota</option>
+                                        <option value="10" class="bg-[#0c0c12]">10</option>
+                                        <option value="9" class="bg-[#0c0c12]">9</option>
+                                        <option value="8" class="bg-[#0c0c12]">8</option>
+                                        <option value="7" class="bg-[#0c0c12]">7</option>
+                                        <option value="6" class="bg-[#0c0c12]">6</option>
+                                        <option value="5" class="bg-[#0c0c12]">5</option>
+                                    </select>
+                                </div>
+                                <button type="button" id="wp-theater-fav" title="Favoritar episódio" class="px-2.5 py-1 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-pink-500/20 text-xs text-zinc-200 hover:text-pink-300 transition">♡ Favorito</button>
+                                <button type="button" id="wp-theater-leave" class="px-3 py-1.5 rounded-lg bg-red-600/90 hover:bg-red-500 text-xs font-semibold text-white shrink-0">Sair da Sala</button>
+                            </div>
+                        </div>
+                        <div class="flex-1 relative flex items-center justify-center overflow-hidden">
+                            <div id="wp-theater-player-slot" class="w-full h-full flex items-center justify-center"></div>
+                            <div id="wp-theater-waiting" class="hidden absolute inset-0 z-20 flex-col items-center justify-center bg-[#09090f]/95 text-center p-6 gap-3">
+                                <div class="w-12 h-12 rounded-full border-2 border-violet-500/40 border-t-violet-400 animate-spin"></div>
+                                <h3 class="text-lg font-bold text-white">Aguardando o líder escolher o próximo episódio...</h3>
+                                <p id="wp-theater-waiting-sub" class="text-xs text-zinc-400 max-w-md">Você continua conectado na sala e pode usar o chat normalmente.</p>
+                            </div>
+                            <div id="wp-theater-stabilizing" class="hidden absolute inset-0 z-30 flex-col items-center justify-center bg-black/90 backdrop-blur-md text-center p-6 gap-3">
+                                <div class="text-4xl font-mono font-black text-violet-400" id="wp-stabilize-countdown">60s</div>
+                                <h3 class="text-base font-bold text-white">Estabilizando e sincronizando todos via rede torrent P2P...</h3>
+                                <p class="text-xs text-zinc-400 max-w-md">Baixando buffer inicial pelo anirium-service para iniciar todos no tempo exato do líder.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <aside class="w-full lg:w-80 h-64 lg:h-full border-t lg:border-t-0 lg:border-l border-white/10 bg-[#0d0d13] flex flex-col shrink-0">
+                        <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                            <span class="text-xs font-bold text-white">Chat da Sala</span>
+                            <span id="wp-theater-members" class="text-[11px] font-mono text-zinc-400">1 na sala</span>
+                        </div>
+                        <div id="wp-theater-messages" class="flex-1 overflow-y-auto px-3.5 py-2.5 space-y-2 text-xs"></div>
+                        <form id="wp-theater-chat-form" class="flex gap-1.5 p-2.5 border-t border-white/10 bg-black/40">
+                            <input id="wp-theater-chat-input" type="text" maxlength="500" placeholder="Mensagem na sala..." class="flex-1 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 outline-none focus:border-violet-500">
+                            <button type="submit" class="rounded-lg bg-violet-600 hover:bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white">Enviar</button>
+                        </form>
+                    </aside>
+                `;
+                document.body.appendChild(modal);
+                modal.querySelector('#wp-theater-leave')?.addEventListener('click', () => leaveRoom());
+                modal.querySelector('#wp-theater-chat-form')?.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const inp = modal.querySelector('#wp-theater-chat-input');
+                    const text = (inp?.value || '').trim();
+                    if (!text || !activeCode) return;
+                    inp.value = '';
+                    await sendMessage(text);
+                });
+                return modal;
+            };
+
+            const loadEpisodeIntoTheater = async (epId) => {
+                const slot = document.getElementById('wp-theater-player-slot');
+                if (!slot || !epId) return;
+                slot.innerHTML = '<div class="text-xs font-mono text-zinc-400 animate-pulse">Carregando player da sala...</div>';
+                try {
+                    const res = await fetch(`/api/catalog/graph/episode/${encodeURIComponent(epId)}?render=blade`, {
+                        headers: { Accept: 'text/html' },
+                    });
+                    if (!res.ok) {
+                        slot.innerHTML = '<div class="text-xs text-red-300">Não foi possível carregar o episódio da sala.</div>';
+                        return;
+                    }
+                    const html = await res.text();
+                    slot.innerHTML = `<style>#wp-theater-player-slot header,#wp-theater-player-slot #ep-info-popover,#wp-theater-player-slot [id*="discussion"],#wp-theater-player-slot [id*="episodes-list"]{display:none!important;}</style><div class="w-full h-full overflow-y-auto">${html}</div>`;
+                    slot.querySelectorAll('script').forEach((oldScript) => {
+                        const s = document.createElement('script');
+                        if (oldScript.src) s.src = oldScript.src;
+                        else s.textContent = oldScript.textContent;
+                        oldScript.replaceWith(s);
+                    });
+                } catch (_) {
+                    slot.innerHTML = '<div class="text-xs text-red-300">Erro de rede ao carregar o episódio.</div>';
+                }
+            };
+
+            const renderRoomPhaseUI = (roomState) => {
+                if (!roomState) return;
+                const phase = String(roomState.phase || 'playing');
+                const rem = Number(roomState.syncRemainingSeconds || 0);
+                const isLeader = Boolean(roomState.isLeader);
+
+                if (syncCountdownTimer) { clearInterval(syncCountdownTimer); syncCountdownTimer = null; }
+
+                if (phase === 'ended' || roomState.status === 'ended') {
+                    handleRoomEnded();
+                    return;
+                }
+
+                if (!isLeader) {
+                    const modal = ensureTheaterModal();
+                    modal.style.display = 'flex';
+                    const waitEl = modal.querySelector('#wp-theater-waiting');
+                    const stabEl = modal.querySelector('#wp-theater-stabilizing');
+                    const cdEl = modal.querySelector('#wp-stabilize-countdown');
+                    const memEl = modal.querySelector('#wp-theater-members');
+                    if (memEl) memEl.textContent = `${roomState.membersCount || 1} na sala`;
+
+                    if (waitEl) { waitEl.classList.toggle('hidden', phase !== 'waiting'); waitEl.classList.toggle('flex', phase === 'waiting'); }
+                    if (stabEl) { stabEl.classList.toggle('hidden', !(phase === 'stabilizing' && rem > 0)); stabEl.classList.toggle('flex', phase === 'stabilizing' && rem > 0); }
+
+                    if (phase === 'stabilizing' && rem > 0 && cdEl) {
+                        let left = rem;
+                        cdEl.textContent = `${left}s`;
+                        syncCountdownTimer = setInterval(() => {
+                            left -= 1;
+                            if (left <= 0) {
+                                clearInterval(syncCountdownTimer);
+                                syncCountdownTimer = null;
+                                stabEl?.classList.add('hidden');
+                                stabEl?.classList.remove('flex');
+                            } else {
+                                cdEl.textContent = `${left}s`;
+                            }
+                        }, 1000);
+                    }
+                }
+            };
+
+            const handleRoomEnded = () => {
+                const wasLiveLaunch = activeRoom?.mode === 'live_launch';
+                const lastEpId = activeRoom?.episodeId || activeRoom?.episode_id || null;
+                activeCode = null;
+                activeRoom = null;
+                if (syncCountdownTimer) { clearInterval(syncCountdownTimer); syncCountdownTimer = null; }
+                if (roomEventSource) { roomEventSource.close(); roomEventSource = null; }
+                const drawer = document.getElementById('anirium-wp-drawer');
+                if (drawer) drawer.remove();
+                const modal = document.getElementById('anirium-wp-theater-modal');
+                if (modal) modal.remove();
+                try {
+                    const u = new URL(window.location.href);
+                    u.searchParams.delete('party');
+                    u.searchParams.delete('partyPass');
+                    window.history.replaceState({}, '', u.pathname + u.search);
+                } catch (_) {}
+                if (wasLiveLaunch && lastEpId && typeof window.pushNavigation === 'function') {
+                    window.pushNavigation('episode', lastEpId, 'Episódio');
+                } else {
+                    if (typeof window.clearNavigation === 'function') window.clearNavigation();
+                    if (typeof window.switchTab === 'function') window.switchTab('home');
+                }
+            };
+
+            const applyRemotePlayback = (roomState) => {
+                if (!roomState) return;
+                const targetPos = Number(roomState.position_seconds ?? roomState.positionSeconds ?? 0);
+                const isPlaying = Boolean(roomState.is_playing ?? roomState.isPlaying);
+                applyingRemoteSync = true;
+                try {
+                    const iframe = document.querySelector('iframe[src*="player-pro"], iframe#player-pro-iframe');
+                    if (iframe?.contentWindow) {
+                        iframe.contentWindow.postMessage({
+                            type: 'anirium:watch-party:sync',
+                            code: activeCode,
+                            isPlaying: roomState.phase === 'stabilizing' ? false : isPlaying,
+                            positionSeconds: targetPos,
+                            controlsLocked: !roomState.isLeader || roomState.mode === 'live_launch' || roomState.phase === 'stabilizing',
+                            phase: roomState.phase || 'playing',
+                            syncRemainingSeconds: Number(roomState.syncRemainingSeconds || 0),
+                        }, '*');
+                    }
+                    const vid = document.querySelector('video');
+                    if (vid) {
+                        if (Math.abs((vid.currentTime || 0) - targetPos) > 1.5) vid.currentTime = targetPos;
+                        if (isPlaying && vid.paused) vid.play().catch(() => {});
+                        if (!isPlaying && !vid.paused) vid.pause();
+                    }
+                } finally {
+                    setTimeout(() => { applyingRemoteSync = false; }, 350);
+                }
+            };
+
+            const connectRoomSse = (code) => {
+                if (roomEventSource) { roomEventSource.close(); roomEventSource = null; }
+                const es = new EventSource(`/api/stream?room_code=${encodeURIComponent(code)}`);
+                es.addEventListener('watch_party.updated', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (data.room) {
+                            const prevEp = activeRoom?.episodeId || activeRoom?.episode_id;
+                            activeRoom = data.room;
+                            renderRoomPhaseUI(data.room);
+                            const nextEp = data.room.episodeId || data.room.episode_id;
+                            if (nextEp && nextEp !== prevEp && typeof window.openEntityContext === 'function') {
+                                window.openEntityContext('episode', nextEp);
+                            }
+                            applyRemotePlayback(data.room);
+                        }
+                    } catch (_) {}
+                });
+                es.addEventListener('watch_party.ended', () => {
+                    handleRoomEnded();
+                });
+                es.addEventListener('watch_party.message', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        if (data.message) appendMessage(data.message);
+                    } catch (_) {}
+                });
+                roomEventSource = es;
+            };
+
+            async function openRoom(code, password = '') {
+                if (!code) return;
+                const joinRes = await fetch(`/api/watch-party/rooms/${encodeURIComponent(code)}/join`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                    body: JSON.stringify(password ? { password } : {}),
+                });
+                if (!joinRes.ok) {
+                    const err = await joinRes.json().catch(() => ({}));
+                    alert(err.message || 'Não foi possível entrar na Watch Party.');
+                    return;
+                }
+                const stateRes = await fetch(`/api/watch-party/rooms/${encodeURIComponent(code)}`, { headers: { Accept: 'application/json' } });
+                if (!stateRes.ok) return;
+                const data = await stateRes.json();
+                activeCode = code;
+                activeRoom = data.room || data;
+
+                if (activeRoom?.isLeader) {
+                    const drawer = ensureDrawer();
+                    drawer.style.display = 'flex';
+                    const titleEl = drawer.querySelector('#wp-drawer-title');
+                    const metaEl = drawer.querySelector('#wp-drawer-meta');
+                    if (titleEl) titleEl.textContent = `Sala #${code}`;
+                    if (metaEl) metaEl.textContent = `${(data.members || []).length || 1} na sala · Rede Torrent P2P`;
+                    const list = drawer.querySelector('#wp-messages-list');
+                    if (list) {
+                        list.innerHTML = '';
+                        (data.messages || []).forEach(appendMessage);
+                    }
+                } else {
+                    const modal = ensureTheaterModal();
+                    const list = modal.querySelector('#wp-theater-messages');
+                    if (list) {
+                        list.innerHTML = '';
+                        (data.messages || []).forEach(appendMessage);
+                    }
+                }
+
+                const epId = activeRoom?.episode_id || activeRoom?.episodeId;
+                renderRoomPhaseUI(activeRoom);
+                if (epId) {
+                    if (activeRoom?.isLeader) {
+                        if (typeof window.openEntityContext === 'function') window.openEntityContext('episode', epId);
+                    } else {
+                        await loadEpisodeIntoTheater(epId);
+                    }
+                }
+                connectRoomSse(code);
+                applyRemotePlayback(activeRoom);
+            }
+
+            async function createRoom(episodeId, options = {}) {
+                if (!episodeId) return;
+                const res = await fetch('/api/watch-party/rooms', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                    body: JSON.stringify({
+                        episode_id: episodeId,
+                        password: options.password || null,
+                    }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.room?.code) {
+                    alert(data.message || 'Não foi possível criar a Watch Party (exclusivo Anirium+).');
+                    return;
+                }
+                await openRoom(data.room.code, options.password || '');
+            }
+
+            async function sendControl(action, positionSeconds = 0, extra = {}) {
+                if (!activeCode || applyingRemoteSync) return;
+                await fetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}/control`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                    body: JSON.stringify({
+                        action,
+                        positionSeconds: Math.max(0, Math.floor(positionSeconds)),
+                        ...extra,
+                    }),
+                }).catch(() => {});
+            }
+
+            async function sendMessage(body) {
+                if (!activeCode) return;
+                await fetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                    body: JSON.stringify({ body }),
+                }).catch(() => {});
+            }
+
+            async function leaveRoom() {
+                const code = activeCode;
+                handleRoomEnded();
+                if (code) {
+                    await fetch(`/api/watch-party/rooms/${encodeURIComponent(code)}/leave`, {
+                        method: 'POST',
+                        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                    }).catch(() => {});
                 }
             }
 
-            function searchMultiTitle(query, { media = 'all', format = 'all', status = 'all', limit = 60 } = {}) {
-                const q = normalize(query);
-                const m = String(media).toLowerCase();
-                const f = String(format).toUpperCase();
-                const s = String(status).toUpperCase();
-                const out = [];
-                for (let i = 0; i < works.length; i++) {
-                    const w = works[i];
-                    if (m !== 'all' && String(w.media || '').toLowerCase() !== m) continue;
-                    if (f !== 'ALL' && String(w.format || '').toUpperCase() !== f) continue;
-                    if (s !== 'ALL' && String(w.status || '').toUpperCase() !== s) continue;
-                    if (q && !(w._haystack || '').includes(q)) continue;
-                    out.push(w);
-                    if (out.length >= limit) break;
+            // Ouve eventos do Player Pro (anirium-service) para repassar play/pause/seek do Host
+            window.addEventListener('message', (event) => {
+                const msg = event.data;
+                if (!msg || typeof msg !== 'object' || !activeCode || applyingRemoteSync) return;
+                if (msg.type === 'anirium:player:control' && ['play', 'pause', 'seek'].includes(msg.action)) {
+                    sendControl(msg.action, Number(msg.positionSeconds || 0));
                 }
-                return out;
-            }
+            });
 
-            return { boot, searchMultiTitle, getWorks: () => works, getRevision: () => revision };
+            return { openRoom, createRoom, sendControl, sendMessage, leaveRoom, getActiveCode: () => activeCode };
         })();
 
         // Inicializa estado ao carregar
@@ -4335,6 +4884,10 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
             });
             window.AniriumSSE?.connect();
             const urlParams = new URLSearchParams(window.location.search);
+            const partyCode = urlParams.get('party');
+            if (partyCode) {
+                window.AniriumWatchParty?.openRoom(partyCode, urlParams.get('partyPass') || '');
+            }
             const initialTab = urlParams.get('tab');
             if (initialTab && ['home', 'explore', 'calendar'].includes(initialTab)) {
                 window.switchTab(initialTab);

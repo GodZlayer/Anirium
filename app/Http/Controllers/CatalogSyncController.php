@@ -25,11 +25,19 @@ class CatalogSyncController extends Controller
             ->when(! $allowAdult, fn ($q) => $q->where('w.is_adult', 0))
             ->count();
 
+        $publicDbUrl = trim((string) env('CATALOG_PUBLIC_DB_URL', ''));
+        if ($publicDbUrl === '') {
+            $localGz = public_path('data/catalog-public.sqlite.gz');
+            $ver = is_file($localGz) ? (string) filemtime($localGz) : (string) $recorder->currentRevision();
+            $publicDbUrl = '/data/catalog-public.sqlite.gz?v='.$ver;
+        }
+
         return response()->json([
             'revision' => $recorder->currentRevision(),
             'scope' => $allowAdult ? 'adult' : 'safe',
             'works_count' => $worksCount,
             'schedules_count' => $schedulesCount,
+            'db_url' => $publicDbUrl,
         ])->header('Cache-Control', 'private, max-age=30');
     }
 
