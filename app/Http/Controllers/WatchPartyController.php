@@ -178,6 +178,18 @@ class WatchPartyController extends Controller
         $windowStart = $now->copy()->subMinutes(30);
         $windowEnd = $now->copy()->addHours(5);
 
+        // Encerra automaticamente salas públicas live_launch cujo episódio já terminou (> 35 min após launch_at)
+        DB::table('watch_party_rooms')
+            ->where('mode', 'live_launch')
+            ->where('status', '!=', 'ended')
+            ->whereNotNull('launch_at')
+            ->where('launch_at', '<', $now->copy()->subMinutes(35))
+            ->update([
+                'status' => 'ended',
+                'phase' => 'ended',
+                'updated_at' => $now,
+            ]);
+
         $activeLiveRooms = DB::table('watch_party_rooms')
             ->where('mode', 'live_launch')
             ->where('status', '!=', 'ended')
@@ -200,16 +212,29 @@ class WatchPartyController extends Controller
         $rooms = collect();
         foreach ($activeLiveRooms as $room) {
             $live = $this->computeLiveState($room, $now);
+            $membersCount = DB::table('watch_party_members')
+                ->where('room_id', $room->id)
+                ->where('last_seen_at', '>=', $now->copy()->subSeconds(45))
+                ->count();
+
+            if ($live['liveLocked']) {
+                // Fecha automaticamente salas públicas que iniciaram com 0 pessoas
+                if ($membersCount === 0) {
+                    DB::table('watch_party_rooms')->where('id', $room->id)->update([
+                        'status' => 'ended',
+                        'phase' => 'ended',
+                        'updated_at' => $now,
+                    ]);
+                }
+
+                continue;
+            }
             $launchAt = $room->launch_at ? Carbon::parse($room->launch_at) : null;
             $liveStartsAt = $launchAt?->copy()->addMinutes(5);
             $canEnterRoom = $launchAt === null || $now->greaterThanOrEqualTo($launchAt);
             $secondsUntilOpen = $launchAt && $now->lessThan($launchAt)
                 ? (int) $now->diffInSeconds($launchAt)
                 : 0;
-            $membersCount = DB::table('watch_party_members')
-                ->where('room_id', $room->id)
-                ->where('last_seen_at', '>=', $now->copy()->subSeconds(45))
-                ->count();
 
             $key = strtolower((string) $room->work_id).':'.((int) ($room->episode_number ?? 0));
             $roomsByWorkEp[$key] = true;
@@ -263,6 +288,9 @@ class WatchPartyController extends Controller
                 $liveStartsAt = $launchAt->copy()->addMinutes(5);
                 $canEnterRoom = $now->greaterThanOrEqualTo($launchAt);
                 $liveLocked = $now->greaterThanOrEqualTo($liveStartsAt);
+                if ($liveLocked) {
+                    continue;
+                }
                 $secondsUntilOpen = $canEnterRoom ? 0 : (int) $now->diffInSeconds($launchAt);
                 $liveEdgeSeconds = $liveLocked ? (float) $liveStartsAt->diffInSeconds($now, false) : 0.0;
 
@@ -436,6 +464,17 @@ class WatchPartyController extends Controller
             return response()->json(['error' => 'room_not_found'], 404);
         }
 
+        // Salas públicas (live_launch): só permite entrar durante o loading/pré-estreia (antes de iniciar)
+        if ($room->mode === 'live_launch') {
+            $liveState = $this->computeLiveState($room, now());
+            if ($liveState['liveLocked']) {
+                return response()->json([
+                    'error' => 'live_already_started',
+                    'message' => 'Esta Live Pública já iniciou. Só é possível entrar durante o carregamento inicial.',
+                ], 403);
+            }
+        }
+
         $isLeader = $room->leader_user_id !== null && (int) $room->leader_user_id === (int) $user->id;
         if (! $isLeader && ! empty($room->password_hash)) {
             $provided = (string) $request->input('password', '');
@@ -509,6 +548,17 @@ class WatchPartyController extends Controller
         $room = DB::table('watch_party_rooms')->where('code', strtoupper($code))->first();
         if (! $room || $room->status === 'ended') {
             return response()->json(['error' => 'room_not_found'], 404);
+        }
+
+        // Salas públicas (live_launch): só permite entrar durante o loading/pré-estreia (antes de iniciar)
+        if ($room->mode === 'live_launch') {
+            $liveState = $this->computeLiveState($room, now());
+            if ($liveState['liveLocked']) {
+                return response()->json([
+                    'error' => 'live_already_started',
+                    'message' => 'Esta Live Pública já iniciou. Só é possível entrar durante o carregamento inicial.',
+                ], 403);
+            }
         }
 
         if ($room->mode === 'live_launch' || $room->leader_user_id === null || (int) $room->leader_user_id !== (int) $user->id) {
@@ -609,6 +659,17 @@ class WatchPartyController extends Controller
         $room = DB::table('watch_party_rooms')->where('code', strtoupper($code))->first();
         if (! $room || $room->status === 'ended') {
             return response()->json(['error' => 'room_not_found'], 404);
+        }
+
+        // Salas públicas (live_launch): só permite entrar durante o loading/pré-estreia (antes de iniciar)
+        if ($room->mode === 'live_launch') {
+            $liveState = $this->computeLiveState($room, now());
+            if ($liveState['liveLocked']) {
+                return response()->json([
+                    'error' => 'live_already_started',
+                    'message' => 'Esta Live Pública já iniciou. Só é possível entrar durante o carregamento inicial.',
+                ], 403);
+            }
         }
 
         $validated = $request->validate([

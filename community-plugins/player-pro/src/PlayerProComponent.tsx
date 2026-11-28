@@ -1741,6 +1741,7 @@ export default function PlayerProComponent({
         <div className="flex items-center justify-between text-xs text-[#FFF9F0] pt-1">
           {/* Esquerda: Play, Skip, Tempo */}
           <div className="flex items-center gap-3">
+            {!(watchPartyLocked || (window as any).__aniriumWatchPartyLocked) && (<>
             <button
               onClick={togglePlay}
               aria-label={isPlaying ? "Pausar" : "Reproduzir"}
@@ -1755,6 +1756,7 @@ export default function PlayerProComponent({
             <button onClick={() => seekRelative(10)} className="hover:text-[#FFC766] transition" title="Avançar 10s">
               <RotateCw className="w-4 h-4" />
             </button>
+            </>)}
 
             <div className="font-mono text-xs text-[#EADCC8]">
               <span>{formatTime(currentTime)}</span> / <span>{formatTime(duration)}</span>
@@ -2031,6 +2033,7 @@ export default function PlayerProComponent({
 
             {/* Navegador de Episódios */}
             <div className="flex items-center gap-1">
+              {!(watchPartyLocked || (window as any).__aniriumWatchPartyLocked) && (
               <button
                 disabled={catalogIdentity ? !previousCatalogEpisode : currentEp <= 1}
                 onClick={() => {
@@ -2043,9 +2046,11 @@ export default function PlayerProComponent({
               >
                 <SkipBack className="w-4 h-4" />
               </button>
+              )}
               <span className="font-mono text-xs px-2 py-0.5 rounded bg-[#1A1A1F] border border-[#3A3A43]">
                 Ep. {currentEp} de {totalEpisodes ?? "?"}
               </span>
+              {!(watchPartyLocked || (window as any).__aniriumWatchPartyLocked) && (
               <button
                 disabled={catalogIdentity ? !nextCatalogEpisode : totalEpisodes == null || currentEp >= totalEpisodes}
                 onClick={() => {
@@ -2059,6 +2064,7 @@ export default function PlayerProComponent({
               >
                 <SkipForward className="w-4 h-4" />
               </button>
+              )}
             </div>
 
             {/* Botão Tela Cheia */}
