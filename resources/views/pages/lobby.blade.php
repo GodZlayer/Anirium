@@ -3350,9 +3350,11 @@
                     episodeId: resolvedEpId,
                     episodeNumber: cleanEpNum,
                 });
-                document.querySelectorAll('#episode-context-stage [id*="discussion"]').forEach((el) => {
-                    el.style.display = 'none';
-                });
+                const discList = document.getElementById('discussion-comments-list');
+                const discSection = discList?.closest('section, .rounded-2xl, .rounded-3xl') || discList?.parentElement;
+                if (discSection) {
+                    discSection.style.display = 'none';
+                }
             }
             const stage = document.getElementById('episode-context-stage')
                 || document.getElementById('work-context-stage')
@@ -3475,9 +3477,11 @@
                     episodeId: resolvedEpId,
                     episodeNumber: cleanEpNum,
                 });
-                document.querySelectorAll('#episode-context-stage [id*="discussion"]').forEach((el) => {
-                    el.style.display = 'none';
-                });
+                const discList = document.getElementById('discussion-comments-list');
+                const discSection = discList?.closest('section, .rounded-2xl, .rounded-3xl') || discList?.parentElement;
+                if (discSection) {
+                    discSection.style.display = 'none';
+                }
             }
             const stage = document.getElementById('episode-context-stage')
                 || document.getElementById('work-context-stage')
@@ -4779,7 +4783,36 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 if (isLeader) {
                     const meta = document.getElementById('wp-drawer-meta');
                     if (meta) {
-                        meta.textContent = `${roomState.membersCount || 1} na sala • Modo Dono de Party`;
+                        meta.textContent = isSyncHold && rem > 0
+                            ? `${roomState.membersCount || 1} na sala • Sync ${rem}s (${roomState.minBufferedSeconds || 0}s/180s)`
+                            : `${roomState.membersCount || 1} na sala • Modo Dono de Party`;
+                    }
+                    window.__aniriumWatchPartyPhase = isSyncHold && rem > 0 ? phase : 'playing';
+                    try {
+                        document.querySelectorAll('iframe[src*="player-pro"], iframe#anirium-player-pro-iframe').forEach((f) => {
+                            f.contentWindow?.postMessage({
+                                type: 'anirium:wp:state',
+                                locked: false,
+                                phase: window.__aniriumWatchPartyPhase,
+                            }, '*');
+                        });
+                    } catch {}
+                    if (isSyncHold && rem > 0) {
+                        let left = rem;
+                        syncCountdownTimer = setInterval(() => {
+                            left -= 1;
+                            if (left <= 0) {
+                                clearInterval(syncCountdownTimer);
+                                syncCountdownTimer = null;
+                                window.__aniriumWatchPartyPhase = 'playing';
+                                if (meta) meta.textContent = `${roomState.membersCount || 1} na sala • Modo Dono de Party`;
+                                document.querySelectorAll('iframe[src*="player-pro"], iframe#anirium-player-pro-iframe').forEach((f) => {
+                                    try { f.contentWindow?.postMessage({ type: 'anirium:wp:state', locked: false, phase: 'playing' }, '*'); } catch {}
+                                });
+                            } else if (meta) {
+                                meta.textContent = `${roomState.membersCount || 1} na sala • Sync ${left}s (${roomState.minBufferedSeconds || 0}s/180s)`;
+                            }
+                        }, 1000);
                     }
                 } else {
                     const modal = ensureTheaterModal();
