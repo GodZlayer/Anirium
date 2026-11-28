@@ -53,6 +53,7 @@ export interface EpisodeDetailModalProps {
   };
   userTier?: number;
   hasCommunityPlayerAddon?: boolean;
+  hasPlayerAddon?: boolean;
   onSelectWork?: (workId: string) => void;
   onSelectUniverse?: (universeId: string) => void;
   onSelectArc?: (arcId: string) => void;
@@ -90,6 +91,7 @@ export function EpisodeDetailModal({
   },
   userTier = 1,
   hasCommunityPlayerAddon = false,
+  hasPlayerAddon,
   onSelectWork,
   onSelectUniverse,
   onSelectArc,
@@ -102,7 +104,8 @@ export function EpisodeDetailModal({
 
   if (!isOpen) return null;
 
-  const canPlay = userTier >= 2 || hasCommunityPlayerAddon;
+  const isPlus = userTier >= 2;
+  const canPlay = hasPlayerAddon !== undefined ? Boolean(hasPlayerAddon) : Boolean(hasCommunityPlayerAddon);
 
   const isCanon = classification.toLowerCase().includes("canon");
   const isFiller = classification.toLowerCase().includes("filler");
@@ -164,11 +167,12 @@ export function EpisodeDetailModal({
             entityType="episode"
             entityId={episodeId}
             entityTitle={episodeTitle || `Episódio ${episodeNumber}`}
+            isPlus={isPlus}
             onOpenDiscussion={() => setShowForum(!showForum)}
           />
 
           {/* FÓRUM / DISCUSSÃO INTEGRADA DO EPISÓDIO */}
-          {showForum && (
+          {isPlus && showForum && (
             <div className="p-4 rounded-2xl bg-neutral-900/60 border border-emerald-500/20 animate-in fade-in">
               <EpisodeDiscussionFeed
                 contextKey={`episode:${episodeId}`}
@@ -176,6 +180,8 @@ export function EpisodeDetailModal({
                 contextTitle={`Discussão com Trava de Spoiler: ${episodeTitle || `Episódio ${episodeNumber}`}`}
                 targetId={episodeId}
                 episodeNum={episodeNumber}
+                isAuthenticated={userTier >= 1}
+                isPlus={isPlus}
               />
             </div>
           )}

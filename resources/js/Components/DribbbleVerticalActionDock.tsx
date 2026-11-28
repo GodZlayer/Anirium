@@ -9,6 +9,7 @@ interface DribbbleVerticalActionDockProps {
   isBookmarked?: boolean;
   userRating?: number;
   isAuthenticated?: boolean;
+  isPlus?: boolean;
   onToggleLike?: () => void;
   onToggleBookmark?: () => void;
   onRate?: (rating: number) => void;
@@ -27,11 +28,16 @@ export function DribbbleVerticalActionDock({
   isBookmarked = false,
   userRating = 0,
   isAuthenticated = false,
+  isPlus = false,
   onToggleLike,
   onToggleBookmark,
   onRate,
 }: DribbbleVerticalActionDockProps) {
   const { tokens } = useDesignTheme();
+
+  if (!isPlus) {
+    return null;
+  }
 
   return (
     <div

@@ -16,6 +16,12 @@ class CatalogLibraryController extends Controller
         if (! $user) {
             return response()->json(['error' => 'unauthorized'], 401);
         }
+        if (! $user->hasActiveAniriumPlus()) {
+            return response()->json([
+                'error' => 'plus_required',
+                'message' => 'Histórico, favoritos e avaliações são exclusivos para contas Anirium+.',
+            ], 403);
+        }
         $input = $request->validate(['view' => ['required', 'in:bookmarks,history,ratings'], 'page' => ['sometimes', 'integer', 'min:1', 'max:1000000'], 'adult' => ['sometimes', 'boolean']]);
         $preferences = DB::table('user_entity_preferences')->where('user_id', $user->id)->where('target_type', 'work')->get()->all();
         try {

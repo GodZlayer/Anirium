@@ -47,6 +47,7 @@ import {
 import { CatalogFilterBar } from "../Components/CatalogFilterBar";
 import { UnifiedCatalogExplorer } from "../Components/UnifiedCatalogExplorer";
 import { getLocalAiring, getAiringStatusLabel } from "../lib/airingSchedule";
+import { useHasPlayerAddon } from "../lib/useHasPlayerAddon";
 
 interface LobbyProps {
   auth?: {
@@ -56,6 +57,7 @@ interface LobbyProps {
       email: string;
       avatar?: string;
       tier: number;
+      has_player_addon?: boolean;
       level?: number;
       xp?: number;
       active_minutes?: number;
@@ -109,7 +111,13 @@ export default function LobbyPage({ auth, initialContext }: LobbyProps) {
   // Filtros da tela Explorar
   const [catalogFilters, setCatalogFilters] = useState<CatalogFilters>(DEFAULT_CATALOG_FILTERS);
   const isAuthenticated = Boolean(auth?.user);
+  const effectiveTier = auth?.user ? auth.user.tier : 0;
+  const isPlus = Boolean(auth?.user && effectiveTier >= 2);
+  const hasPlayerAddon = useHasPlayerAddon(isAuthenticated, Boolean(auth?.user?.has_player_addon));
   const allowAdult = Boolean(isAuthenticated && adultContentEnabled);
+  useEffect(() => {
+    if (!isPlus && activeTab === "calendar") setActiveTab("home");
+  }, [isPlus, activeTab]);
 
   // Lista de gêneros e formatos presentes no catálogo carregado (Hentai oculto sem conta ou quando desativado na conta)
   const availableGenres = React.useMemo(
@@ -135,14 +143,13 @@ export default function LobbyPage({ auth, initialContext }: LobbyProps) {
       .slice(0, 3);
   }, [universalCatalog, allowAdult]);
   const homeFeed = useCatalogFeed("home", allowAdult, !isAuthenticated);
-  const calendarFeed = useCatalogFeed("calendar", allowAdult);
+  const calendarFeed = useCatalogFeed("calendar", allowAdult, isPlus);
   const rollAnimes = homeRollLocal ?? (homeFeed.ready ? homeFeed.items : []);
   const homePhase = homeRollLocal ? "ready" : homeFeed.phase;
   useEffect(() => { setRollIdx(index => Math.max(0, Math.min(index, rollAnimes.length - 1))); }, [rollAnimes.length]);
 
   // Telemetria Contínua Desacoplada de Tier
   const [telemetry, setTelemetry] = useState<TelemetryState>(() => loadTelemetryState());
-  const effectiveTier = auth?.user ? auth.user.tier : 0;
 
   // Sincronizar preferência adulta (+24 Anos), hidratação de XP/Streaks e trava de máquina única
   useEffect(() => {
@@ -267,7 +274,7 @@ export default function LobbyPage({ auth, initialContext }: LobbyProps) {
   };
 
   const handleToggleBookmark = (anime: AnimeRecord) => {
-    if (!isAuthenticated || !anime.work_id) return;
+    if (!isPlus || !anime.work_id) return;
     const targetId = anime.work_id;
     const exists = libraryMatches(anime, bookmarkedIds);
     const updated = exists
@@ -330,7 +337,7 @@ export default function LobbyPage({ auth, initialContext }: LobbyProps) {
               {[
                 { id: "home", label: strings.navigation.home, icon: Tv },
                 { id: "explore", label: strings.navigation.explore, icon: Compass },
-                { id: "calendar", label: strings.navigation.calendar, icon: Calendar },
+                ...(isPlus ? [{ id: "calendar", label: strings.navigation.calendar, icon: Calendar }] : []),
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -394,10 +401,10 @@ export default function LobbyPage({ auth, initialContext }: LobbyProps) {
               onSelectIdx={setRollIdx}
               onPlay={handlePlayAnime}
               onExplore={handlePlayAnime}
-              onToggleBookmark={isAuthenticated ? handleToggleBookmark : undefined}
-              isBookmarked={rollAnimes[rollIdx] ? libraryMatches(rollAnimes[rollIdx], bookmarkedIds) : false}
+              onToggleBookmark={isPlus ? handleToggleBookmark : undefined}
+              isBookmarked={isPlus && rollAnimes[rollIdx] ? libraryMatches(rollAnimes[rollIdx], bookmarkedIds) : false}
               isAuthenticated={Boolean(auth?.user)}
-              hasPlayerAddon={Boolean(auth?.user && effectiveTier >= 2)}
+              hasPlayerAddon={hasPlayerAddon}
             />
           </div>
         )}
@@ -437,15 +444,15 @@ export default function LobbyPage({ auth, initialContext }: LobbyProps) {
                 activeAnimeId={selectedAnime?.id}
                 onSelectAnime={handleOpenContext}
                 onPlayAnime={handlePlayAnime}
-                onToggleBookmark={isAuthenticated ? handleToggleBookmark : undefined}
-                bookmarkedIds={bookmarkedIds}
+                onToggleBookmark={isPlus ? handleToggleBookmark : undefined}
+                bookmarkedIds={isPlus ? bookmarkedIds : []}
                 layout="grid"
               />
             </div>
           </div>} />
         )}
 
-        {activeTab === "calendar" && (() => {
+        {activeTab === "calendar" && isPlus && (() => {
           const weekDays = calendarWeekDays(language);
 
           // Todas as obras ativas no ciclo de transmissão (bloqueia Hentai sem conta +24)

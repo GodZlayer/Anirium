@@ -177,9 +177,9 @@ export function CinematicArena({
                   </div>
             )}
 
-            {isAuthenticated && (
+            {isAuthenticated && onToggleBookmark && (
               <button
-                onClick={() => onToggleBookmark?.(anime)}
+                onClick={() => onToggleBookmark(anime)}
                 className="p-3 rounded-xl border backdrop-blur-md transition-all duration-200 hover:scale-105 cursor-pointer"
                 style={{
                   backgroundColor: tokens.colors.bgSurface,

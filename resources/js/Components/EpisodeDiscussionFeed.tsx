@@ -20,6 +20,7 @@ interface EpisodeDiscussionFeedProps {
   targetId: string | number;
   episodeNum?: number;
   isAuthenticated?: boolean;
+  isPlus?: boolean;
   onPostComment?: (content: string, isSpoiler: boolean) => void;
 }
 
@@ -30,10 +31,12 @@ export function EpisodeDiscussionFeed({
   targetId,
   episodeNum = 1,
   isAuthenticated = false,
+  isPlus = false,
   onPostComment,
 }: EpisodeDiscussionFeedProps) {
   const { tokens, language } = useDesignTheme();
-  const { comments, newText, setNewText, isSpoiler, setIsSpoiler, busy, error, handleSubmit } = useDiscussion(contextKey, contextType, language, isAuthenticated, onPostComment);
+  const canInteract = Boolean(isAuthenticated && isPlus);
+  const { comments, newText, setNewText, isSpoiler, setIsSpoiler, busy, error, handleSubmit } = useDiscussion(contextKey, contextType, language, canInteract, onPostComment);
   const [revealedSpoilers, setRevealedSpoilers] = useState<Record<string, boolean>>({});
 
   const toggleSpoiler = (id: string) => {
@@ -78,7 +81,7 @@ export function EpisodeDiscussionFeed({
       {error && <p role="alert" className="text-xs text-[color:var(--wc-stateWarning)]">{DISCUSSION_UNAVAILABLE[language] || DISCUSSION_UNAVAILABLE["en-US"]}</p>}
 
       {/* Input para Escrever Comentário */}
-      {isAuthenticated ? (
+      {canInteract ? (
         <form onSubmit={handleSubmit} className="flex flex-col gap-2">
           <div className="relative">
             <textarea
@@ -131,7 +134,7 @@ export function EpisodeDiscussionFeed({
             color: tokens.colors.textMuted,
           }}
         >
-          Faça login com sua conta Google para comentar em <strong>{contextTitle}</strong> ({levelBadgeLabel}).
+          Recurso exclusivo para contas <strong>Anirium+</strong>: assine para comentar em <strong>{contextTitle}</strong> ({levelBadgeLabel}).
         </div>
       )}
 

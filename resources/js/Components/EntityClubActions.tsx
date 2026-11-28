@@ -24,6 +24,7 @@ export interface EntityClubActionsProps {
   onToggleBookmark?: () => void;
   onUpdateStatus?: (status: "reading" | "watching" | "completed" | "plan_to" | "dropped") => void;
   onOpenDiscussion?: () => void;
+  isPlus?: boolean;
 }
 
 /**
@@ -46,9 +47,14 @@ export function EntityClubActions({
   onToggleBookmark,
   onUpdateStatus,
   onOpenDiscussion,
+  isPlus = false,
 }: EntityClubActionsProps) {
   const { tokens } = useDesignTheme();
   const [hoverScore, setHoverScore] = useState<number | null>(null);
+
+  if (!isPlus) {
+    return null;
+  }
 
   const statusOptions = [
     { key: "watching", label: "Consumindo" },

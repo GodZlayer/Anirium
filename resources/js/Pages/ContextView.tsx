@@ -179,6 +179,7 @@ export default function ContextView({ initialType, initialId, initialState, auth
   const [telemetry, setTelemetry] = useState<TelemetryState>(() => loadTelemetryState());
   const isAuthenticated = !!auth?.user;
   const effectiveTier = auth?.user?.tier || 0;
+  const isPlus = Boolean(auth?.user && effectiveTier >= 2);
 
   useEffect(() => {
     const handleXpEvent = (e: any) => {
@@ -389,7 +390,7 @@ export default function ContextView({ initialType, initialId, initialState, auth
 
   // Ações Sociais Rápidas Vinculadas à Chave Única Indexada (+2 XP Like, +5 XP Bookmark, +5 XP Nota)
   const handleToggleLike = () => {
-    if (!isAuthenticated) return;
+    if (!isPlus) return;
     const next = !isLiked;
     setIsLiked(next);
 
@@ -419,7 +420,7 @@ export default function ContextView({ initialType, initialId, initialState, auth
   };
 
   const handleToggleBookmark = () => {
-    if (!isAuthenticated) return;
+    if (!isPlus) return;
     const next = !isBookmarked;
     setIsBookmarked(next);
 
@@ -435,7 +436,7 @@ export default function ContextView({ initialType, initialId, initialState, auth
   };
 
   const handleRate = (rating: number) => {
-    if (!isAuthenticated) return;
+    if (!isPlus) return;
     setUserRating(rating);
 
     try {
@@ -961,6 +962,7 @@ export default function ContextView({ initialType, initialId, initialState, auth
                   targetId={activeId}
                   episodeNum={selectedEpisode}
                   isAuthenticated={isAuthenticated}
+                  isPlus={isPlus}
                 />
               </div>
             ) : (
@@ -1598,6 +1600,7 @@ export default function ContextView({ initialType, initialId, initialState, auth
             isBookmarked={isBookmarked}
             userRating={userRating}
             isAuthenticated={isAuthenticated}
+            isPlus={isPlus}
             onToggleLike={handleToggleLike}
             onToggleBookmark={handleToggleBookmark}
             onRate={handleRate}

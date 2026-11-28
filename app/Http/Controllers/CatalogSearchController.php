@@ -16,6 +16,13 @@ class CatalogSearchController extends Controller
         $allowAdult = (bool) $request->user()?->canAccessAdultContent() && $request->boolean('adult');
 
         if ($input['view'] === 'calendar') {
+            if (! $request->user()?->hasActiveAniriumPlus()) {
+                return response()->json([
+                    'error' => 'plus_required',
+                    'message' => 'As telas de lançamento são exclusivas para contas Anirium+.',
+                ], 403);
+            }
+
             $calendar = $catalogService->getCalendarByDay($allowAdult);
             $flat = [];
             foreach ($calendar as $day => $dayItems) {

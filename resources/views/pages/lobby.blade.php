@@ -2794,11 +2794,15 @@
             });
 
             if (tabName === 'discussion') {
-                const container = document.getElementById('entity-discussions-container');
-                if (container) {
-                    const type = container.getAttribute('data-target-type');
-                    const id = container.getAttribute('data-target-id');
-                    if (type && id) window.refreshEntityComments(type, id);
+                if (window.AniriumWatchParty?.getActiveCode?.()) {
+                    window.AniriumWatchParty.dockChatIntoEpisode?.();
+                } else {
+                    const container = document.getElementById('entity-discussions-container');
+                    if (container) {
+                        const type = container.getAttribute('data-target-type');
+                        const id = container.getAttribute('data-target-id');
+                        if (type && id) window.refreshEntityComments(type, id);
+                    }
                 }
             } else if (tabName === 'player') {
                 window.mountAddonStage?.();
@@ -4949,14 +4953,15 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                         const data = JSON.parse(e.data);
                         if (data.room) {
                             const prevEp = activeRoom?.episodeId || activeRoom?.episode_id;
-                            const wasLeader = Boolean(activeRoom?.isLeader);
-                            activeRoom = { ...data.room, isLeader: wasLeader || Boolean(data.room.isLeader) };
+                            const localIsLeader = activeRoom ? Boolean(activeRoom.isLeader) : Boolean(data.room.isLeader);
+                            activeRoom = { ...data.room, isLeader: localIsLeader };
                             renderRoomPhaseUI(activeRoom);
                             const nextEp = activeRoom.episodeId || activeRoom.episode_id;
                             if (!activeRoom.isLeader && nextEp && nextEp !== prevEp) {
                                 mountTheaterPlayer(activeRoom);
                             }
-                            if (!activeRoom.isLeader) {
+                            const isSyncHold = activeRoom.phase === 'stabilizing' || activeRoom.phase === 'overtime';
+                            if (!activeRoom.isLeader || isSyncHold) {
                                 applyRemotePlayback(activeRoom);
                             }
                         }
@@ -4996,8 +5001,10 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 wpRequest(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}/ready`, 'POST', { bufferedSeconds })
                     .then((res) => {
                         if (res?.room) {
-                            activeRoom = res.room;
-                            renderRoomPhaseUI(res.room);
+                            const localIsLeader = activeRoom ? Boolean(activeRoom.isLeader) : Boolean(res.room.isLeader);
+                            activeRoom = { ...res.room, isLeader: localIsLeader };
+                            renderRoomPhaseUI(activeRoom);
+                            applyRemotePlayback(activeRoom);
                         }
                     })
                     .catch(() => {});

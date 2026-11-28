@@ -45,6 +45,7 @@ export function UserProfileModal({
   ];
 
   const effectiveTier = user.tier;
+  const isPlus = Number(effectiveTier || 1) >= 2;
   const currentTier = tierConfig[effectiveTier] || tierConfig[1];
   const TierIcon = currentTier.icon;
 
@@ -143,8 +144,10 @@ export function UserProfileModal({
         <div className="flex items-center gap-1 px-6 pt-3 border-b border-[color:var(--wc-borderDefault)]/5 bg-[color:var(--wc-bgBase)]/20">
           {[
             { id: "overview", label: "Visão Geral & XP", icon: Trophy },
-            { id: "bookmarks", label: `Favoritos (${bookmarkedIds.length})`, icon: Bookmark },
-            { id: "history", label: `Concluídos (${telemetry.worksCompleted})`, icon: History },
+            ...(isPlus ? [
+              { id: "bookmarks", label: `Favoritos (${bookmarkedIds.length})`, icon: Bookmark },
+              { id: "history", label: `Concluídos (${telemetry.worksCompleted})`, icon: History },
+            ] : []),
             { id: "addons", label: "Addons", icon: Puzzle },
             { id: "settings", label: "Configurações", icon: Settings },
           ].map((tab) => {
@@ -216,7 +219,7 @@ export function UserProfileModal({
             </div>
           )}
 
-          {activeTab === "bookmarks" && (
+          {isPlus && activeTab === "bookmarks" && (
             <ProfileCatalogLibrary
               key={`bookmarks:${user.id}`}
               type="bookmarks"
@@ -231,7 +234,7 @@ export function UserProfileModal({
             />
           )}
 
-          {activeTab === "history" && (
+          {isPlus && activeTab === "history" && (
             <ProfileCatalogLibrary
               key={`history:${user.id}`}
               type="history"

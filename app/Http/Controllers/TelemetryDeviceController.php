@@ -371,6 +371,13 @@ class TelemetryDeviceController extends Controller
             return response()->json(['error' => 'unauthorized'], 401);
         }
 
+        if (! $user->hasActiveAniriumPlus()) {
+            return response()->json([
+                'error' => 'plus_required',
+                'message' => 'As funções de interação são exclusivas para contas Anirium+.',
+            ], 403);
+        }
+
         $raw = $request->json()->all() ?: $request->all();
         $targetType = $raw['target_type'] ?? 'work';
         $targetId = (string) ($raw['target_id'] ?? '');
@@ -523,6 +530,25 @@ class TelemetryDeviceController extends Controller
 
         self::evaluateDailyStreak($user);
 
+        if (! $user->hasActiveAniriumPlus()) {
+            return response()->json([
+                'preferences' => [],
+                'commented_targets' => [],
+                'gamification' => [
+                    'catalog_completion' => app(CatalogUserCompletion::class)->read($user->id),
+                    'active_minutes' => (int) ($user->active_minutes ?? 0),
+                    'current_streak' => (int) ($user->current_streak ?? 0),
+                    'longest_streak' => (int) ($user->longest_streak ?? 0),
+                    'streak_xp' => (int) ($user->streak_xp ?? 0),
+                    'adult_content_enabled' => $user->canAccessAdultContent(),
+                    'age_verified' => $user->isAgeVerified(),
+                    'age_verification_status' => (string) ($user->age_verification_status ?? 'unverified'),
+                    'age_verification_method' => $user->age_verification_method,
+                    'custom_title' => $user->custom_title,
+                ],
+            ]);
+        }
+
         $targetId = $request->query('target_id');
         $targetType = $request->query('target_type');
 
@@ -621,6 +647,13 @@ class TelemetryDeviceController extends Controller
         $user = Auth::user();
         if (! $user) {
             return response()->json(['error' => 'unauthorized'], 401);
+        }
+
+        if (! $user->hasActiveAniriumPlus()) {
+            return response()->json([
+                'error' => 'plus_required',
+                'message' => 'As funções de interação são exclusivas para contas Anirium+.',
+            ], 403);
         }
 
         $raw = $request->json()->all() ?: $request->all();

@@ -25,12 +25,7 @@ class WatchPartyController extends Controller
             return [null, response()->json(['error' => 'unauthenticated'], 401)];
         }
 
-        $tier = (int) ($user->tier ?? 1);
-        if (strtolower((string) $user->email) === 'santoss.cog@gmail.com') {
-            $tier = 3;
-        }
-
-        if ($tier < 2) {
+        if (! $user->hasActiveAniriumPlus()) {
             return [null, response()->json([
                 'error' => 'plus_required',
                 'message' => 'As Salas e Watch Parties são exclusivas para assinantes Anirium+.',
@@ -359,6 +354,21 @@ class WatchPartyController extends Controller
             ->where('last_seen_at', '>=', now()->subSeconds(45))
             ->count();
 
+        if ($membersCount === 0) {
+            DB::table('watch_party_rooms')->where('id', $room->id)->update([
+                'status' => 'ended',
+                'phase' => 'ended',
+                'sync_lock_until' => null,
+                'updated_at' => now(),
+            ]);
+
+            return response()->json([
+                'active' => false,
+                'handle' => $owner->handle,
+                'ownerName' => $owner->name,
+            ], 200, ['Cache-Control' => 'no-store']);
+        }
+
         return response()->json([
             'active' => true,
             'code' => $room->code,
@@ -559,7 +569,7 @@ class WatchPartyController extends Controller
         }
 
         $room = DB::table('watch_party_rooms')->where('code', strtoupper($code))->first();
-        if (! $room) {
+        if (! $room || $room->status === 'ended') {
             return response()->json(['error' => 'room_not_found'], 404);
         }
 
@@ -616,7 +626,8 @@ class WatchPartyController extends Controller
         $live = $this->computeLiveState($room, $now);
         $currentPos = $live['effectivePositionSeconds'];
         $updates = ['updated_at' => $now, 'playback_updated_at' => $now];
-        $inSyncHold = in_array((string) ($room->phase ?? ''), ['stabilizing', 'overtime'], true)
+        $inSyncHold = $room->mode === 'live_launch'
+            && in_array((string) ($room->phase ?? ''), ['stabilizing', 'overtime'], true)
             && ! empty($room->sync_lock_until)
             && $now->lessThan(Carbon::parse($room->sync_lock_until));
 
@@ -629,6 +640,7 @@ class WatchPartyController extends Controller
                 $updates['status'] = 'playing';
                 $updates['phase'] = 'playing';
                 $updates['sync_lock_until'] = null;
+                $updates['sync_overtime_until'] = null;
                 $updates['playback_position_seconds'] = $pos;
                 $updates['live_edge_seconds'] = max((float) $room->live_edge_seconds, $pos);
                 break;
@@ -640,6 +652,8 @@ class WatchPartyController extends Controller
                 $pos = isset($validated['positionSeconds']) ? (float) $validated['positionSeconds'] : $currentPos;
                 $updates['status'] = 'paused';
                 $updates['phase'] = 'playing';
+                $updates['sync_lock_until'] = null;
+                $updates['sync_overtime_until'] = null;
                 $updates['playback_position_seconds'] = $pos;
                 break;
 
@@ -774,7 +788,7 @@ class WatchPartyController extends Controller
         }
 
         $room = DB::table('watch_party_rooms')->where('code', strtoupper($code))->first();
-        if (! $room) {
+        if (! $room || $room->status === 'ended') {
             return response()->json(['error' => 'room_not_found'], 404);
         }
 
@@ -850,7 +864,7 @@ class WatchPartyController extends Controller
             ]);
 
         $broadcasted = false;
-        if (in_array((string) ($room->phase ?? ''), ['stabilizing', 'overtime'], true) && ! empty($room->sync_overtime_until)) {
+        if (in_array((string) ($room->phase ?? ''), ['stabilizing', 'overtime'], true)) {
             $unreadyCount = DB::table('watch_party_members')
                 ->where('room_id', $room->id)
                 ->where('buffered_seconds', '<', self::TARGET_BUFFER_SECONDS)
@@ -858,9 +872,11 @@ class WatchPartyController extends Controller
 
             if ($unreadyCount === 0) {
                 DB::table('watch_party_rooms')->where('id', $room->id)->update([
+                    'status' => 'playing',
                     'phase' => 'playing',
-                    'sync_lock_until' => $now,
+                    'sync_lock_until' => null,
                     'sync_overtime_until' => null,
+                    'playback_updated_at' => $now,
                     'updated_at' => $now,
                 ]);
                 $room = $this->findRoom($code);
@@ -1089,12 +1105,31 @@ class WatchPartyController extends Controller
                     $syncRemainingSeconds = (int) $now->diffInSeconds($overtimeUntil);
                 } else {
                     $phase = 'playing';
-                    $effectiveSyncUntil = $overtimeUntil;
+                    $effectiveSyncUntil = null;
                     $syncRemainingSeconds = 0;
+                    $live['effectiveStatus'] = 'playing';
+                    DB::table('watch_party_rooms')->where('id', $room->id)->update([
+                        'status' => 'playing',
+                        'phase' => 'playing',
+                        'sync_lock_until' => null,
+                        'sync_overtime_until' => null,
+                        'playback_updated_at' => $now,
+                        'updated_at' => $now,
+                    ]);
                 }
             } else {
                 $phase = 'playing';
+                $effectiveSyncUntil = null;
                 $syncRemainingSeconds = 0;
+                $live['effectiveStatus'] = 'playing';
+                DB::table('watch_party_rooms')->where('id', $room->id)->update([
+                    'status' => 'playing',
+                    'phase' => 'playing',
+                    'sync_lock_until' => null,
+                    'sync_overtime_until' => null,
+                    'playback_updated_at' => $now,
+                    'updated_at' => $now,
+                ]);
             }
         }
 

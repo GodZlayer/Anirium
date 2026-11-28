@@ -76,14 +76,44 @@ class HandleInertiaRequests extends Middleware
                 $cleanName = explode('@', (string) $user->email)[0] ?: 'Membro';
             }
 
-            $preferences = DB::table('user_entity_preferences')
-                ->where('user_id', $user->id)
-                ->get();
-            $preferences = app(CatalogPreferenceProjection::class)->apply($preferences);
+            $isPlus = $user->hasActiveAniriumPlus();
+            $preferences = [];
+            $commentedTargets = [];
 
-            $commentedTargets = DB::table('entity_discussions as d')->join('catalog_entities as e', 'e.id', '=', 'd.entity_id')
-                ->where('d.user_id', $user->id)->whereColumn('d.target_type', 'e.kind')->where('e.resolution_status', 'verified')
-                ->distinct()->pluck('d.entity_id');
+            if ($isPlus) {
+                $preferences = DB::table('user_entity_preferences')
+                    ->where('user_id', $user->id)
+                    ->get();
+                $preferences = app(CatalogPreferenceProjection::class)->apply($preferences);
+
+                $commentedTargets = DB::table('entity_discussions as d')->join('catalog_entities as e', 'e.id', '=', 'd.entity_id')
+                    ->where('d.user_id', $user->id)->whereColumn('d.target_type', 'e.kind')->where('e.resolution_status', 'verified')
+                    ->distinct()->pluck('d.entity_id');
+            }
+
+            $dbAddons = DB::table('user_addons')->where('user_id', $user->id)->get();
+            $hasPlayerAddon = false;
+            if ($isPlus) {
+                $playerProRecord = $dbAddons->firstWhere('addon_id', 'player-pro');
+                if (! $playerProRecord || (bool) $playerProRecord->enabled) {
+                    $hasPlayerAddon = true;
+                }
+            }
+            if (! $hasPlayerAddon) {
+                foreach ($dbAddons as $addon) {
+                    if (in_array($addon->addon_id, ['player-pro', 'manga-reader-pro'], true) || ! (bool) $addon->enabled) {
+                        continue;
+                    }
+                    $manifest = ! empty($addon->manifest_json) ? json_decode($addon->manifest_json, true) : null;
+                    $caps = is_array($manifest['capabilities'] ?? null) ? $manifest['capabilities'] : [];
+                    $category = $manifest['category'] ?? null;
+                    $mediaType = $manifest['mediaType'] ?? null;
+                    if (($category === 'engine.renderer' && ($mediaType === 'video' || ! $mediaType)) || in_array('ui.player.render', $caps, true)) {
+                        $hasPlayerAddon = true;
+                        break;
+                    }
+                }
+            }
 
             $completion = app(CatalogUserCompletion::class)->read($user->id);
             $experience = app(AccountExperience::class)->read($user, $completion);
@@ -93,6 +123,7 @@ class HandleInertiaRequests extends Middleware
                 'email' => $user->email,
                 'avatar' => $user->avatar,
                 'tier' => $effectiveTier,
+                'has_player_addon' => $hasPlayerAddon,
                 'anirium_plus_expires_at' => $user->anirium_plus_expires_at?->toIso8601String(),
                 'anirium_plus_trial_claimed' => $user->anirium_plus_trial_claimed_at !== null,
                 'level' => $experience['level'],
