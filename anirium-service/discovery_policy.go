@@ -184,8 +184,8 @@ func discoverPlaybackInventory(parent context.Context, magnets []string, generat
 	var probedMu sync.Mutex
 	probedFast := map[string]bool{}
 	var fastProbeWg sync.WaitGroup
-	fastLimit := 3
-	bgLimit := 2
+	fastLimit := 6
+	bgLimit := 1
 	if os.Getenv("ANIRIUM_E2E_CHILD") == "1" {
 		fastLimit = 8
 		bgLimit = 8
@@ -193,13 +193,37 @@ func discoverPlaybackInventory(parent context.Context, magnets []string, generat
 	probeSlots := make(chan struct{}, fastLimit)
 	bgProbeSlots := make(chan struct{}, bgLimit)
 
-	// Contexto único de inventário para nunca cancelar ffprobe no meio durante a fase rápida.
+	// Contexto da fase rápida usa discoveryInventoryBudget(); a fase abrangente em segundo plano
+	// usa o contexto da sessão (parent) para nunca abandonar magnets secundários enquanto a janela
+	// inicial carrega ou o usuário ainda está assistindo.
 	inventory, cancelInventory := context.WithTimeout(parent, discoveryInventoryBudget())
 	defer cancelInventory()
 
-	scheduleProbeWith := func(slots chan struct{}, waitForWindow bool) func(string) {
+	var failedMu sync.Mutex
+	failedSources := map[string]bool{}
+
+	recordProbeOutcome := func(src string) bool {
+		swarmMu.RLock()
+		hasQualities := generation == playbackGeneration && len(probedStreams[src]) > 0
+		swarmMu.RUnlock()
+		if !hasQualities {
+			probedMu.Lock()
+			delete(probedFast, src)
+			probedMu.Unlock()
+			failedMu.Lock()
+			failedSources[src] = true
+			failedMu.Unlock()
+			return false
+		}
+		failedMu.Lock()
+		delete(failedSources, src)
+		failedMu.Unlock()
+		return true
+	}
+
+	scheduleProbeWith := func(probeCtx context.Context, slots chan struct{}, waitForWindow bool) func(string) {
 		return func(source string) {
-			if inventory.Err() != nil {
+			if probeCtx.Err() != nil {
 				return
 			}
 			probedMu.Lock()
@@ -213,27 +237,23 @@ func discoverPlaybackInventory(parent context.Context, magnets []string, generat
 			fastProbeWg.Add(1)
 			go func(src string) {
 				defer fastProbeWg.Done()
-				if os.Getenv("ANIRIUM_E2E_CHILD") != "1" && firstReadyFired.Load() {
-					waitInitialWindowReady(inventory, generation)
+				if waitForWindow && os.Getenv("ANIRIUM_E2E_CHILD") != "1" && firstReadyFired.Load() {
+					waitInitialWindowReady(probeCtx, generation)
 				}
 				select {
 				case slots <- struct{}{}:
-				case <-inventory.Done():
+				case <-probeCtx.Done():
 					return
 				}
 				defer func() { <-slots }()
-				if os.Getenv("ANIRIUM_E2E_CHILD") != "1" && firstReadyFired.Load() {
-					waitInitialWindowReady(inventory, generation)
+				if waitForWindow && os.Getenv("ANIRIUM_E2E_CHILD") != "1" && firstReadyFired.Load() {
+					waitInitialWindowReady(probeCtx, generation)
 				}
 
-				probeMixFileContext(inventory, src, generation)
-				swarmMu.RLock()
-				hasQualities := generation == playbackGeneration && len(probedStreams[src]) > 0
-				swarmMu.RUnlock()
-				if !hasQualities {
-					probedMu.Lock()
-					delete(probedFast, src)
-					probedMu.Unlock()
+				magnetCtx, cancelMagnet := context.WithTimeout(probeCtx, 20*time.Second)
+				probeMixFileContext(magnetCtx, src, generation)
+				cancelMagnet()
+				if !recordProbeOutcome(src) {
 					return
 				}
 				broadcastStartupTelemetry()
@@ -254,9 +274,9 @@ func discoverPlaybackInventory(parent context.Context, magnets []string, generat
 	}
 
 	// 1. Fase Rápida: assim que qualquer magnet prioritário obtiver metadados,
-	// dispara ffprobe concorrente usando o contexto de inventário completo.
-	fastMeta, cancelFast := context.WithTimeout(parent, 2000*time.Millisecond)
-	_ = expandMediaSources(fastMeta, priorityMagnets, generation, scheduleProbeWith(probeSlots, false))
+	// dispara ffprobe concorrente usando o contexto de inventário.
+	fastMeta, cancelFast := context.WithTimeout(parent, 5000*time.Millisecond)
+	_ = expandMediaSources(fastMeta, priorityMagnets, generation, scheduleProbeWith(inventory, probeSlots, false))
 	cancelFast()
 
 	if parent.Err() != nil {
@@ -267,15 +287,18 @@ func discoverPlaybackInventory(parent context.Context, magnets []string, generat
 	// 2. Se já conseguiu faixas na fase rápida, dispara imediatamente
 	triggerReady()
 
-	// 3. Fase Abrangente em Segundo Plano: expande e sonda novas fontes continuamente
-	metadata, cancelMetadata := context.WithTimeout(parent, discoveryMetadataBudget())
-	sources := expandMediaSources(metadata, orderedMagnets, generation, scheduleProbeWith(bgProbeSlots, true))
-	cancelMetadata()
+	// 3. Fase Abrangente em Segundo Plano: usa parent (vida da sessão) sem timeout artificial
+	// enquanto o usuário estiver assistindo, garantindo descoberta contínua de todas as fontes.
+	bgCtx := parent
+	if os.Getenv("ANIRIUM_E2E_CHILD") == "1" {
+		bgCtx = inventory
+	}
+	sources := expandMediaSources(bgCtx, orderedMagnets, generation, scheduleProbeWith(bgCtx, bgProbeSlots, true))
 	if parent.Err() != nil {
 		fastProbeWg.Wait()
 		return
 	}
-	probeSources(inventory, sources, func(source string) {
+	probeSources(bgCtx, sources, func(source string) {
 		probedMu.Lock()
 		alreadyProbed := probedFast[source]
 		if !alreadyProbed {
@@ -284,20 +307,19 @@ func discoverPlaybackInventory(parent context.Context, magnets []string, generat
 		probedMu.Unlock()
 		if !alreadyProbed {
 			if os.Getenv("ANIRIUM_E2E_CHILD") != "1" && firstReadyFired.Load() {
-				waitInitialWindowReady(inventory, generation)
+				waitInitialWindowReady(bgCtx, generation)
 			}
 			select {
 			case bgProbeSlots <- struct{}{}:
-			case <-inventory.Done():
+			case <-bgCtx.Done():
 				return
 			}
 			defer func() { <-bgProbeSlots }()
 
-			probeMixFileContext(inventory, source, generation)
-			swarmMu.RLock()
-			hasQualities := generation == playbackGeneration && len(probedStreams[source]) > 0
-			swarmMu.RUnlock()
-			if hasQualities && !triggerReady() && firstReadyFired.Load() {
+			magnetCtx, cancelMagnet := context.WithTimeout(bgCtx, 20*time.Second)
+			probeMixFileContext(magnetCtx, source, generation)
+			cancelMagnet()
+			if recordProbeOutcome(source) && !triggerReady() && firstReadyFired.Load() {
 				prewarmNewlyDiscoveredSubtitles(source)
 				swarmMu.Lock()
 				sameGen := generation == playbackGeneration
@@ -314,6 +336,49 @@ func discoverPlaybackInventory(parent context.Context, magnets []string, generat
 		}
 	})
 	fastProbeWg.Wait()
+
+	// 4. Passada de retry controlada (15s depois) para magnets que deram timeout de peer na 1ª rodada,
+	// garantindo que vídeo/áudio/legendas de fontes mais lentas ainda entrem na mixagem ao vivo.
+	if os.Getenv("ANIRIUM_E2E_CHILD") != "1" && parent.Err() == nil {
+		failedMu.Lock()
+		retryList := make([]string, 0, len(failedSources))
+		for src := range failedSources {
+			retryList = append(retryList, src)
+		}
+		failedMu.Unlock()
+		if len(retryList) > 0 {
+			timer := time.NewTimer(15 * time.Second)
+			select {
+			case <-timer.C:
+			case <-parent.Done():
+				timer.Stop()
+				return
+			}
+			probeSources(parent, retryList, func(source string) {
+				select {
+				case bgProbeSlots <- struct{}{}:
+				case <-parent.Done():
+					return
+				}
+				defer func() { <-bgProbeSlots }()
+				magnetCtx, cancelMagnet := context.WithTimeout(parent, 20*time.Second)
+				probeMixFileContext(magnetCtx, source, generation)
+				cancelMagnet()
+				if recordProbeOutcome(source) && !triggerReady() && firstReadyFired.Load() {
+					prewarmNewlyDiscoveredSubtitles(source)
+					swarmMu.Lock()
+					sameGen := generation == playbackGeneration
+					if sameGen {
+						refreshAudioSelectionLocked()
+					}
+					swarmMu.Unlock()
+					if sameGen {
+						broadcastWSEvent("manifest", buildCurrentManifest())
+					}
+				}
+			})
+		}
+	}
 }
 
 

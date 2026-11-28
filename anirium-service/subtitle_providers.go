@@ -45,6 +45,9 @@ func searchSubtitleProvidersSubset(query PlaybackPrepareRequest, parent context.
 		if !server.Enabled || !containsString(query.AuthorizedAddonIDs, server.ID) {
 			continue
 		}
+		if isProviderInCooldown(server.ID) {
+			continue
+		}
 		base, err := url.Parse(server.ManifestURL)
 		if err != nil || !sameProviderOrigin(base, base) {
 			continue
@@ -58,10 +61,16 @@ func searchSubtitleProvidersSubset(query PlaybackPrepareRequest, parent context.
 			defer cancel()
 			manifest, snapshotStatus := query.ManifestSnapshots.manifest(parent, server)
 			if snapshotStatus != "ok" || !manifestIdentityAcceptsServer(server, manifest) {
+				if snapshotStatus == "offline" || snapshotStatus == "timeout" {
+					markProviderOffline(server.ID)
+				}
 				return
 			}
+			markProviderOnline(server.ID)
 			if isSubtitleQueryProviderURL(server.ManifestURL) || containsString(manifest.Capabilities, "subtitle-query") {
-				for _, subtitle := range searchSubtitleQueryProvider(ctx, server, query) {
+				querySubs := searchSubtitleQueryProvider(ctx, server, query)
+				appendLog(fmt.Sprintf("Subtitle query provider host=%s candidates=%d timeout=%t", base.Host, len(querySubs), ctx.Err() != nil))
+				for _, subtitle := range querySubs {
 					if !seen[subtitle.URL] {
 						seen[subtitle.URL] = true
 						result = append(result, subtitle)

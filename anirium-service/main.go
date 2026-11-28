@@ -50,6 +50,8 @@ type HealthResponse struct {
 	IsNative                bool   `json:"isNative"`
 	Engine                  string `json:"engine"`
 	LogFailures             uint64 `json:"logFailures"`
+	LanIP                   string `json:"lanIp,omitempty"`
+	LanURL                  string `json:"lanUrl,omitempty"`
 }
 
 type StreamSession struct {
@@ -297,6 +299,7 @@ type PlaybackPrepareRequest struct {
 	Aliases                []string                `json:"aliases,omitempty"`
 	Season                 int                     `json:"season"`
 	Episode                int                     `json:"episode"`
+	AbsoluteEpisode        int                     `json:"absoluteEpisode,omitempty"`
 }
 
 // Telemetria do Swarm P2P e Mix de Conteúdo do Player Pro Multi-Usuário Local
@@ -313,6 +316,7 @@ var (
 	activeSessions                            = make(map[string]*StreamSession) // Sessões ativas por IP / stream
 	connectedPeers           int              = 0
 	uploadRateStr            string           = "0.0 KB/s"
+	torrentUploadRateLimiter                  = rate.NewLimiter(rate.Limit(uploadBytesPerPlayerPerSec), uploadBurstPerPlayerBytes)
 	downloadRateStr          string           = "0.0 KB/s"
 	totalDownloadedStr       string           = "0.0 MB"
 	totalUploadedStr         string           = "0.0 MB"
@@ -326,6 +330,19 @@ var (
 	providerMu               sync.RWMutex
 	providerServers          []ProviderServer
 )
+
+const (
+	uploadBytesPerPlayerPerSec = 100 * 1024
+	uploadBurstPerPlayerBytes  = 32 * 1024
+)
+
+func updateUploadRateLimit(activePlayers int) {
+	if activePlayers < 1 {
+		activePlayers = 1
+	}
+	torrentUploadRateLimiter.SetLimit(rate.Limit(activePlayers * uploadBytesPerPlayerPerSec))
+	torrentUploadRateLimiter.SetBurst(activePlayers * uploadBurstPerPlayerBytes)
+}
 
 // ---------- Episode cache structures ----------
 type EpisodeCache struct {
@@ -878,6 +895,9 @@ func wndProc(hwnd uintptr, msg uintptr, wParam uintptr, lParam uintptr) uintptr 
 				Bottom: 242,
 			}
 			portStr := fmt.Sprintf("API local: http://127.0.0.1:%d", globalPort)
+			if lanURL := formatLANServiceURL(detectPrimaryLANIPv4(), globalPort); lanURL != "" {
+				portStr = fmt.Sprintf("Rede local: %s", lanURL)
+			}
 			portMsg := utf16Ptr(portStr)
 			procDrawTextW.Call(
 				hdc,
@@ -1271,12 +1291,16 @@ func initTorrentClientWithOptions(options serviceStartupOptions) (*torrent.Clien
 			return nil, cacheErr
 		}
 		globalEpisodeRetention.initDir(cfg.DataDir)
+		globalEpisodeStorage.init(filepath.Dir(cfg.DataDir))
+		go cleanupLegacyOwnedPieceDirs(cfg.DataDir)
+		go cleanupLegacyTempWindows()
 	}
 	cfg.Seed = true
 	cfg.NoUpload = false
 	cfg.DisableAggressiveUpload = false
 	cfg.NoDefaultPortForwarding = true // Desabilita UPnP automático que gerava erro 500 em roteadores sem IGD
 	cfg.DisablePEX = false
+	globalMeshHub.attachCallbacks(&cfg.Callbacks)
 	if options.Headless {
 		cfg.DataDir = options.DataDir
 		cfg.ListenPort = 0
@@ -1290,8 +1314,9 @@ func initTorrentClientWithOptions(options serviceStartupOptions) (*torrent.Clien
 		cfg.ListenHost = func(string) string { return "127.0.0.1" }
 	}
 
-	// Upload rate limit: ~100 KB/s (102400 bytes/s) para não saturar a conexão do usuário
-	cfg.UploadRateLimiter = rate.NewLimiter(rate.Limit(100*1024), 32*1024)
+	// Upload rate limit: 100 KB/s por player conectado (dinâmico via updateUploadRateLimit)
+	cfg.UploadRateLimiter = torrentUploadRateLimiter
+	updateUploadRateLimit(globalSessionManager.ActiveCount())
 
 	clientFactory := newManagedTorrentClient
 	if !options.Headless {
@@ -1643,9 +1668,17 @@ func probeMixFileContext(discovery context.Context, magnet string, generation ..
 	swarmMu.Unlock()
 	// A seekable local range input lets ffprobe inspect headers/tail metadata
 	// without prioritizing the complete video or first trying a non-seekable pipe.
-	parsed, err := probeCachedInput(parent, probeCache, magnet)
-	if err != nil {
-		return
+	infoHashHex := t.InfoHash().HexString()
+	parsed, cacheHit := readProbeCache(infoHashHex, video.DisplayPath())
+	if !cacheHit {
+		probeCtx, cancelProbe := context.WithTimeout(parent, 8*time.Second)
+		var probeErr error
+		parsed, probeErr = probeCachedInput(probeCtx, probeCache, magnet)
+		cancelProbe()
+		if probeErr != nil {
+			return
+		}
+		writeProbeCache(infoHashHex, video.DisplayPath(), parsed)
 	}
 	qualities := map[string]bool{}
 	audios := map[string]bool{}
@@ -2128,6 +2161,7 @@ func newServiceHTTPHandler(port int) http.Handler {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		lanIP := detectPrimaryLANIPv4()
 		resp := HealthResponse{
 			PlaybackIdentityVersion: 1,
 			Status:                  "online",
@@ -2137,6 +2171,8 @@ func newServiceHTTPHandler(port int) http.Handler {
 			IsNative:                true,
 			Engine:                  "anirium-native-torrent",
 			LogFailures:             serviceLog.failures.Load(),
+			LanIP:                   lanIP,
+			LanURL:                  formatLANServiceURL(lanIP, port),
 		}
 		json.NewEncoder(w).Encode(resp)
 	})
@@ -2281,7 +2317,7 @@ func newServiceHTTPHandler(port int) http.Handler {
 		peers := connectedPeers
 		rateSnapshot := downloadRateStr
 		variants := []MixVariant{}
-		manifestQualities := selectVariantQualities(qualities)
+		manifestQualities := expandDownscaleQualities(selectVariantQualities(qualities))
 		discoveryComplete := playbackDiscoveryComplete
 		for _, quality := range manifestQualities {
 			if quality != "" {

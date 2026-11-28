@@ -26,6 +26,23 @@ func registerSequentialFile(source string, file *torrent.File) {
 	seqPumpMu.Unlock()
 }
 
+func stopAllSequentialDownloads() {
+	seqPumpMu.Lock()
+	if activeSeqCancel != nil {
+		activeSeqCancel()
+		activeSeqCancel = nil
+	}
+	activeSeqKey = ""
+	activeSeqFile = nil
+	for _, f := range seqRegistered {
+		if f != nil {
+			clearFilePriorities(f)
+		}
+	}
+	seqRegistered = map[string]*torrent.File{}
+	seqPumpMu.Unlock()
+}
+
 func clearFilePriorities(file *torrent.File) {
 	if file == nil {
 		return
@@ -107,7 +124,9 @@ func applySequentialWindow(file *torrent.File) (done bool) {
 		case offset < nextSpan:
 			tor.Piece(i).SetPriority(types.PiecePriorityNext)
 		default:
-			tor.Piece(i).SetPriority(types.PiecePriorityNone)
+			// Never downgrade pieces beyond nextSpan to PiecePriorityNone:
+			// active ffmpeg/seek readers may have prioritized pieces near the
+			// current seek position (e.g. 510s), and resetting them kills the seek.
 		}
 	}
 	return false

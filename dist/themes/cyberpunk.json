@@ -1,0 +1,25 @@
+{
+  "theme_id": "cyberpunk",
+  "name": "Cyberpunk Neon",
+  "mode": "dark",
+  "color_primary": "#00FFCC",
+  "tokens": {
+    "color.bg.base": "#05050A",
+    "color.bg.surface": "#0D0D1A",
+    "color.bg.raised": "#16162D",
+    "color.bg.overlay": "rgba(5, 5, 10, 0.92)",
+    "color.border.default": "rgba(0, 255, 204, 0.25)",
+    "color.border.highlight": "#00FFCC",
+    "color.text.primary": "#F0FDF4",
+    "color.text.secondary": "#99F6E4",
+    "color.text.muted": "#5EEAD4",
+    "color.accent.primary": "#00FFCC",
+    "color.accent.amber": "#FF007F",
+    "color.state.canon": "#00FFCC",
+    "color.state.filler": "#FF0055",
+    "color.state.mixed": "#BD00FF",
+    "color.header.bg": "#070712",
+    "color.card.bg": "#0D0D1E",
+    "color.pill.bg": "#171732"
+  }
+}

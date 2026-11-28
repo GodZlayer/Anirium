@@ -1,0 +1,23 @@
+{
+  "id": "manga-reader-pro",
+  "name": "Anirium Manga Reader Pro",
+  "version": "1.0.0",
+  "description": "Módulo externo de leitura de capítulos de mangás e novels (imagens, CBZ e PDF).",
+  "author": "Anirium Community & TGCode",
+  "category": "engine.renderer",
+  "mediaType": "manga",
+  "type": "official-plus",
+  "origin": "official",
+  "capabilities": [
+    "ui.reader.render",
+    "manga.reader",
+    "document.pdf",
+    "document.images"
+  ],
+  "permissions": [
+    "ui.reader.render"
+  ],
+  "entrypoint": "src/entry.ts",
+  "entryScriptUrl": "https://godzlayer.github.io/anirium-manga-reader/dist/manga-reader.js",
+  "enabled": false
+}

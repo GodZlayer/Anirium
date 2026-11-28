@@ -54,9 +54,14 @@ class HandleInertiaRequests extends Middleware
 
             // Regra imutável: APENAS santoss.cog@gmail.com pode ter tier 3 (Admin).
             // Nenhuma outra conta pode ser Admin (se estiver com 3 no banco, cai para 1).
+            // Se o período de teste/assinatura do Anirium+ expirou, volta para tier 1.
+            $plusExpired = $rawTier === 2
+                && $user->anirium_plus_expires_at !== null
+                && $user->anirium_plus_expires_at->isPast();
+
             $effectiveTier = $isAdminOwner
                 ? 3
-                : ($rawTier === 2 ? 2 : 1);
+                : ($rawTier === 2 && ! $plusExpired ? 2 : 1);
 
             if ($rawTier !== $effectiveTier) {
                 $user->tier = $effectiveTier;
@@ -88,6 +93,8 @@ class HandleInertiaRequests extends Middleware
                 'email' => $user->email,
                 'avatar' => $user->avatar,
                 'tier' => $effectiveTier,
+                'anirium_plus_expires_at' => $user->anirium_plus_expires_at?->toIso8601String(),
+                'anirium_plus_trial_claimed' => $user->anirium_plus_trial_claimed_at !== null,
                 'level' => $experience['level'],
                 'xp' => $experience['total'],
                 'active_minutes' => (int) ($user->active_minutes ?? 0),

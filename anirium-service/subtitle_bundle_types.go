@@ -88,7 +88,7 @@ func (cache *mediaInputCache) bundle() *subtitleBundle {
 			fastHeads:     map[string][]subtitlePart{},
 			fastFlights:   map[string]chan struct{}{},
 			jobs:          map[float64]*subtitleBatchJob{},
-			externalSlots: make(chan struct{}, 2),
+			externalSlots: make(chan struct{}, 6),
 			extract:       extractSubtitleBatch,
 			extractSpan:   extractSubtitleSpan,
 			budget:        90 * time.Second,

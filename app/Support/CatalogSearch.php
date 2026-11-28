@@ -113,7 +113,8 @@ class CatalogSearch
     public function search(string $query, string $media, int $page, bool $adult, ?string $universe = null, array $filters = []): array
     {
         [$db, $generation] = $this->connection();
-        preg_match_all('/[\pL\pN]+/u', $query, $matches);
+        $normalizedQuery = preg_replace("/['’`´]/u", '', $query) ?? $query;
+        preg_match_all('/[\pL\pN]+/u', $normalizedQuery, $matches);
         $tokens = array_slice($matches[0], 0, 8);
         $where = ["coalesce(json_extract(summary, '$.catalog_visibility'), 'visible')='visible'"];
         if (! $adult) {
@@ -124,7 +125,9 @@ class CatalogSearch
             $where[] = "json_extract(works.summary, '$.universe_v2_id')=:universe";
             $parameters['universe'] = $universe;
         }
-        if ($media !== 'all') {
+        if ($media === 'literature') {
+            $where[] = "works.media IN ('manga','novel')";
+        } elseif ($media !== 'all') {
             $where[] = 'works.media=:media';
             $parameters['media'] = $media;
         }
@@ -135,7 +138,15 @@ class CatalogSearch
         if ($tokens) {
             $from .= ' JOIN search ON search.work_id=works.work_id';
             $where[] = 'search MATCH :query';
-            $parameters['query'] = implode(' AND ', array_map(fn ($token) => '"'.$token.'"*', $tokens));
+            $parameters['query'] = implode(' AND ', array_map(function (string $token): string {
+                if (strlen($token) >= 4 && str_ends_with(strtolower($token), 's')) {
+                    $stem = substr($token, 0, -1);
+
+                    return '('.sprintf('"%s"* OR "%s"*', $token, $stem).')';
+                }
+
+                return '"'.$token.'"*';
+            }, $tokens));
         }
         $sql = ' FROM '.$from.' WHERE '.implode(' AND ', $where);
         $count = $db->prepare('SELECT count(*)'.$sql);

@@ -41,12 +41,21 @@ func (b *subtitleBundle) startExtras(tracks []SubtitleTrack) {
 		added = true
 	}
 	if added {
+		activeID := activeSubtitleTrackID()
 		sort.SliceStable(b.extraPending, func(i, j int) bool {
+			if activeID != "" {
+				if b.extraPending[i].ID == activeID && b.extraPending[j].ID != activeID {
+					return true
+				}
+				if b.extraPending[j].ID == activeID && b.extraPending[i].ID != activeID {
+					return false
+				}
+			}
 			return subtitleLanguagePriority(b.extraPending[i].Language) < subtitleLanguagePriority(b.extraPending[j].Language)
 		})
 		limit := cap(b.externalSlots)
 		if limit < 1 {
-			limit = 2
+			limit = 6
 		}
 		for spawned := 0; b.extraActive < limit && spawned < len(b.extraPending); spawned++ {
 			b.extraActive++
@@ -84,7 +93,7 @@ func (b *subtitleBundle) loadExtra(state *bundledSubtitle) {
 	defer func() { <-b.externalSlots }()
 	budget := 90 * time.Second
 	if state.track.Source == "" && os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
-		budget = 20 * time.Second
+		budget = 8 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(b.cache.ctx, budget)
 	defer cancel()
@@ -115,6 +124,19 @@ func (b *subtitleBundle) loadExtra(state *bundledSubtitle) {
 		"complete": true,
 	})
 	pushCompleteSubtitleToSubscribers(trackID, content, alignment)
+	if epKey := currentEpisodeRetentionKey(); epKey != "" {
+		blk := persistedSubtitleBlock{
+			TrackID:  trackID,
+			Language: lang,
+			Title:    state.Title,
+			Start:    0,
+			End:      86400,
+			Complete: true,
+			VTT:      content,
+		}
+		go globalEpisodeRetention.saveEpisodeSubtitle(epKey, blk)
+		go globalEpisodeStorage.saveSubtitle(epKey, blk)
+	}
 }
 
 func loadBundleExtra(ctx context.Context, track SubtitleTrack, budget ...time.Duration) (string, error) {

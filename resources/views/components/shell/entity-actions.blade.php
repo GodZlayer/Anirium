@@ -52,20 +52,8 @@
         @endforeach
     </div>
 
-    <!-- 3. Botões Rápidos: Favorito, Curtida e Assistido -->
+    <!-- 3. Botões Rápidos: Favorito e Curtida -->
     <div class="flex items-center gap-2">
-        @if($targetType === 'episode' || $targetType === 'work')
-            <button type="button"
-                    onclick="window.toggleEntityWatched('{{ $targetType }}', '{{ $targetId }}')"
-                    id="btn-action-watched"
-                    title="Marcar como Assistido"
-                    data-i18n-title="action.mark_watched"
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer {{ $isWatched ? 'bg-[var(--color-state-canon,#10B981)]/20 text-[var(--color-state-canon,#10B981)] border-[var(--color-state-canon,#10B981)]/40' : 'bg-theme-pill text-theme-muted border-theme-default hover:text-theme-primary' }}">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                <span data-i18n="action.watched">Assistido</span>
-            </button>
-        @endif
-
         <button type="button"
                 onclick="window.toggleEntityBookmark('{{ $targetType }}', '{{ $targetId }}')"
                 id="btn-action-bookmark"

@@ -14,10 +14,13 @@ use Illuminate\Notifications\Notifiable;
 #[Fillable([
     'name',
     'email',
+    'handle',
     'password',
     'google_id',
     'avatar',
     'tier',
+    'anirium_plus_expires_at',
+    'anirium_plus_trial_claimed_at',
     'level',
     'xp',
     'active_minutes',
@@ -65,6 +68,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'adult_content_enabled' => 'boolean',
             'age_verified_at' => 'datetime',
+            'anirium_plus_expires_at' => 'datetime',
+            'anirium_plus_trial_claimed_at' => 'datetime',
             'birth_date' => 'encrypted',
         ];
     }
@@ -93,5 +98,22 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return (int) $this->tier === 3 && strtolower(trim((string) $this->email)) === 'santoss.cog@gmail.com';
+    }
+
+    public function hasActiveAniriumPlus(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ((int) $this->tier !== 2) {
+            return false;
+        }
+
+        if ($this->anirium_plus_expires_at !== null && $this->anirium_plus_expires_at->isPast()) {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -3,6 +3,18 @@
     'targetId' => '',
 ])
 
+@php
+    $discussionTitle = match (strtolower((string) $targetType)) {
+        'episode' => 'Discussão do Episódio',
+        'universe' => 'Discussão do Universo',
+        'arc' => 'Discussão do Arco',
+        'creator' => 'Discussão do Criador',
+        'studio' => 'Discussão do Estúdio',
+        'track' => 'Discussão da Música',
+        default => 'Discussão da Obra',
+    };
+@endphp
+
 <div class="w-full flex-1 flex flex-col min-h-0 bg-theme-surface/60 rounded-3xl border border-theme-default p-4 gap-3"
      id="entity-discussions-container"
      data-target-type="{{ $targetType }}"
@@ -12,15 +24,11 @@
     <div class="flex items-center justify-between pb-2 border-b border-theme-default">
         <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-theme-accent animate-pulse"></span>
-            <h3 class="text-xs font-mono font-bold uppercase tracking-wider text-theme-primary" data-i18n="discussion.title">Discussão da Entidade</h3>
+            <h3 class="text-xs font-mono font-bold uppercase tracking-wider text-theme-primary">{{ $discussionTitle }}</h3>
         </div>
-        <button type="button" 
-                onclick="window.refreshEntityComments('{{ $targetType }}', '{{ $targetId }}')"
-                class="text-[10px] font-mono text-theme-muted hover:text-theme-accent flex items-center gap-1 cursor-pointer"
-                title="Sincronizar deltas">
-            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            <span data-i18n="discussion.sync">Sync Delta</span>
-        </button>
+        <span class="px-2 py-0.5 rounded-full border border-theme-accent/30 bg-theme-pill text-[9px] font-mono font-bold text-theme-accent">
+            LIVE · SSE
+        </span>
     </div>
 
     <!-- Lista de Comentários com Scroll Suave -->

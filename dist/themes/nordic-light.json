@@ -1,0 +1,25 @@
+{
+  "theme_id": "nordic-light",
+  "name": "Nordic Light",
+  "mode": "light",
+  "color_primary": "#2563EB",
+  "tokens": {
+    "color.bg.base": "#F8FAFC",
+    "color.bg.surface": "#FFFFFF",
+    "color.bg.raised": "#EDF2F7",
+    "color.bg.overlay": "rgba(248, 250, 252, 0.92)",
+    "color.border.default": "rgba(0, 0, 0, 0.08)",
+    "color.border.highlight": "#2563EB",
+    "color.text.primary": "#0F172A",
+    "color.text.secondary": "#334155",
+    "color.text.muted": "#475569",
+    "color.accent.primary": "#1D4ED8",
+    "color.accent.amber": "#B45309",
+    "color.state.canon": "#047857",
+    "color.state.filler": "#BE123C",
+    "color.state.mixed": "#6D28D9",
+    "color.header.bg": "#FFFFFF",
+    "color.card.bg": "#FFFFFF",
+    "color.pill.bg": "#E2E8F0"
+  }
+}

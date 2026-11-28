@@ -1,4 +1,4 @@
-import { AniriumAddonManifest, AniriumPlayerPlugin } from "./addonTypes";
+import { AniriumAddonManifest, AniriumPlayerPlugin, RenderMediaType } from "./addonTypes";
 
 class AddonRegistry {
   private static instance: AddonRegistry;
@@ -62,30 +62,35 @@ class AddonRegistry {
   }
 
   /**
-   * Obtém o plugin de player ativo com base no Tier da conta:
-   * - Tier 0: Não tem player addon ativo.
-   * - Tier 1: Addons de player comunitários da conta (se houver).
-   * - Tier 2 e Tier 3: Addon oficial Anirium+ (Player Pro) ou comunitário se habilitado.
+   * Obtém o plugin renderizador ativo (video, manga ou audio) com base no Tier da conta:
+   * - Tier 0: Não tem renderizador ativo.
+   * - Tier 1: Addons comunitários da conta (se houver).
+   * - Tier 2 e Tier 3: Addon oficial Anirium+ (player-pro / manga-reader-pro) ou comunitário se habilitado.
    */
-  public getActivePlayerPlugin(tier: number = 0): AniriumPlayerPlugin | null {
+  public getActiveRendererPlugin(mediaType: RenderMediaType = "video", tier: number = 0): AniriumPlayerPlugin | null {
     if (tier === 0) return null;
 
-    // Se a conta for Tier 2 (Anirium+) ou Tier 3 (Admin), ela tem autorização para o Player Pro oficial
-    if (tier >= 2) {
-      const officialPro = this.playerPlugins.get("player-pro");
-      if (officialPro && this.enabledAddons.has("player-pro")) {
-        return officialPro;
+    const officialId = mediaType === "manga" ? "manga-reader-pro" : mediaType === "video" ? "player-pro" : null;
+
+    if (tier >= 2 && officialId) {
+      const officialPlugin = this.playerPlugins.get(officialId);
+      if (officialPlugin && this.enabledAddons.has(officialId)) {
+        return officialPlugin;
       }
     }
 
-    // Plugins comunitários de reprodução instalados pela conta
     for (const [id, plugin] of this.playerPlugins.entries()) {
-      if (id !== "player-pro" && this.enabledAddons.has(id)) {
+      const pluginMedia = plugin.manifest.mediaType || "video";
+      if (id !== officialId && pluginMedia === mediaType && this.enabledAddons.has(id)) {
         return plugin;
       }
     }
 
     return null;
+  }
+
+  public getActivePlayerPlugin(tier: number = 0): AniriumPlayerPlugin | null {
+    return this.getActiveRendererPlugin("video", tier);
   }
 
   public enableAddon(addonId: string) {

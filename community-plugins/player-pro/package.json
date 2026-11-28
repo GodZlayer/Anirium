@@ -1,9 +1,22 @@
 {
-  "name": "anirium-addon-player-pro",
+  "name": "anirium-player-pro-addon",
   "version": "1.0.0",
-  "description": "Anirium Official Plus Addon: Player Pro & Video Torrent Orchestration Service",
-  "main": "server.js",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "hls.js": "^1.7.3",
+    "lucide-react": "^1.58.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.0.0"
   }
 }

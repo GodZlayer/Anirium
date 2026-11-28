@@ -68,6 +68,7 @@ func playbackVariantID(generation uint64, quality string) string {
 
 // Caller holds swarmMu exclusively; lock order is swarmMu then variantMu.
 func resetPlaybackLocked() uint64 {
+	stopAllSequentialDownloads()
 	currentCatalogIdentity = catalogPlaybackIdentity{}
 	currentSkipMALID = 0
 	currentSkipEpisode = 0

@@ -454,27 +454,43 @@ func manifestSubtitleTracksLocked() []SubtitleTrack {
 	result = append(result, externalAndSidecar...)
 	result = append(result, secondaryTracks...)
 	if !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" && len(result) > 0 {
-		hasPor := false
+		presentLangs := make(map[string]bool, len(result))
 		var engBase *SubtitleTrack
 		for i := range result {
 			lang := canonicalLanguage(result[i].Language)
-			if lang == "por" {
-				hasPor = true
-				break
-			}
+			presentLangs[lang] = true
 			if engBase == nil && lang == "eng" {
 				engBase = &result[i]
 			}
 		}
-		if !hasPor {
-			base := engBase
-			if base == nil {
-				base = &result[0]
+		base := engBase
+		if base == nil {
+			base = &result[0]
+		}
+		targetLangs := []struct {
+			code  string
+			title string
+		}{
+			{code: "por", title: "Português (Traduzida)"},
+			{code: "eng", title: "English (Translated)"},
+			{code: "spa", title: "Español (Traducida)"},
+			{code: "fra", title: "Français (Traduite)"},
+			{code: "deu", title: "Deutsch (Übersetzt)"},
+			{code: "ita", title: "Italiano (Tradotta)"},
+			{code: "jpn", title: "日本語 (翻訳)"},
+			{code: "rus", title: "Русский (Перевод)"},
+			{code: "kor", title: "한국어 (번역)"},
+			{code: "zho", title: "中文 (翻译)"},
+			{code: "ara", title: "العربية (مترجمة)"},
+		}
+		for _, target := range targetLangs {
+			if presentLangs[target.code] {
+				continue
 			}
 			translated := *base
-			translated.ID = "translated-por:" + base.ID
-			translated.Language = "por"
-			translated.Title = "Português (Traduzida)"
+			translated.ID = "translated-" + target.code + ":" + base.ID
+			translated.Language = target.code
+			translated.Title = target.title
 			result = append(result, translated)
 		}
 	}

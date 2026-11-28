@@ -1,15 +1,29 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 )
 
 const retentionSubsequentThreshold = 3
+
+type persistedSubtitleBlock struct {
+	TrackID  string  `json:"trackId"`
+	Language string  `json:"language"`
+	Title    string  `json:"title,omitempty"`
+	Start    float64 `json:"start"`
+	End      float64 `json:"end"`
+	Complete bool    `json:"complete,omitempty"`
+	VTT      string  `json:"vtt"`
+}
 
 type episodeRetentionEntry struct {
 	EpisodeKey        string    `json:"episodeKey"`
@@ -132,6 +146,29 @@ func (s *episodeRetentionStore) recordAccess(episodeKey, infoHash string) []stri
 		}
 	}
 
+	// Enforce strict 3-episode LRU: when a 4th episode is accessed, evict the oldest.
+	for len(s.entries)-len(evictKeys) > retentionSubsequentThreshold {
+		var oldestKey string
+		var oldestTime time.Time
+		evictSet := map[string]bool{}
+		for _, k := range evictKeys {
+			evictSet[k] = true
+		}
+		for key, other := range s.entries {
+			if key == episodeKey || evictSet[key] {
+				continue
+			}
+			if oldestKey == "" || other.LastAccessedAt.Before(oldestTime) {
+				oldestKey = key
+				oldestTime = other.LastAccessedAt
+			}
+		}
+		if oldestKey == "" {
+			break
+		}
+		evictKeys = append(evictKeys, oldestKey)
+	}
+
 	if len(evictKeys) == 0 {
 		s.saveLocked()
 		return nil
@@ -141,6 +178,7 @@ func (s *episodeRetentionStore) recordAccess(episodeKey, infoHash string) []stri
 	for _, key := range evictKeys {
 		evictedHashes = append(evictedHashes, s.entries[key].InfoHashes...)
 		delete(s.entries, key)
+		s.removeEpisodeCacheDirLocked(key)
 	}
 
 	// Keep any hash still referenced by a retained episode.
@@ -205,4 +243,143 @@ func dropRetainedHashes(hashes []string) {
 			tor.Drop()
 		}
 	}
+}
+
+func episodeRetentionKeyFor(identity catalogPlaybackIdentity, season, episode int) string {
+	if id := strings.TrimSpace(identity.EpisodeID); id != "" {
+		return "ep:" + id
+	}
+	if wid := strings.TrimSpace(identity.WorkID); wid != "" {
+		return fmt.Sprintf("work:%s:s%de%d", wid, season, episode)
+	}
+	return ""
+}
+
+func currentEpisodeRetentionKey() string {
+	swarmMu.RLock()
+	id := currentCatalogIdentity
+	ep := requestedEpisode
+	swarmMu.RUnlock()
+	return episodeRetentionKeyFor(id, ep.Season, ep.Episode)
+}
+
+func (s *episodeRetentionStore) episodeCacheDirLocked(episodeKey string) string {
+	if s.path == "" || strings.TrimSpace(episodeKey) == "" {
+		return ""
+	}
+	sum := sha1.Sum([]byte(strings.TrimSpace(episodeKey)))
+	return filepath.Join(filepath.Dir(s.path), "episode-cache", hex.EncodeToString(sum[:12]))
+}
+
+func (s *episodeRetentionStore) removeEpisodeCacheDirLocked(episodeKey string) {
+	dir := s.episodeCacheDirLocked(episodeKey)
+	if dir != "" {
+		_ = os.RemoveAll(dir)
+	}
+}
+
+type persistedEpisodeMeta struct {
+	EpisodeKey string   `json:"episodeKey"`
+	Magnets    []string `json:"magnets"`
+}
+
+func (s *episodeRetentionStore) saveEpisodeMagnets(episodeKey string, magnets []string) {
+	episodeKey = strings.TrimSpace(episodeKey)
+	if episodeKey == "" || len(magnets) == 0 {
+		return
+	}
+	s.mu.Lock()
+	dir := s.episodeCacheDirLocked(episodeKey)
+	s.mu.Unlock()
+	if dir == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return
+	}
+	if raw, err := json.Marshal(persistedEpisodeMeta{EpisodeKey: episodeKey, Magnets: magnets}); err == nil {
+		_ = os.WriteFile(filepath.Join(dir, "meta.json"), raw, 0o600)
+	}
+}
+
+func (s *episodeRetentionStore) loadEpisodeMagnets(episodeKey string) []string {
+	episodeKey = strings.TrimSpace(episodeKey)
+	if episodeKey == "" {
+		return nil
+	}
+	s.mu.Lock()
+	dir := s.episodeCacheDirLocked(episodeKey)
+	s.mu.Unlock()
+	if dir == "" {
+		return nil
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "meta.json"))
+	if err != nil {
+		return nil
+	}
+	var meta persistedEpisodeMeta
+	if json.Unmarshal(raw, &meta) != nil || len(meta.Magnets) == 0 {
+		return nil
+	}
+	return meta.Magnets
+}
+
+func (s *episodeRetentionStore) saveEpisodeSubtitle(episodeKey string, block persistedSubtitleBlock) {
+	episodeKey = strings.TrimSpace(episodeKey)
+	if episodeKey == "" || strings.TrimSpace(block.VTT) == "" || strings.TrimSpace(block.TrackID) == "" {
+		return
+	}
+	s.mu.Lock()
+	dir := s.episodeCacheDirLocked(episodeKey)
+	s.mu.Unlock()
+	if dir == "" {
+		return
+	}
+	subsDir := filepath.Join(dir, "subs")
+	if err := os.MkdirAll(subsDir, 0o700); err != nil {
+		return
+	}
+	keySum := sha1.Sum([]byte(fmt.Sprintf("%s|%.0f|%.0f|%t", block.TrackID, block.Start, block.End, block.Complete)))
+	filePath := filepath.Join(subsDir, hex.EncodeToString(keySum[:12])+".json")
+	if raw, err := json.Marshal(block); err == nil {
+		_ = os.WriteFile(filePath, raw, 0o600)
+	}
+}
+
+func (s *episodeRetentionStore) loadEpisodeSubtitles(episodeKey string) []persistedSubtitleBlock {
+	episodeKey = strings.TrimSpace(episodeKey)
+	if episodeKey == "" {
+		return nil
+	}
+	s.mu.Lock()
+	dir := s.episodeCacheDirLocked(episodeKey)
+	s.mu.Unlock()
+	if dir == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(filepath.Join(dir, "subs"))
+	if err != nil {
+		return nil
+	}
+	blocks := make([]persistedSubtitleBlock, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, "subs", entry.Name()))
+		if err != nil {
+			continue
+		}
+		var block persistedSubtitleBlock
+		if json.Unmarshal(raw, &block) == nil && block.VTT != "" && block.TrackID != "" {
+			blocks = append(blocks, block)
+		}
+	}
+	sort.Slice(blocks, func(i, j int) bool {
+		if blocks[i].TrackID != blocks[j].TrackID {
+			return blocks[i].TrackID < blocks[j].TrackID
+		}
+		return blocks[i].Start < blocks[j].Start
+	})
+	return blocks
 }

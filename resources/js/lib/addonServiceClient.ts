@@ -84,7 +84,7 @@ export interface AddonConfigCapturedPayload {
   manifestUrl: string;
 }
 
-const SERVICE_WS_URL = "ws://127.0.0.1:4004/ws";
+import { getResolvedServiceWsUrl } from "./serviceDiscovery";
 
 interface PendingRequest<T = unknown> {
   resolve: (value: T) => void;
@@ -127,7 +127,7 @@ class AddonServiceWSClient {
       let settled = false;
       let socket: WebSocket;
       try {
-        socket = new WebSocket(SERVICE_WS_URL);
+        socket = new WebSocket(getResolvedServiceWsUrl());
       } catch {
         this.connectPromise = null;
         reject(new Error("service_offline"));

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\RealtimeEventStore;
 use App\Support\AccountAchievementCatalog;
 use App\Support\AccountExperience;
 use App\Support\CatalogActionTarget;
@@ -167,7 +168,9 @@ class TelemetryDeviceController extends Controller
         }
 
         $events = $raw['events'] ?? [];
-        $fingerprint = $raw['machine_fingerprint'] ?? 'anonymous';
+        $fingerprint = is_string($raw['machine_fingerprint'] ?? null) && $raw['machine_fingerprint'] !== ''
+            ? $raw['machine_fingerprint']
+            : 'anonymous';
         $user = Auth::user();
         $userId = $user?->id;
 
@@ -186,7 +189,8 @@ class TelemetryDeviceController extends Controller
             if (! is_array($ev) || (isset($ev['target_id']) && ! is_string($ev['target_id']))) {
                 return response()->json(['error' => 'invalid_event_target'], 422);
             }
-            $eventType = substr($ev['event_type'] ?? 'presence_ping', 0, 32);
+            $rawEventType = is_string($ev['event_type'] ?? null) ? $ev['event_type'] : 'presence_ping';
+            $eventType = substr($rawEventType, 0, 32);
             if ($eventType === 'active_minute') {
                 $activeMinuteIncrements += 1;
             } elseif ($eventType === 'p2p_seeding_heartbeat') {
@@ -204,13 +208,15 @@ class TelemetryDeviceController extends Controller
             if (! is_string($eventTargetType) || ! in_array($eventTargetType, ['global', ...CatalogIdentityStore::KINDS], true)) {
                 return response()->json(['error' => 'invalid_target_type'], 422);
             }
-            $eventTargetId = $ev['target_id'] ?? 'none';
+            $eventTargetId = is_string($ev['target_id'] ?? null) ? $ev['target_id'] : 'none';
             if ($eventTargetType === 'global') {
                 $eventTargetId = substr($eventTargetId, 0, 64);
-            }
-            $eventEntityId = app(CatalogActionTarget::class)->canonical($eventTargetType, $eventTargetId);
-            if ($eventTargetType !== 'global' && $eventEntityId === null) {
-                return response()->json(['error' => 'invalid_entity_id'], 422);
+                $eventEntityId = null;
+            } else {
+                $eventEntityId = app(CatalogActionTarget::class)->canonical($eventTargetType, $eventTargetId);
+                if ($eventEntityId === null) {
+                    return response()->json(['error' => 'invalid_entity_id'], 422);
+                }
             }
             $rows[] = [
                 'user_id' => $userId,
@@ -445,6 +451,53 @@ class TelemetryDeviceController extends Controller
                 $fanEvaluation = app(EntityFanTierEvaluator::class)->evaluateWork($user, (string) $workIdToEvaluate);
             }
 
+            $events = app(RealtimeEventStore::class);
+            $events->publish('user:'.$user->id, 'preference.confirmed', [
+                'target_type' => $targetType,
+                'target_id' => $targetId,
+                'preference' => $saved,
+            ]);
+
+            if (array_key_exists('user_score', $raw)) {
+                $avgScore = DB::table('user_entity_preferences')
+                    ->where('target_type', $targetType)
+                    ->where('target_id', $targetId)
+                    ->whereNotNull('user_score')
+                    ->where('user_score', '>', 0)
+                    ->avg('user_score');
+
+                $events->publish("entity:{$targetType}:{$targetId}", 'entity.rating_updated', [
+                    'target_type' => $targetType,
+                    'target_id' => $targetId,
+                    'community_score' => $avgScore !== null ? round((float) $avgScore, 1) : null,
+                ]);
+            }
+
+            if (array_key_exists('progress_seconds', $raw) || array_key_exists('status', $raw)) {
+                $episodeRow = $targetType === 'episode'
+                    ? DB::table('catalog_episodes')->where('id', $targetId)->first(['id', 'work_id', 'number', 'title', 'runtime_minutes'])
+                    : null;
+                $resolvedWorkId = $workIdToEvaluate ?: ($episodeRow->work_id ?? ($raw['work_id'] ?? ($targetType === 'work' ? $targetId : null)));
+                $workRow = $resolvedWorkId
+                    ? DB::table('catalog_works')->where('id', $resolvedWorkId)->first(['id', 'title', 'image_url'])
+                    : null;
+                $durationSec = max(1, ((int) ($episodeRow->runtime_minutes ?? 24)) * 60);
+                $posSec = (int) ($saved->progress_seconds ?? 0);
+                $isWatched = ($saved->status ?? '') === 'completed';
+
+                $events->publish('user:'.$user->id, 'progress.updated', [
+                    'workId' => $resolvedWorkId,
+                    'workTitle' => $workRow->title ?? null,
+                    'image' => $workRow->image_url ?? null,
+                    'episodeId' => $targetType === 'episode' ? $targetId : null,
+                    'episodeNumber' => (int) ($episodeRow->number ?? ($raw['episode_number'] ?? 1)),
+                    'positionSeconds' => $posSec,
+                    'durationSeconds' => $durationSec,
+                    'isWatched' => $isWatched,
+                    'updatedAt' => now()->toIso8601String(),
+                ]);
+            }
+
             return response()->json([
                 'status' => 'saved',
                 'preference' => $saved,
@@ -545,8 +598,7 @@ class TelemetryDeviceController extends Controller
         $completion = app(CatalogUserCompletion::class)->read($user->id);
         $experience = app(AccountExperience::class)->read($user, $completion);
 
-        return response()->json([
-            'status' => 'updated',
+        $accountPayload = [
             'adult_content_enabled' => $user->canAccessAdultContent(),
             'age_verified' => $user->isAgeVerified(),
             'age_verification_status' => (string) ($user->age_verification_status ?? 'unverified'),
@@ -554,7 +606,11 @@ class TelemetryDeviceController extends Controller
             'custom_title' => $user->custom_title,
             'xp' => $experience['total'],
             'level' => $experience['level'],
-        ]);
+        ];
+
+        app(RealtimeEventStore::class)->publish('user:'.$user->id, 'account.updated', $accountPayload);
+
+        return response()->json(array_merge(['status' => 'updated'], $accountPayload));
     }
 
     /**
@@ -607,6 +663,14 @@ class TelemetryDeviceController extends Controller
         $fanEvaluation = null;
         if ($targetType === 'work') {
             $fanEvaluation = app(EntityFanTierEvaluator::class)->evaluateWork($user, (string) $targetId);
+        }
+
+        if ($inserted) {
+            app(RealtimeEventStore::class)->publish("entity:{$targetType}:{$targetId}", 'comment.posted', [
+                'target_type' => $targetType,
+                'target_id' => $targetId,
+                'comment' => $inserted,
+            ]);
         }
 
         return response()->json([
@@ -684,10 +748,13 @@ class TelemetryDeviceController extends Controller
                 'version' => '1.0.0',
                 'description' => 'Módulo externo de vídeo (episódios e filmes) Anirium+: conexões via Anirium+ Service, multi-áudio e legendas.',
                 'author' => 'Anirium Core & TGCode',
+                'category' => 'engine.renderer',
+                'mediaType' => 'video',
                 'type' => 'official-plus',
                 'origin' => 'official',
+                'entryScriptUrl' => config('services.addons.player_pro_bundle_url'),
                 'embed_url' => 'https://godzlayer.github.io/anirium-embeds/video/',
-                'repository_url' => 'https://github.com/GodZlayer/anirium-embeds',
+                'repository_url' => config('services.addons.player_pro_repository_url'),
                 'capabilities' => ['ui.player.render', 'playback.client', 'video.stream', 'subtitles.manage', 'audio.manage'],
                 'enabled' => $playerProRecord ? (bool) $playerProRecord->enabled : true,
                 'is_official' => true,
@@ -700,10 +767,13 @@ class TelemetryDeviceController extends Controller
                 'version' => '1.0.0',
                 'description' => 'Módulo externo de leitura de capítulos de mangás e novels Anirium+ (imagens, CBZ e PDF).',
                 'author' => 'Anirium Core & TGCode',
+                'category' => 'engine.renderer',
+                'mediaType' => 'manga',
                 'type' => 'official-plus',
                 'origin' => 'official',
+                'entryScriptUrl' => config('services.addons.manga_reader_bundle_url'),
                 'embed_url' => 'https://godzlayer.github.io/anirium-embeds/manga/',
-                'repository_url' => 'https://github.com/GodZlayer/anirium-embeds',
+                'repository_url' => config('services.addons.manga_reader_repository_url'),
                 'capabilities' => ['ui.reader.render', 'manga.reader', 'document.pdf', 'document.images'],
                 'enabled' => $mangaReaderRecord ? (bool) $mangaReaderRecord->enabled : false,
                 'is_official' => true,
@@ -733,6 +803,9 @@ class TelemetryDeviceController extends Controller
                 'version' => $a->version ?: ($manifest['version'] ?? '1.0.0'),
                 'description' => $manifest['description'] ?? 'Addon comunitário instalado pelo usuário.',
                 'author' => $manifest['author'] ?? 'Comunidade',
+                'category' => $manifest['category'] ?? null,
+                'mediaType' => $manifest['mediaType'] ?? null,
+                'entryScriptUrl' => $manifest['entryScriptUrl'] ?? ($manifest['entry_script_url'] ?? null),
                 'type' => 'community',
                 'origin' => 'community',
                 'capabilities' => $caps,
@@ -789,6 +862,11 @@ class TelemetryDeviceController extends Controller
             ]
         );
         ServiceSessionSnapshot::forget((int) $user->id);
+        app(RealtimeEventStore::class)->publish('user:'.$user->id, 'account.updated', [
+            'reason' => 'addon_toggled',
+            'addon_id' => $addonId,
+            'enabled' => $enabled,
+        ]);
 
         return response()->json(['success' => true, 'addon_id' => $addonId, 'enabled' => $enabled]);
     }
@@ -873,6 +951,10 @@ class TelemetryDeviceController extends Controller
             }
         });
         ServiceSessionSnapshot::forget((int) $user->id);
+        app(RealtimeEventStore::class)->publish('user:'.$user->id, 'account.updated', [
+            'reason' => 'addon_installed',
+            'addon_id' => $addonId,
+        ]);
 
         return response()->json(['success' => true, 'addon_id' => $addonId]);
     }
@@ -897,6 +979,10 @@ class TelemetryDeviceController extends Controller
             ->where('addon_id', $addonId)
             ->delete();
         ServiceSessionSnapshot::forget((int) $user->id);
+        app(RealtimeEventStore::class)->publish('user:'.$user->id, 'account.updated', [
+            'reason' => 'addon_uninstalled',
+            'addon_id' => $addonId,
+        ]);
 
         return response()->json(['success' => true, 'uninstalled' => $addonId]);
     }

@@ -50,3 +50,26 @@ func TestQualityInventoryPreservesActualHeightsAndDeduplicates(t *testing.T) {
 		t.Fatal("lower-resolution input upscaled")
 	}
 }
+
+func TestExpandDownscaleQualities(t *testing.T) {
+	cases := []struct {
+		in   []string
+		want []string
+	}{
+		{in: []string{"1080p"}, want: []string{"1080p", "720p", "480p"}},
+		{in: []string{"4k"}, want: []string{"4k", "1080p", "720p", "480p"}},
+		{in: []string{"720p"}, want: []string{"720p", "480p"}},
+		{in: []string{"480p"}, want: []string{"480p"}},
+	}
+	for _, tc := range cases {
+		got := expandDownscaleQualities(tc.in)
+		if len(got) != len(tc.want) {
+			t.Fatalf("expandDownscaleQualities(%v) = %v, want %v", tc.in, got, tc.want)
+		}
+		for i := range tc.want {
+			if got[i] != tc.want[i] {
+				t.Fatalf("expandDownscaleQualities(%v) = %v, want %v", tc.in, got, tc.want)
+			}
+		}
+	}
+}

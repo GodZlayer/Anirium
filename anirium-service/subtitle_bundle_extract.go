@@ -60,7 +60,10 @@ func extractSubtitleSpan(ctx context.Context, cache *mediaInputCache, source str
 		return result
 	}
 	err = mediaCommandContext(ctx, mediaTool("ffmpeg"), args...).Run()
-	if err != nil || ctx.Err() != nil {
+	if err != nil && ctx.Err() != context.DeadlineExceeded {
+		return result
+	}
+	if ctx.Err() == context.Canceled {
 		return result
 	}
 	for _, track := range tracks {

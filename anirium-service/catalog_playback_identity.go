@@ -23,7 +23,7 @@ func applyCatalogPlaybackContext(input PlaybackPrepareRequest, data corePlayback
 	}
 	input.TitleNative = data.TitleNative
 	input.Aliases = append([]string(nil), data.Aliases...)
-	input.Episode, input.Season, input.EpisodeCount, input.Format = data.Episode, data.Season, data.EpisodeCount, data.Format
+	input.Episode, input.AbsoluteEpisode, input.Season, input.EpisodeCount, input.Format = data.Episode, data.AbsoluteEpisode, data.Season, data.EpisodeCount, data.Format
 	if input.Season < 1 {
 		input.Season = 1
 	}

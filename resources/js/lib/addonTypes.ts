@@ -1,6 +1,17 @@
 import React from "react";
 import { AnimeRecord } from "../Components/AnimeCard";
-import type { CatalogPlaybackIdentity, CatalogPlaybackEpisode } from "../addons/player-pro/playbackIdentity";
+
+export interface CatalogPlaybackIdentity {
+  workId: string;
+  episodeId?: string;
+  seasonId?: string;
+}
+
+export interface CatalogPlaybackEpisode {
+  id: string;
+  number: number;
+  season_id?: string | null;
+}
 
 /**
  * 1. Categorias de Addon no Ecossistema Anirium
@@ -109,6 +120,8 @@ export interface AniriumPlayerProps {
   preferences?: AniriumPlaybackPreferences;
   initialEpisode: number;
   initialSeasonIdx: number;
+  initialPosition?: number;
+  autoResume?: boolean;
   onBack: () => void;
   onOpenOverview?: () => void;
   onOpenFranchise?: (franchiseRoot: string) => void;

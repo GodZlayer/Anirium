@@ -4,12 +4,18 @@
  * no DOM da Casca Branca através de um protocolo universal window.__ANIRIUM_REGISTER_RENDERER__
  */
 
+import React from "react";
+import * as ReactDOM from "react-dom";
 import { AniriumAddonManifest, AniriumPlayerPlugin, AniriumPlayerProps } from "./addonTypes";
 import { addonRegistry } from "./addonRegistry";
 
 // Interface exposta globalmente para qualquer script externo se auto-registrar
 declare global {
   interface Window {
+    __ANIRIUM_HOST_RUNTIME__?: {
+      React: typeof React;
+      ReactDOM: typeof ReactDOM;
+    };
     __ANIRIUM_REGISTER_RENDERER__?: (
       addonId: string,
       rendererComponent: React.ComponentType<AniriumPlayerProps>
@@ -18,8 +24,12 @@ declare global {
   }
 }
 
-// Inicializa a ponte global uma única vez
+// Inicializa a ponte global e o runtime compartilhado de React uma única vez
 if (typeof window !== "undefined") {
+  if (!window.__ANIRIUM_HOST_RUNTIME__) {
+    window.__ANIRIUM_HOST_RUNTIME__ = { React, ReactDOM };
+  }
+
   if (!window.__ANIRIUM_LOADED_SCRIPTS__) {
     window.__ANIRIUM_LOADED_SCRIPTS__ = new Set();
   }

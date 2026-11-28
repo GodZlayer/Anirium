@@ -44,6 +44,20 @@ var (
 	aniSkipClient   = &http.Client{Timeout: 4 * time.Second}
 )
 
+func mergeMeshSkipTimes(malID, ep int, st *SkipTimes) bool {
+	if malID <= 0 || ep <= 0 || !validateMeshSkipTimes(st) {
+		return false
+	}
+	key := fmt.Sprintf("%d:%d", malID, ep)
+	aniSkipMu.Lock()
+	defer aniSkipMu.Unlock()
+	if existing := aniSkipCache[key]; existing != nil && (existing.OP != nil || existing.ED != nil) {
+		return false
+	}
+	aniSkipCache[key] = st
+	return true
+}
+
 func setCurrentSkipTarget(malID, episode int) {
 	if malID <= 0 || episode <= 0 {
 		return

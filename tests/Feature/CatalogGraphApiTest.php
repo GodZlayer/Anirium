@@ -90,8 +90,8 @@ class CatalogGraphApiTest extends TestCase
 
         $this->get('/api/catalog/graph/episode/'.$workId.':ep:1?render=blade&adult=0&v=v8')
             ->assertOk()
-            ->assertSee('UNIDADE #01')
-            ->assertSee('Raio-X do Episódio')
+            ->assertSee('Episódio 1')
+            ->assertSee('entity-discussions-container')
             ->assertSee("window.pushNavigation('episode', '".$workId.":ep:1'", false);
     }
 
@@ -196,5 +196,50 @@ class CatalogGraphApiTest extends TestCase
         $this->get('/api/catalog/graph/episode/'.$ep3Id.'?render=blade&adult=0')
             ->assertOk()
             ->assertSee('Transmissão Futura (Não Lançado)');
+    }
+
+    public function test_anirium_plus_watch_progress_renders_completed_and_partial_badges_on_work_and_universe_cards(): void
+    {
+        $workId = (string) Str::uuid();
+        $this->work($workId, $workId, [], ['status' => 'COMPLETED', 'episode_count' => 4]);
+        $this->visible([$workId => false]);
+        $universeId = (string) DB::table('catalog_universes')->value('id');
+
+        $user = User::factory()->create(['tier' => 2]);
+        DB::table('user_entity_preferences')->insert([
+            [
+                'user_id' => $user->id,
+                'target_type' => 'episode',
+                'target_id' => $workId.':ep:1',
+                'status' => 'completed',
+                'progress_seconds' => 1440,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => $user->id,
+                'target_type' => 'episode',
+                'target_id' => $workId.':ep:2',
+                'status' => 'watching',
+                'progress_seconds' => 720,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->get('/api/catalog/graph/work/'.$workId.'?render=blade&adult=0')
+            ->assertOk()
+            ->assertSee('Assistido')
+            ->assertSee('Parcial 50%')
+            ->assertSee('entity-discussions-container')
+            ->assertSee('Sua nota');
+
+        $this->actingAs($user)
+            ->get('/api/catalog/graph/universe/'.$universeId.'?render=blade&adult=0')
+            ->assertOk()
+            ->assertSee('Fluxo Canônico (Obras & Arcos)', false)
+            ->assertSee('1/4')
+            ->assertSee('entity-discussions-container');
     }
 }

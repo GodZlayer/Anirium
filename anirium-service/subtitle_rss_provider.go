@@ -10,13 +10,160 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var (
-	htmlHrefRe      = regexp.MustCompile(`(?is)<a\s+[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>(.*?)</a>`)
-	htmlTagStripRe  = regexp.MustCompile(`(?s)<[^>]+>`)
+	htmlHrefRe       = regexp.MustCompile(`(?is)<a\s+[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>(.*?)</a>`)
+	htmlTagStripRe   = regexp.MustCompile(`(?s)<[^>]+>`)
+	subSeasonEpRe    = regexp.MustCompile(`(?i)(?:^|[\s._\-\[\(/])s0*(\d{1,2})\s*e0*(\d{1,4})(?:v\d)?(?:$|[\s._\-\]\),/])`)
+	subSeasonOnlyRe  = regexp.MustCompile(`(?i)(?:^|[\s._\-\[\(/])(?:season|temp|temporada)[\s._\-]*0*(\d{1,2})(?:$|[\s._\-\]\),/])`)
+	subEpisodeNumRe  = regexp.MustCompile(`(?i)(?:^|[\s._\-\[\(/])(?:ep?|episode|s\d{1,2}e)?0*(\d{1,4})(?:v\d)?(?:$|[\s._\-\]\),/])`)
+	subNonWordRe     = regexp.MustCompile(`[^\p{L}\p{N}]+`)
 )
+
+var subtitleTitleStopwords = map[string]bool{
+	"the": true, "a": true, "an": true, "of": true, "to": true, "in": true, "on": true, "and": true,
+	"no": true, "wa": true, "ga": true, "wo": true, "ni": true, "de": true, "to2": true,
+}
+
+func subtitleCandidatePathText(raw string) string {
+	s := strings.TrimSpace(raw)
+	if strings.HasPrefix(strings.ToLower(s), "http://") || strings.HasPrefix(strings.ToLower(s), "https://") {
+		if u, err := url.Parse(s); err == nil {
+			s = u.Path
+		}
+	}
+	if unescaped, err := url.PathUnescape(s); err == nil && unescaped != "" {
+		s = unescaped
+	}
+	return s
+}
+
+func subtitleTokens(raw string) []string {
+	cleaned := strings.ToLower(subNonWordRe.ReplaceAllString(raw, " "))
+	fields := strings.Fields(cleaned)
+	if len(fields) == 0 {
+		return nil
+	}
+	var filtered []string
+	for _, f := range fields {
+		if len([]rune(f)) >= 2 && !subtitleTitleStopwords[f] {
+			filtered = append(filtered, f)
+		}
+	}
+	if len(filtered) > 0 {
+		return filtered
+	}
+	return fields
+}
+
+func subtitleTextMatchesQueryTitle(text string, query PlaybackPrepareRequest) bool {
+	var titles []string
+	for _, t := range append([]string{query.Title, query.TitleEnglish, query.TitleRomaji}, query.Aliases...) {
+		if strings.TrimSpace(t) != "" {
+			titles = append(titles, t)
+		}
+	}
+	if len(titles) == 0 {
+		return true
+	}
+	candidateTokens := subtitleTokens(subtitleCandidatePathText(text))
+	if len(candidateTokens) == 0 {
+		return false
+	}
+	candSet := make(map[string]bool, len(candidateTokens))
+	for _, tok := range candidateTokens {
+		candSet[tok] = true
+	}
+	for _, title := range titles {
+		tTokens := subtitleTokens(title)
+		if len(tTokens) == 0 {
+			continue
+		}
+		matched := 0
+		for _, tok := range tTokens {
+			if candSet[tok] {
+				matched++
+			}
+		}
+		if len(tTokens) <= 2 {
+			if matched == len(tTokens) {
+				return true
+			}
+		} else if matched >= 2 && matched*4 >= len(tTokens)*3 {
+			return true
+		}
+	}
+	return false
+}
+
+// subtitleTextMatchesEpisode prevents external search sites (e.g. SubtitleCat)
+// from returning Episode 7's .srt when searching for Episode 8, or S12E02 when
+// searching for Season 1 Episode 2.
+func subtitleTextMatchesEpisode(text string, wantedSeason, wantedEp int) bool {
+	pathText := subtitleCandidatePathText(text)
+	if seMatches := subSeasonEpRe.FindAllStringSubmatch(pathText, -1); len(seMatches) > 0 {
+		matchedSE := false
+		for _, m := range seMatches {
+			s, errS := strconv.Atoi(m[1])
+			e, errE := strconv.Atoi(m[2])
+			if errS != nil || errE != nil {
+				continue
+			}
+			seasonOK := wantedSeason <= 0 || s == wantedSeason
+			epOK := wantedEp <= 0 || e == wantedEp
+			if seasonOK && epOK {
+				matchedSE = true
+			}
+		}
+		return matchedSE
+	}
+	if wantedSeason > 0 {
+		if sMatches := subSeasonOnlyRe.FindAllStringSubmatch(pathText, -1); len(sMatches) > 0 {
+			seasonOK := false
+			for _, m := range sMatches {
+				if s, err := strconv.Atoi(m[1]); err == nil && s == wantedSeason {
+					seasonOK = true
+				}
+			}
+			if !seasonOK {
+				return false
+			}
+		}
+	}
+	if wantedEp <= 0 {
+		return true
+	}
+	matches := subEpisodeNumRe.FindAllStringSubmatch(pathText, -1)
+	if len(matches) == 0 {
+		return false
+	}
+	foundWanted := false
+	for _, m := range matches {
+		if len(m) < 2 {
+			continue
+		}
+		n, err := strconv.Atoi(m[1])
+		if err != nil || n == 0 {
+			continue
+		}
+		// Ignore common video resolutions / years (e.g. 720, 1080, 2026)
+		if n == 480 || n == 720 || n == 1080 || n == 2160 || (n >= 1990 && n <= 2035) {
+			continue
+		}
+		if n == wantedEp {
+			foundWanted = true
+		}
+	}
+	return foundWanted
+}
+
+func subtitleCandidateMatchesQuery(text string, query PlaybackPrepareRequest) bool {
+	if !subtitleTextMatchesQueryTitle(text, query) {
+		return false
+	}
+	return subtitleTextMatchesEpisode(text, query.Season, query.Episode)
+}
 
 func isSubtitleQueryProviderURL(raw string) bool {
 	u := strings.ToLower(strings.TrimSpace(raw))
@@ -280,8 +427,10 @@ func searchSubtitleQueryProvider(parent context.Context, server ProviderServer, 
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-	defer cancel()
+	ctx := parent
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	var all []ProviderSubtitle
 	seen := map[string]bool{}
@@ -312,15 +461,30 @@ func searchSubtitleQueryProvider(parent context.Context, server ProviderServer, 
 			continue
 		}
 		found := parseSubtitleQueryResponse(server.ID, body)
+		if len(found) > 0 && usesQuery {
+			var filtered []ProviderSubtitle
+			for _, sub := range found {
+				if subtitleCandidateMatchesQuery(sub.Title+" "+sub.URL, query) {
+					filtered = append(filtered, sub)
+				}
+			}
+			found = filtered
+		}
 		if len(found) == 0 {
 			htmlSubs, detailPages := parseSubtitleHTMLResponse(endpoint, body)
-			found = append(found, htmlSubs...)
-			if len(found) == 0 && len(detailPages) > 0 {
-				limit := len(detailPages)
-				if limit > 2 {
-					limit = 2
+			for _, sub := range htmlSubs {
+				if !usesQuery || subtitleCandidateMatchesQuery(sub.Title+" "+sub.URL, query) {
+					found = append(found, sub)
 				}
-				for _, detailURL := range detailPages[:limit] {
+			}
+			if len(found) == 0 && len(detailPages) > 0 {
+				var filteredPages []string
+				for _, detailURL := range detailPages {
+					if subtitleCandidateMatchesQuery(detailURL, query) {
+						filteredPages = append(filteredPages, detailURL)
+					}
+				}
+				for _, detailURL := range filteredPages {
 					if ctx.Err() != nil {
 						break
 					}
@@ -350,9 +514,6 @@ func searchSubtitleQueryProvider(parent context.Context, server ProviderServer, 
 			}
 			seen[sub.URL] = true
 			all = append(all, sub)
-		}
-		if len(all) >= 8 {
-			break
 		}
 	}
 	return all

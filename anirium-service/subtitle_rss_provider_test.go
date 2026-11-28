@@ -1,69 +1,51 @@
 package main
 
-import (
-	"context"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-)
+import "testing"
 
-func TestSearchSubtitleQueryProviderParsesJSONAndRSS(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/json" {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"subtitles":[{"url":"https://example.com/ep1.pt.vtt","lang":"pt-BR","title":"PT-BR Oficial"},{"url":"https://example.com/ep1.en.srt","lang":"eng","title":"English"}]}`))
-			return
-		}
-		w.Header().Set("Content-Type", "application/xml")
-		_, _ = w.Write([]byte(`<rss><channel><item><title>Mouse Cursor 01 [PT-BR]</title><enclosure url="https://example.com/mouse01.srt" /></item></channel></rss>`))
-	}))
-	defer srv.Close()
-
-	prev := providerHTTPClient
-	providerHTTPClient = srv.Client()
-	defer func() { providerHTTPClient = prev }()
-
-	jsonRes := searchSubtitleQueryProvider(context.Background(), ProviderServer{
-		ID:          "sub-json",
-		ManifestURL: srv.URL + "/json?q={subquery}",
-	}, PlaybackPrepareRequest{Title: "Mouse Cursor", Episode: 1})
-	if len(jsonRes) != 2 || jsonRes[0].Language != "por" || jsonRes[1].Language != "eng" {
-		t.Fatalf("unexpected JSON subtitle results: %+v", jsonRes)
+func TestSubtitleCandidateMatchesQuery(t *testing.T) {
+	tankChair := PlaybackPrepareRequest{
+		Title:       "Tank Chair",
+		TitleRomaji: "Sensha Isu",
+		Season:      1,
+		Episode:     2,
 	}
 
-	rssRes := searchSubtitleQueryProvider(context.Background(), ProviderServer{
-		ID:          "sub-rss",
-		ManifestURL: srv.URL + "/rss?q={subquery}",
-	}, PlaybackPrepareRequest{Title: "Mouse Cursor", Episode: 1})
-	if len(rssRes) != 1 || rssRes[0].Language != "por" || rssRes[0].URL != "https://example.com/mouse01.srt" {
-		t.Fatalf("unexpected RSS subtitle results: %+v", rssRes)
+	rejected := []string{
+		"https://www.subtitlecat.com/subs/12345/Shark.Tank.S12E02.720p.WEB.h264-CAKES.html",
+		"https://www.subtitlecat.com/subs/67890/Shark.Tank.S15E02.720p.WEB.h264-EDITH.html",
+		"https://www.subtitlecat.com/subs/11111/Tank.Chair.S02E02.1080p.html",
+		"https://www.subtitlecat.com/subs/22222/Tank.Chair.S01E03.1080p.html",
+		"https://www.subtitlecat.com/subs/33333/Tank.Chair.Season.2.Episode.02.html",
+		"https://www.subtitlecat.com/subs/44444/Unrelated.Anime.02.1080p.html",
 	}
-}
-
-func TestSearchSubtitleQueryProviderParsesHTMLSearchAndDetail(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		if r.URL.Path == "/index.php" {
-			_, _ = w.Write([]byte(`<html><body><a href="/subs/99/Mouse.Cursor.01.html">Mouse Cursor 01</a></body></html>`))
-			return
+	for _, url := range rejected {
+		if subtitleCandidateMatchesQuery(url, tankChair) {
+			t.Errorf("expected candidate to be rejected for Tank Chair S1E2, got accepted: %s", url)
 		}
-		if r.URL.Path == "/subs/99/Mouse.Cursor.01.html" {
-			_, _ = w.Write([]byte(`<html><body><a href="/subs/99/Mouse.Cursor.01-pt-BR.srt">Portuguese</a><a href="/subs/99/Mouse.Cursor.01-en.srt">English</a></body></html>`))
-			return
+	}
+
+	accepted := []string{
+		"https://www.subtitlecat.com/subs/55555/Tank.Chair.S01E02.1080p.WEB.html",
+		"https://www.subtitlecat.com/subs/55556/%5BSubsPlease%5D%20Tank%20Chair%20-%2002%20(1080p).html",
+		"https://www.subtitlecat.com/subs/55557/Sensha.Isu.02.1080p.html",
+	}
+	for _, url := range accepted {
+		if !subtitleCandidateMatchesQuery(url, tankChair) {
+			t.Errorf("expected candidate to be accepted for Tank Chair S1E2, got rejected: %s", url)
 		}
-		http.NotFound(w, r)
-	}))
-	defer srv.Close()
+	}
 
-	prev := providerHTTPClient
-	providerHTTPClient = srv.Client()
-	defer func() { providerHTTPClient = prev }()
-
-	res := searchSubtitleQueryProvider(context.Background(), ProviderServer{
-		ID:          "sub-html",
-		ManifestURL: srv.URL + "/index.php?search={subquery}",
-	}, PlaybackPrepareRequest{Title: "Mouse Cursor", Episode: 1})
-	if len(res) != 2 || res[0].Language != "por" || res[1].Language != "eng" {
-		t.Fatalf("unexpected HTML subtitle results: %+v", res)
+	frieren := PlaybackPrepareRequest{
+		Title:        "Frieren: Beyond Journey's End",
+		TitleRomaji:  "Sousou no Frieren",
+		TitleEnglish: "Frieren: Beyond Journey's End",
+		Season:       1,
+		Episode:      8,
+	}
+	if !subtitleCandidateMatchesQuery("https://www.subtitlecat.com/subs/999/Sousou.no.Frieren.08.1080p.html", frieren) {
+		t.Errorf("expected Romaji title match to be accepted")
+	}
+	if subtitleCandidateMatchesQuery("https://www.subtitlecat.com/subs/999/Sousou.no.Frieren.07.1080p.html", frieren) {
+		t.Errorf("expected wrong episode to be rejected")
 	}
 }

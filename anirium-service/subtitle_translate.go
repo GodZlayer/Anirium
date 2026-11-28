@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -18,11 +19,43 @@ import (
 )
 
 var (
-	subTranslateMu      sync.Mutex
-	subTranslateMem     = map[string]string{}
-	subTranslateBaseURL = "https://translate.googleapis.com/translate_a/single"
-	subTranslateClient  = &http.Client{Timeout: 6 * time.Second}
+	subTranslateMu               sync.Mutex
+	subTranslateMem              = map[string]string{}
+	subTranslateBaseURL          = "https://translate.googleapis.com/translate_a/single"
+	subTranslateFallbackURL      = "https://clients5.google.com/translate_a/t"
+	subTranslateClient           = &http.Client{Timeout: 10 * time.Second}
+	subTranslateSepRe            = regexp.MustCompile(`(?i)\s*@{2,}\s*ANIRIUM[_\s-]*SEP\s*@{2,}\s*`)
+	subTranslateThrottleMu       sync.Mutex
+	subTranslateNextAllowed      time.Time
+	subTranslateThrottleInterval = 350 * time.Millisecond
 )
+
+func waitSubtitleTranslateSlot(ctx context.Context) error {
+	if testing.Testing() || subTranslateThrottleInterval <= 0 {
+		return nil
+	}
+	subTranslateThrottleMu.Lock()
+	now := time.Now()
+	wait := time.Until(subTranslateNextAllowed)
+	if wait > 0 {
+		subTranslateNextAllowed = subTranslateNextAllowed.Add(subTranslateThrottleInterval)
+	} else {
+		subTranslateNextAllowed = now.Add(subTranslateThrottleInterval)
+	}
+	subTranslateThrottleMu.Unlock()
+
+	if wait <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
 type vttCueBlock struct {
 	header string
@@ -30,10 +63,35 @@ type vttCueBlock struct {
 	text   string
 }
 
+func parseTranslatedTrackID(trackID string) (string, string, bool) {
+	if !strings.HasPrefix(trackID, "translated-") {
+		return "", trackID, false
+	}
+	rest := strings.TrimPrefix(trackID, "translated-")
+	colon := strings.IndexByte(rest, ':')
+	if colon <= 0 || colon+1 >= len(rest) {
+		return "", trackID, false
+	}
+	lang := strings.TrimSpace(rest[:colon])
+	baseID := rest[colon+1:]
+	if lang == "" || baseID == "" {
+		return "", trackID, false
+	}
+	return normalizeTranslateLang(lang), baseID, true
+}
+
+func unwrapTranslatedTrackID(trackID string) string {
+	_, baseID, ok := parseTranslatedTrackID(trackID)
+	if ok {
+		return baseID
+	}
+	return trackID
+}
+
 func normalizeTranslateLang(lang string) string {
 	l := strings.ToLower(strings.TrimSpace(lang))
 	switch l {
-	case "", "por", "pt-br", "pt_br", "pt":
+	case "", "por", "pob", "pt-br", "pt_br", "pt":
 		return "pt"
 	case "eng", "en-us", "en-gb", "en":
 		return "en"
@@ -47,6 +105,32 @@ func normalizeTranslateLang(lang string) string {
 		return "it"
 	case "jpn", "ja":
 		return "ja"
+	case "rus", "ru":
+		return "ru"
+	case "kor", "ko":
+		return "ko"
+	case "zho", "chi", "zh", "zh-cn", "zh_cn":
+		return "zh-CN"
+	case "zh-tw", "zh_tw":
+		return "zh-TW"
+	case "ara", "ar":
+		return "ar"
+	case "hin", "hi":
+		return "hi"
+	case "tur", "tr":
+		return "tr"
+	case "nld", "dut", "nl":
+		return "nl"
+	case "pol", "pl":
+		return "pl"
+	case "ukr", "uk":
+		return "uk"
+	case "tha", "th":
+		return "th"
+	case "vie", "vi":
+		return "vi"
+	case "ind", "id":
+		return "id"
 	default:
 		if len(l) >= 2 {
 			return l[:2]
@@ -107,9 +191,47 @@ func translateTextBatch(ctx context.Context, texts []string, targetLang string) 
 	if len(texts) == 0 {
 		return texts, nil
 	}
+	if err := waitSubtitleTranslateSlot(ctx); err != nil {
+		return nil, err
+	}
 	const sep = "\n@@@ANIRIUM_SEP@@@\n"
 	joined := strings.Join(texts, sep)
 
+	full, err := requestPrimaryTranslate(ctx, joined, targetLang)
+	if err != nil && strings.Contains(err.Error(), "429") && !testing.Testing() {
+		if fb, fbErr := requestFallbackTranslate(ctx, joined, targetLang); fbErr == nil && fb != "" {
+			full = fb
+			err = nil
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	parts := subTranslateSepRe.Split(full, -1)
+	if len(parts) != len(texts) {
+		// Fallback: subdivide batch so a single mangled separator never aborts the whole VTT.
+		if len(texts) > 1 {
+			mid := len(texts) / 2
+			left, leftErr := translateTextBatch(ctx, texts[:mid], targetLang)
+			if leftErr != nil {
+				return nil, leftErr
+			}
+			right, rightErr := translateTextBatch(ctx, texts[mid:], targetLang)
+			if rightErr != nil {
+				return nil, rightErr
+			}
+			return append(left, right...), nil
+		}
+		return []string{strings.TrimSpace(full)}, nil
+	}
+	result := make([]string, len(parts))
+	for i, p := range parts {
+		result[i] = strings.TrimSpace(p)
+	}
+	return result, nil
+}
+
+func requestPrimaryTranslate(ctx context.Context, joined, targetLang string) (string, error) {
 	form := url.Values{}
 	form.Set("client", "gtx")
 	form.Set("sl", "auto")
@@ -119,31 +241,31 @@ func translateTextBatch(ctx context.Context, texts []string, targetLang string) 
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, subTranslateBaseURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 
 	resp, err := subTranslateClient.Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("translate HTTP %d", resp.StatusCode)
+		return "", fmt.Errorf("translate HTTP %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	var parsed []any
 	if err := json.Unmarshal(body, &parsed); err != nil || len(parsed) == 0 {
-		return nil, fmt.Errorf("invalid translate response")
+		return "", fmt.Errorf("invalid translate response")
 	}
 	sentences, ok := parsed[0].([]any)
 	if !ok {
-		return nil, fmt.Errorf("missing translated sentences")
+		return "", fmt.Errorf("missing translated sentences")
 	}
 	var out strings.Builder
 	for _, item := range sentences {
@@ -154,16 +276,48 @@ func translateTextBatch(ctx context.Context, texts []string, targetLang string) 
 			}
 		}
 	}
-	full := out.String()
-	parts := strings.Split(full, "@@@ANIRIUM_SEP@@@")
-	if len(parts) != len(texts) {
-		return nil, fmt.Errorf("cue count mismatch: got %d want %d", len(parts), len(texts))
+	return out.String(), nil
+}
+
+func requestFallbackTranslate(ctx context.Context, joined, targetLang string) (string, error) {
+	form := url.Values{}
+	form.Set("client", "dict-chrome-ex")
+	form.Set("sl", "auto")
+	form.Set("tl", targetLang)
+	form.Set("q", joined)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, subTranslateFallbackURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", err
 	}
-	result := make([]string, len(parts))
-	for i, p := range parts {
-		result[i] = strings.TrimSpace(p)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+
+	resp, err := subTranslateClient.Do(req)
+	if err != nil {
+		return "", err
 	}
-	return result, nil
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("fallback translate HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil {
+		return "", err
+	}
+	var parsed []any
+	if err := json.Unmarshal(body, &parsed); err != nil || len(parsed) == 0 {
+		return "", fmt.Errorf("invalid fallback translate response")
+	}
+	if first, ok := parsed[0].(string); ok {
+		return first, nil
+	}
+	if pair, ok := parsed[0].([]any); ok && len(pair) > 0 {
+		if first, ok := pair[0].(string); ok {
+			return first, nil
+		}
+	}
+	return "", fmt.Errorf("unexpected fallback translate shape")
 }
 
 func translateWebVTT(ctx context.Context, vtt string, targetLang string) (string, bool, error) {
@@ -209,9 +363,15 @@ func translateWebVTT(ctx context.Context, vtt string, targetLang string) (string
 		return vtt, true, nil
 	}
 
-	// Translate in chunks of up to 25 cues so requests stay fast (~200-400ms).
-	const chunkSize = 25
+	// Translate sequentially in ~30s blocks (up to 15 cues per request), paced at 1 request every 5s
+	// so playback stays well ahead (~3 min translated per 30s) without triggering HTTP 429 bursts.
+	const chunkSize = 15
 	translated := make([]string, len(texts))
+	copy(translated, texts)
+
+	var firstErr error
+	translatedCount := 0
+
 	for start := 0; start < len(texts); start += chunkSize {
 		end := start + chunkSize
 		if end > len(texts) {
@@ -219,9 +379,17 @@ func translateWebVTT(ctx context.Context, vtt string, targetLang string) (string
 		}
 		batch, err := translateTextBatch(ctx, texts[start:end], lang)
 		if err != nil {
-			return vtt, false, err
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
 		}
 		copy(translated[start:end], batch)
+		translatedCount += len(batch)
+	}
+
+	if translatedCount == 0 && firstErr != nil {
+		return vtt, false, firstErr
 	}
 
 	for i, blockIdx := range cueIndices {
@@ -238,6 +406,8 @@ func translateWebVTT(ctx context.Context, vtt string, targetLang string) (string
 	}
 
 	finalVTT := strings.Join(rawBlocks, "\n\n")
-	writeSubtitleTranslateCache(key, finalVTT)
-	return finalVTT, false, nil
+	if firstErr == nil {
+		writeSubtitleTranslateCache(key, finalVTT)
+	}
+	return finalVTT, false, firstErr
 }

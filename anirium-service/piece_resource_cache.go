@@ -46,6 +46,40 @@ func newPieceResourceCache(parent string, budget int64) (*pieceResourceCache, er
 	return &pieceResourceCache{root: root, budget: budget, entries: map[string]*cachedResourceEntry{}}, nil
 }
 
+// newFixedPieceResourceCache reuses a deterministic directory across restarts
+// and indexes existing completed/incompleted piece files so torrent pieces are
+// never re-downloaded after a service restart.
+func newFixedPieceResourceCache(root string, budget int64) (*pieceResourceCache, error) {
+	if budget <= 0 {
+		return nil, fmt.Errorf("invalid piece cache capacity")
+	}
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		return nil, err
+	}
+	cache := &pieceResourceCache{root: root, budget: budget, entries: map[string]*cachedResourceEntry{}}
+	for _, sub := range []string{"completed", "incompleted"} {
+		subDir := filepath.Join(root, sub)
+		_ = filepath.Walk(subDir, func(p string, info os.FileInfo, err error) error {
+			if err != nil || info == nil || info.IsDir() {
+				return nil
+			}
+			rel, relErr := filepath.Rel(root, p)
+			if relErr != nil {
+				return nil
+			}
+			name := filepath.ToSlash(rel)
+			if !pieceResourceName.MatchString(name) {
+				return nil
+			}
+			cache.clock++
+			cache.entries[name] = &cachedResourceEntry{size: info.Size(), touched: cache.clock}
+			cache.used += info.Size()
+			return nil
+		})
+	}
+	return cache, nil
+}
+
 func (cache *pieceResourceCache) NewInstance(name string) (resource.Instance, error) {
 	if !pieceResourceName.MatchString(name) {
 		return nil, fmt.Errorf("invalid piece resource")

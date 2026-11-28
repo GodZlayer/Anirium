@@ -1,5 +1,5 @@
-import React from "react";
-import { ShieldAlert, Laptop, LogOut, CheckCircle, FastForward } from "lucide-react";
+import React, { useState } from "react";
+import { ShieldAlert, Laptop, LogOut, CheckCircle, FastForward, Sparkles, Download, Puzzle, QrCode, Copy } from "lucide-react";
 import { router } from "@inertiajs/react";
 import { useDesignTheme } from "../context/ThemeContext";
 import { usePlayerProPrefs } from "../lib/playerProPreferences";
@@ -19,6 +19,72 @@ export function ProfileSettingsTab({
 }: ProfileSettingsTabProps) {
   const { tokens, strings } = useDesignTheme();
   const [playerProPrefs, updatePlayerProPrefs] = usePlayerProPrefs();
+  const [trialBusy, setTrialBusy] = useState(false);
+  const [trialMessage, setTrialMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [pixBusy, setPixBusy] = useState(false);
+  const [pixCharge, setPixCharge] = useState<{ txid: string; amount_brl: number; pix_copy_paste: string; qrcode_image?: string | null } | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
+
+  const handleCreatePix = async (plan: "monthly" | "annual" = "monthly") => {
+    if (pixBusy) return;
+    setPixBusy(true);
+    setTrialMessage(null);
+    try {
+      const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || "";
+      const res = await fetch("/api/anirium-plus/pix", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-CSRF-TOKEN": csrf,
+        },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setPixCharge({
+          txid: data.txid,
+          amount_brl: data.amount_brl,
+          pix_copy_paste: data.pix_copy_paste,
+          qrcode_image: data.qrcode_image,
+        });
+      } else {
+        setTrialMessage({ kind: "error", text: data.message || "Não foi possível gerar o Pix Efí Bank." });
+      }
+    } catch {
+      setTrialMessage({ kind: "error", text: "Erro de conexão ao gerar Pix Efí Bank." });
+    } finally {
+      setPixBusy(false);
+    }
+  };
+
+  const handleActivateTrial = async () => {
+    if (trialBusy) return;
+    setTrialBusy(true);
+    setTrialMessage(null);
+    try {
+      const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || "";
+      const res = await fetch("/api/anirium-plus/trial", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-CSRF-TOKEN": csrf,
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setTrialMessage({ kind: "ok", text: data.message || "Anirium+ ativado por 15 dias!" });
+        router.reload();
+      } else {
+        setTrialMessage({ kind: "error", text: data.message || "Não foi possível ativar o período grátis." });
+      }
+    } catch {
+      setTrialMessage({ kind: "error", text: "Erro de conexão ao ativar o Anirium+." });
+    } finally {
+      setTrialBusy(false);
+    }
+  };
 
   const automationItems: Array<{
     key: "autoSkipIntro" | "autoSkipEnding" | "autoNextEpisode";
@@ -44,6 +110,140 @@ export function ProfileSettingsTab({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Guia Rápido 3 Passos: Anirium+ (15 dias grátis / Pix Efí Bank) + Service + Add-ons */}
+      {user && (
+        <div className="p-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 flex flex-col gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-amber-400/15 border border-amber-400/30 text-amber-300">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-[color:var(--wc-textPrimary)]">
+                Configuração Rápida Anirium+ (em menos de 5 min)
+              </span>
+              <span className="text-xs text-[color:var(--wc-textMuted)]">
+                15 dias grátis (1 conta Google por IPv6) · depois US$ 0,99/mês via Pix Efí Bank.
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            {/* Passo 1: Ativar Teste ou Assinar via Pix Efí */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-[color:var(--wc-bgBase)]/60 border border-[color:var(--wc-borderDefault)]/10">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-[color:var(--wc-textPrimary)]">
+                  1. {Number(user.tier || 1) >= 2 ? "Anirium+ Ativo ✓" : "Ativar Anirium+ (15 dias grátis)"}
+                </span>
+                <span className="text-[11px] text-[color:var(--wc-textMuted)]">
+                  {Number(user.tier || 1) >= 2
+                    ? "Você já tem acesso ao Player Pro e add-ons. Pode renovar +30 dias via Pix Efí."
+                    : "Teste grátis sem cartão. Depois apenas US$ 0,99/mês via Pix Efí Bank."}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {Number(user.tier || 1) < 2 && (
+                  <button
+                    type="button"
+                    disabled={trialBusy}
+                    onClick={handleActivateTrial}
+                    className="px-3 py-1.5 rounded-lg text-xs font-extrabold bg-amber-400 text-slate-950 hover:bg-amber-300 disabled:opacity-50 transition-colors cursor-pointer"
+                  >
+                    {trialBusy ? "Ativando..." : "15 dias grátis"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={pixBusy}
+                  onClick={() => handleCreatePix("monthly")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-400/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  {pixBusy ? "Gerando..." : "Pix $0.99/mês"}
+                </button>
+                <button
+                  type="button"
+                  disabled={pixBusy}
+                  onClick={() => handleCreatePix("annual")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-amber-400/40 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  {pixBusy ? "Gerando..." : "Pix $9.99/ano"}
+                </button>
+              </div>
+            </div>
+
+            {/* Passo 2: Baixar Anirium Service */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-[color:var(--wc-bgBase)]/60 border border-[color:var(--wc-borderDefault)]/10">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-[color:var(--wc-textPrimary)]">
+                  2. Baixar e abrir o Anirium Service
+                </span>
+                <span className="text-[11px] text-[color:var(--wc-textMuted)]">
+                  Roda em segundo plano na porta 4004 (também funciona na rede local para o celular).
+                </span>
+              </div>
+              <a
+                href="/download/service"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-[color:var(--wc-borderDefault)]/20 bg-[color:var(--wc-bgSurface)] text-[color:var(--wc-textPrimary)] hover:border-amber-400/50 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Baixar Service
+              </a>
+            </div>
+
+            {/* Passo 3: Adicionar Add-ons / RSS */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-[color:var(--wc-bgBase)]/60 border border-[color:var(--wc-borderDefault)]/10">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-[color:var(--wc-textPrimary)]">
+                  3. Colar seus Add-ons (Stremio / RSS / Legendas)
+                </span>
+                <span className="text-[11px] text-[color:var(--wc-textMuted)]">
+                  Na aba Add-ons, cole links Stremio, feeds RSS ({"{query}"}) ou buscadores de legenda ({"{subquery}"}).
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-300 px-2.5 py-1 rounded-lg bg-amber-400/10 border border-amber-400/20">
+                <Puzzle className="w-3.5 h-3.5" />
+                Aba Add-ons
+              </span>
+            </div>
+          </div>
+
+          {pixCharge && (
+            <div className="p-3 rounded-xl border border-emerald-400/30 bg-emerald-950/30 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-300">
+                  Pix Efí Bank gerado — R$ {pixCharge.amount_brl.toFixed(2).replace(".", ",")} (+30 dias)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(pixCharge.pix_copy_paste);
+                    setPixCopied(true);
+                    setTimeout(() => setPixCopied(false), 2500);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 cursor-pointer"
+                >
+                  <Copy className="w-3 h-3" />
+                  {pixCopied ? "Copiado!" : "Copiar Pix"}
+                </button>
+              </div>
+              {pixCharge.qrcode_image && (
+                <img src={pixCharge.qrcode_image} alt="QR Code Pix Efí Bank" className="w-36 h-36 rounded-lg bg-white p-1.5 self-center" />
+              )}
+              <code className="text-[10px] break-all text-emerald-100/80 bg-black/30 p-2 rounded-lg">
+                {pixCharge.pix_copy_paste}
+              </code>
+            </div>
+          )}
+
+          {trialMessage && (
+            <p className={`text-xs font-semibold ${trialMessage.kind === "ok" ? "text-emerald-300" : "text-rose-300"}`}>
+              {trialMessage.text}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Automação do Player Pro */}
       <div className="p-4 rounded-2xl border border-[color:var(--wc-borderDefault)]/10 bg-[color:var(--wc-bgBase)]/40 flex flex-col gap-3">
         <div className="flex items-center gap-2.5">

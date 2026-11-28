@@ -13,16 +13,12 @@ class CatalogTranslateSynopsesCommand extends Command
     protected $signature = 'catalog:translate-synopses
                             {--locales=pt-BR,es-ES,ja-JP,zh-CN,ru-RU,it-IT,fr-FR,de-DE,hi-IN : Locales destino separados por vírgula}
                             {--limit=0 : Quantidade máxima de traduções por execução (0 = ilimitado)}
-                            {--sleep-ms=0 : Pausa entre requisições em milissegundos}';
+                            {--sleep-ms=100 : Pausa entre requisições em milissegundos}';
 
     protected $description = 'Pré-traduz sinopses em inglês da tabela catalog_translations para todos os idiomas suportados';
 
     public function handle(LocaleResolver $locales, SynopsisTranslator $translator): int
     {
-        try {
-            DB::connection()->getPdo()->exec('PRAGMA busy_timeout = 10000;');
-        } catch (\Throwable) {
-        }
 
         $targetLocales = collect(explode(',', (string) $this->option('locales')))
             ->map(fn (string $item): ?string => $locales->normalize($item))

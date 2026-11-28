@@ -84,21 +84,92 @@ func executePlaybackPrepare(ctx context.Context, input PlaybackPrepareRequest, a
 	if ctx.Err() != nil {
 		return playbackPrepareOutcome{}
 	}
-	input = enrichPlaybackTitlesFromMAL(ctx, input)
+	if !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
+		swarmMu.RLock()
+		canReuse := playbackContext != nil && playbackContext.Err() == nil && len(activeLinks) > 0 && (
+			(input.CatalogIdentity.EpisodeID != "" && input.CatalogIdentity.EpisodeID == currentCatalogIdentity.EpisodeID) ||
+			(input.CatalogIdentity.WorkID != "" && input.CatalogIdentity.WorkID == currentCatalogIdentity.WorkID && input.Episode == requestedEpisode.Episode && input.Season == requestedEpisode.Season))
+		existingGen := playbackGeneration
+		existingSources := len(activeLinks)
+		existingIdentity := currentCatalogIdentity
+		existingReady := len(currentMixQualities) > 0
+		swarmMu.RUnlock()
+		if canReuse {
+			ticket, ticketErr := issuePlaybackGrant(input.Token, input.DeviceID, authorization.AccountID, authorization.PlayerSessionID)
+			if ticketErr == nil {
+				slot := globalSessionManager.CreateOrReplace(authorization.PlayerSessionID, ticket, existingGen)
+				slot.mu.Lock()
+				slot.CatalogIdentity = existingIdentity
+				slot.mu.Unlock()
+				appendLog(fmt.Sprintf("Playback prepare reused active session gen=%d sources=%d ready=%t", existingGen, existingSources, existingReady))
+				broadcastStartupTelemetry()
+				if existingReady {
+					broadcastWSEvent("manifest", buildCurrentManifest())
+				}
+				status := "preparing"
+				if existingReady {
+					status = "ready"
+				}
+				return playbackPrepareOutcome{
+					StatusCode: http.StatusOK,
+					Ticket:     ticket,
+					Body: map[string]interface{}{
+						"success":         true,
+						"status":          status,
+						"reusedSession":   true,
+						"sessionId":       slot.ID,
+						"sources":         existingSources,
+						"playbackTicket":  ticket,
+						"providerStatus":  input.ManifestSnapshots.statusByID(),
+						"catalogIdentity": existingIdentity,
+					},
+				}
+			}
+		}
+	}
+	epKey := episodeRetentionKeyFor(input.CatalogIdentity, input.Season, input.Episode)
+	if epKey == "" {
+		if id := strings.TrimSpace(input.EpisodeID); id != "" {
+			epKey = "ep:" + id
+		} else if wid := strings.TrimSpace(input.WorkID); wid != "" {
+			epKey = fmt.Sprintf("work:%s:s%de%d", wid, input.Season, input.Episode)
+		} else if input.MALID > 0 {
+			epKey = fmt.Sprintf("mal:%d:s%de%d", input.MALID, input.Season, input.Episode)
+		} else if t := strings.TrimSpace(input.Title); t != "" {
+			epKey = fmt.Sprintf("title:%s:s%de%d", slugifyFolderSegment(t, 40), input.Season, input.Episode)
+		}
+	}
+	var cachedMagnets []string
+	if !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" && epKey != "" {
+		if _, entry, ok := globalEpisodeStorage.lookup(epKey); ok && len(entry.Magnets) > 0 {
+			cachedMagnets = entry.Magnets
+			appendLog(fmt.Sprintf("[EpisodeCache] HIT dir=%s magnets=%d subs=%d (skipping provider search)", entry.RelDir, len(entry.Magnets), entry.SubtitleCount))
+		} else {
+			cachedMagnets = globalEpisodeRetention.loadEpisodeMagnets(epKey)
+			if len(cachedMagnets) > 0 {
+				appendLog(fmt.Sprintf("[EpisodeCache] HIT legacy magnets=%d for %s (skipping provider search)", len(cachedMagnets), epKey))
+			} else {
+				appendLog(fmt.Sprintf("[EpisodeCache] MISS key=%s title=%q s=%d e=%d (searching providers)", epKey, input.Title, input.Season, input.Episode))
+			}
+		}
+	}
 	var results []ProviderSearchResult
 	var providerSubtitles []ProviderSubtitle
-	var searchWg sync.WaitGroup
-	searchWg.Add(2)
-	go func() {
-		defer searchWg.Done()
-		results = searchProviderServers(input, ctx)
-	}()
-	go func() {
-		defer searchWg.Done()
-		providerSubtitles = searchSubtitleProviders(input, ctx)
-	}()
-	searchWg.Wait()
-	appendLog(fmt.Sprintf("Playback provider search sources=%d status=%v", len(results), input.ManifestSnapshots.statusByID()))
+	if len(cachedMagnets) == 0 {
+		input = enrichPlaybackTitlesFromMAL(ctx, input)
+		var searchWg sync.WaitGroup
+		searchWg.Add(2)
+		go func() {
+			defer searchWg.Done()
+			results = searchProviderServers(input, ctx)
+		}()
+		go func() {
+			defer searchWg.Done()
+			providerSubtitles = searchSubtitleProviders(input, ctx)
+		}()
+		searchWg.Wait()
+		appendLog(fmt.Sprintf("Playback provider search sources=%d status=%v", len(results), input.ManifestSnapshots.statusByID()))
+	}
 	if ctx.Err() != nil {
 		return playbackPrepareOutcome{}
 	}
@@ -112,7 +183,16 @@ func executePlaybackPrepare(ctx context.Context, input PlaybackPrepareRequest, a
 	if ctx.Err() != nil {
 		return playbackPrepareOutcome{}
 	}
-	magnets := pooledMagnets(results)
+	magnets := cachedMagnets
+	if len(magnets) == 0 {
+		magnets = pooledMagnets(results)
+		if len(magnets) > 0 && epKey != "" && !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
+			go globalEpisodeRetention.saveEpisodeMagnets(epKey, magnets)
+			go globalEpisodeStorage.recordMagnets(epKey, input.Title, input.CatalogIdentity.WorkID, input.Season, input.Episode, input.CatalogIdentity.EpisodeID, magnets)
+		}
+	} else if epKey != "" && !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
+		go globalEpisodeStorage.ensureEpisodeDir(epKey, input.Title, input.CatalogIdentity.WorkID, input.Season, input.Episode, input.CatalogIdentity.EpisodeID)
+	}
 	if len(magnets) == 0 {
 		swarmMu.Lock()
 		resetPlaybackLocked()
@@ -156,6 +236,10 @@ func executePlaybackPrepare(ctx context.Context, input PlaybackPrepareRequest, a
 			PlainError: "Playback credential unavailable",
 		}
 	}
+	slot := globalSessionManager.CreateOrReplace(authorization.PlayerSessionID, ticket, generation)
+	slot.mu.Lock()
+	slot.CatalogIdentity = input.CatalogIdentity
+	slot.mu.Unlock()
 	// Monitora a autorização contínua da reprodução em segundo plano.
 	workers.Add(1)
 	go func() {
@@ -308,6 +392,8 @@ func executePlaybackPrepare(ctx context.Context, input PlaybackPrepareRequest, a
 		Body: map[string]interface{}{
 			"success":         true,
 			"status":          "preparing",
+			"localCacheHit":   len(cachedMagnets) > 0,
+			"sessionId":       slot.ID,
 			"sources":         len(magnets),
 			"playbackTicket":  ticket,
 			"providerStatus":  input.ManifestSnapshots.statusByID(),
@@ -390,6 +476,58 @@ func (c *wsClient) handleWSPrepare(cmd map[string]interface{}) {
 		resp[key] = val
 	}
 	c.sendEvent("prepare_result", resp)
+	if reused, _ := outcome.Body["reusedSession"].(bool); reused {
+		swarmMu.RLock()
+		hasReady := len(currentMixQualities) > 0
+		inputs := playbackInputs
+		swarmMu.RUnlock()
+		if hasReady {
+			c.sendEvent("manifest", buildCurrentManifest())
+		}
+		if inputs != nil {
+			b := inputs.existingBundle()
+			if b != nil {
+				snap := b.snapshot(0, 0)
+				for _, tr := range snap.Tracks {
+					for _, part := range tr.Parts {
+						if part.Failed || len(part.Cues) == 0 {
+							continue
+						}
+						c.sendEvent("subtitle_data", wsSubtitlePayload{
+							TrackID:     tr.ID,
+							BlockStart:  math.Floor(part.Start/60) * 60,
+							Offset:      part.Start,
+							CoverageEnd: part.End,
+							Partial:     !tr.Complete && (part.End-part.Start) < 55,
+							Complete:    tr.Complete,
+							Alignment:   tr.Alignment,
+							VTT:         bundleVTT(part.Cues, part.Start),
+						})
+					}
+				}
+			}
+		}
+		broadcastStartupTelemetry()
+	} else if epKey := episodeRetentionKeyFor(input.CatalogIdentity, input.Season, input.Episode); epKey != "" {
+		savedSubs := globalEpisodeStorage.loadSubtitles(epKey)
+		if len(savedSubs) == 0 {
+			savedSubs = globalEpisodeRetention.loadEpisodeSubtitles(epKey)
+		}
+		if len(savedSubs) > 0 {
+			for _, sub := range savedSubs {
+				c.sendEvent("subtitle_data", wsSubtitlePayload{
+					TrackID:     sub.TrackID,
+					BlockStart:  math.Floor(sub.Start/60) * 60,
+					Offset:      sub.Start,
+					CoverageEnd: sub.End,
+					Partial:     !sub.Complete && (sub.End-sub.Start) < 55,
+					Complete:    sub.Complete,
+					Alignment:   "verified",
+					VTT:         sub.VTT,
+				})
+			}
+		}
+	}
 }
 
 func (c *wsClient) handleWSRenew(cmd map[string]interface{}) {
@@ -476,7 +614,7 @@ func (c *wsClient) handleWSGetSubtitle(cmd map[string]interface{}) {
 		tracks := subtitleTracksLocked()
 		episodeDuration := playbackEpisodeDurationLocked()
 		var targetSource string
-		baseTrackID := strings.TrimPrefix(trackID, "translated-por:")
+		baseTrackID := unwrapTranslatedTrackID(trackID)
 		for _, tr := range tracks {
 			if (tr.ID == trackID || tr.ID == baseTrackID) && tr.Source != "" && tr.StreamIndex >= 0 {
 				targetSource = tr.Source
@@ -507,7 +645,7 @@ func (c *wsClient) tryServeBundledWSSubtitle(ctx context.Context, cache *mediaIn
 	if b == nil {
 		return false
 	}
-	lookupID := strings.TrimPrefix(trackID, "translated-por:")
+	lookupID := unwrapTranslatedTrackID(trackID)
 	snapshot := b.snapshot(0, 0)
 	for _, track := range snapshot.Tracks {
 		if track.ID != trackID && track.ID != lookupID {
@@ -679,13 +817,13 @@ func (c *wsClient) tryServeBundledWSSubtitle(ctx context.Context, cache *mediaIn
 					}
 					return true
 				}
-				// Run 16s fast-head first so it never competes with a simultaneous 60s FFmpeg reader on the same torrent file,
+				// Run 8s fast-head first so it never competes with a simultaneous 60s FFmpeg reader on the same torrent file,
 				// then immediately schedule the 60s full block and 60s lookahead in the background.
 				singleTrack := []SubtitleTrack{track.track}
 				src := track.track.Source
 				go func(reqID string, tr SubtitleTrack, blk, atPos float64, align string) {
 					fastSent := false
-					if b.prepareFastHead(b.cache.ctx, src, singleTrack, atPos, 16) {
+					if b.prepareFastHead(b.cache.ctx, src, singleTrack, atPos, 8) {
 						if headPart, ok := b.fastHeadFor(tr.ID, atPos); ok && ctx.Err() == nil {
 							fastSent = true
 							c.sendEvent("subtitle_data", wsSubtitlePayload{
@@ -822,7 +960,7 @@ func (c *wsClient) serveFallbackWSSubtitle(reqCtx context.Context, cache *mediaI
 	defer cancelSubtitle()
 
 	var remote *ProviderSubtitle
-	lookupTrackID := strings.TrimPrefix(trackID, "translated-por:")
+	lookupTrackID := unwrapTranslatedTrackID(trackID)
 	for index, subtitle := range externalSubtitles {
 		if lookupTrackID == fmt.Sprintf("external-%d-%d", playbackGeneration, index) {
 			copySub := subtitle

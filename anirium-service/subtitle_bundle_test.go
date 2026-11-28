@@ -357,3 +357,33 @@ func TestSpeculativePrefetchDoesNotCancelActiveSubtitleBatch(t *testing.T) {
 		}
 	}
 }
+
+func TestSubtitleBundleSnapshotExposesFastHeadImmediately(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cache := newMediaInputCache(ctx, nil)
+	b := cache.bundle()
+	track := SubtitleTrack{ID: "ptbr", Language: "por", Title: "PT-BR", StreamIndex: 2, Source: "test.mkv"}
+	b.configure("test.mkv", []SubtitleTrack{track}, 1440)
+	b.extractSpan = func(ctx context.Context, cache *mediaInputCache, source string, tracks []SubtitleTrack, start, span float64) map[int]string {
+		return map[int]string{
+			2: "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nOlá mundo!\n",
+		}
+	}
+
+	initial := b.snapshot(0, 0)
+	if !b.prepareFastHead(ctx, "test.mkv", []SubtitleTrack{track}, 0, 16) {
+		t.Fatalf("expected prepareFastHead to succeed")
+	}
+
+	snap := b.snapshot(initial.Epoch, initial.Revision)
+	if len(snap.Tracks) != 1 {
+		t.Fatalf("expected 1 updated track in incremental snapshot, got %d", len(snap.Tracks))
+	}
+	if snap.Tracks[0].Status != "ready" {
+		t.Fatalf("expected fast-head track status ready, got %q", snap.Tracks[0].Status)
+	}
+	if len(snap.Tracks[0].Parts) != 1 || len(snap.Tracks[0].Parts[0].Cues) != 1 {
+		t.Fatalf("expected 1 fast-head part with 1 cue, got %+v", snap.Tracks[0].Parts)
+	}
+}

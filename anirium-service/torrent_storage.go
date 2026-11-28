@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"sync"
 
 	"github.com/anacrolix/torrent"
@@ -14,7 +15,7 @@ const runtimePieceCacheBudget = 12 << 30
 const runtimePieceSchedulingCapacity = 8 << 30
 
 func newBoundedRuntimeTorrentClient(cfg *torrent.ClientConfig) (*torrent.Client, func(), error) {
-	cache, err := newPieceResourceCache(cfg.DataDir, runtimePieceCacheBudget)
+	cache, err := newFixedPieceResourceCache(filepath.Join(cfg.DataDir, "pieces"), runtimePieceCacheBudget)
 	if err != nil {
 		return nil, nil, err
 	}

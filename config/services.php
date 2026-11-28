@@ -6,6 +6,13 @@ return [
         'service_secret' => env('ANIRIUM_SERVICE_SECRET', 'development-only-anirium-service-secret'),
     ],
 
+    'addons' => [
+        'player_pro_bundle_url' => env('ANIRIUM_PLAYER_PRO_BUNDLE_URL', 'https://godzlayer.github.io/anirium-player-pro/dist/player-pro.js'),
+        'player_pro_repository_url' => env('ANIRIUM_PLAYER_PRO_REPO_URL', 'https://github.com/GodZlayer/anirium-player-pro'),
+        'manga_reader_bundle_url' => env('ANIRIUM_MANGA_READER_BUNDLE_URL', 'https://godzlayer.github.io/anirium-manga-reader/dist/manga-reader.js'),
+        'manga_reader_repository_url' => env('ANIRIUM_MANGA_READER_REPO_URL', 'https://github.com/GodZlayer/anirium-manga-reader'),
+    ],
+
     'ollama' => [
         'url' => env('OLLAMA_URL', 'http://host.docker.internal:11434'),
         'model' => env('OLLAMA_TRANSLATE_MODEL', 'gemma4:e2b-it-qat'),
@@ -58,6 +65,24 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI', 'http://localhost:8080/auth/google/callback'),
+    ],
+
+    'efi' => [
+        'sandbox' => (bool) env('EFI_SANDBOX', false),
+        'client_id' => env('EFI_SANDBOX', false)
+            ? env('EFI_SANDBOX_CLIENT_ID', env('EFI_CLIENT_ID'))
+            : env('EFI_PROD_CLIENT_ID', env('EFI_CLIENT_ID')),
+        'client_secret' => env('EFI_SANDBOX', false)
+            ? env('EFI_SANDBOX_CLIENT_SECRET', env('EFI_CLIENT_SECRET'))
+            : env('EFI_PROD_CLIENT_SECRET', env('EFI_CLIENT_SECRET')),
+        'certificate_path' => env('EFI_SANDBOX', false)
+            ? env('EFI_SANDBOX_CERTIFICATE_PATH', env('EFI_CERTIFICATE_PATH'))
+            : env('EFI_PROD_CERTIFICATE_PATH', env('EFI_CERTIFICATE_PATH')),
+        'pix_key' => env('EFI_PIX_KEY'),
+        'usd_brl_rate' => (float) env('EFI_USD_BRL_RATE', 5.80),
+        'monthly_price_usd' => 0.99,
+        'annual_price_usd' => 9.99,
+        'webhook_secret' => env('EFI_WEBHOOK_SECRET'),
     ],
 
 ];

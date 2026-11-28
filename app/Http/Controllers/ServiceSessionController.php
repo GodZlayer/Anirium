@@ -335,6 +335,300 @@ class ServiceSessionController extends Controller
     }
 
     /**
+     * POST /api/service/session/heartbeat
+     * Atualiza o estado em tempo real e diagnósticos da sessão ativa do anirium-service
+     */
+    public function heartbeat(Request $request)
+    {
+        $token = (string) $request->bearerToken();
+        if ($token === '') {
+            $token = (string) $request->header('X-Anirium-Service-Token', '');
+        }
+        $deviceId = trim((string) ($request->header('x-anirium-device')
+            ?: $request->header('X-Anirium-Device-Id')
+            ?: $request->input('deviceId', '')));
+
+        $verified = $this->verifyServiceTokenDetailed($token, $deviceId);
+        if (! $verified['ok']) {
+            return response()->json([
+                'status' => 'unauthorized',
+                'reason' => $verified['reason'],
+            ], 401, ['Cache-Control' => 'no-store']);
+        }
+
+        $claims = $verified['claims'];
+        $accountId = (int) ($claims['accountId'] ?? 0);
+        $playerSessionId = (string) ($claims['playerSessionId'] ?? '');
+
+        if ($accountId <= 0 || $playerSessionId === '') {
+            return response()->json(['status' => 'unauthorized', 'reason' => 'token_invalid'], 401, ['Cache-Control' => 'no-store']);
+        }
+
+        $validated = $request->validate([
+            'status' => ['nullable', 'string', 'in:idle,loading,playing,paused,error'],
+            'serviceVersion' => ['nullable', 'string', 'max:32'],
+            'workId' => ['nullable', 'uuid'],
+            'episodeId' => ['nullable', 'uuid'],
+            'episodeNumber' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'positionSeconds' => ['nullable', 'integer', 'min:0', 'max:86400'],
+            'diagnostics' => ['nullable', 'array'],
+        ]);
+
+        $now = now();
+        $busyTimeoutMs = max(1, (int) config('services.anirium.telemetry_write_busy_timeout_ms', 3000));
+
+        try {
+            ServiceSessionSnapshot::withShortSqliteBusyTimeout($busyTimeoutMs, function () use (
+                $accountId,
+                $deviceId,
+                $playerSessionId,
+                $validated,
+                $request,
+                $now
+            ): void {
+                DB::table('active_service_sessions')->upsert(
+                    [[
+                        'user_id' => $accountId,
+                        'device_id' => substr($deviceId, 0, 128),
+                        'player_session_id' => substr($playerSessionId, 0, 128),
+                        'service_version' => isset($validated['serviceVersion']) ? substr($validated['serviceVersion'], 0, 32) : null,
+                        'ip_address' => $request->ip(),
+                        'status' => $validated['status'] ?? 'idle',
+                        'work_id' => isset($validated['workId']) ? strtolower($validated['workId']) : null,
+                        'episode_id' => isset($validated['episodeId']) ? strtolower($validated['episodeId']) : null,
+                        'episode_number' => $validated['episodeNumber'] ?? null,
+                        'position_seconds' => (int) ($validated['positionSeconds'] ?? 0),
+                        'diagnostics' => isset($validated['diagnostics']) ? json_encode($validated['diagnostics']) : null,
+                        'last_seen_at' => $now,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]],
+                    ['player_session_id'],
+                    [
+                        'user_id',
+                        'device_id',
+                        'service_version',
+                        'ip_address',
+                        'status',
+                        'work_id',
+                        'episode_id',
+                        'episode_number',
+                        'position_seconds',
+                        'diagnostics',
+                        'last_seen_at',
+                        'updated_at',
+                    ]
+                );
+            });
+        } catch (Throwable $exception) {
+            if (! ServiceSessionSnapshot::isSqliteBusy($exception)) {
+                throw $exception;
+            }
+
+            return response()->json(['status' => 'deferred', 'reason' => 'database_busy'], 202, ['Cache-Control' => 'no-store']);
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'playerSessionId' => $playerSessionId,
+            'lastSeenAt' => $now->toIso8601String(),
+        ], 200, ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * GET /api/admin/service-sessions
+     * Lista sessões ativas do anirium-service com usuário, obra/episódio e diagnósticos
+     */
+    public function adminIndex(Request $request)
+    {
+        $user = Auth::user();
+        if (! $user || strtolower((string) $user->email) !== 'santoss.cog@gmail.com') {
+            return response()->json(['error' => 'forbidden'], 403);
+        }
+
+        $includeAll = $request->boolean('all', false);
+        $ttlSeconds = max(10, min((int) $request->integer('ttl', 90), 86400));
+
+        $query = DB::table('active_service_sessions as s')
+            ->leftJoin('users as u', 'u.id', '=', 's.user_id')
+            ->select([
+                's.*',
+                'u.name as user_name',
+                'u.email as user_email',
+            ])
+            ->orderByDesc('s.last_seen_at');
+
+        if (! $includeAll) {
+            $query->where('s.last_seen_at', '>=', now()->subSeconds($ttlSeconds));
+        }
+
+        $rows = $query->limit(200)->get();
+
+        $workIds = $rows->pluck('work_id')->filter()->unique()->values()->all();
+        $titlesByWorkId = [];
+        if (! empty($workIds)) {
+            $titleRows = DB::table('catalog_entity_titles')
+                ->whereIn('entity_id', $workIds)
+                ->get(['entity_id', 'locale', 'title']);
+
+            foreach ($titleRows as $titleRow) {
+                $eid = (string) $titleRow->entity_id;
+                if (! isset($titlesByWorkId[$eid]) || $titleRow->locale === 'en') {
+                    $titlesByWorkId[$eid] = $titleRow->title;
+                }
+            }
+        }
+
+        $sessions = $rows->map(function ($row) use ($titlesByWorkId) {
+            $diagnostics = is_string($row->diagnostics) ? json_decode($row->diagnostics, true) : $row->diagnostics;
+
+            return [
+                'playerSessionId' => $row->player_session_id,
+                'userId' => (int) $row->user_id,
+                'userName' => $row->user_name,
+                'userEmail' => $row->user_email,
+                'deviceId' => $row->device_id,
+                'serviceVersion' => $row->service_version,
+                'ipAddress' => $row->ip_address,
+                'status' => $row->status,
+                'workId' => $row->work_id,
+                'workTitle' => $row->work_id ? ($titlesByWorkId[$row->work_id] ?? null) : null,
+                'episodeId' => $row->episode_id,
+                'episodeNumber' => $row->episode_number !== null ? (int) $row->episode_number : null,
+                'positionSeconds' => (int) $row->position_seconds,
+                'diagnostics' => is_array($diagnostics) ? $diagnostics : null,
+                'lastSeenAt' => $row->last_seen_at,
+            ];
+        })->values();
+
+        return response()->json([
+            'count' => $sessions->count(),
+            'ttlSeconds' => $ttlSeconds,
+            'sessions' => $sessions,
+        ], 200, ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * POST /api/service/nodes
+     * Registra um nó LAN (ex: http://192.168.x.x:4004) ativo para descoberta por outros dispositivos da conta.
+     */
+    public function announceNode(Request $request)
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['status' => 'unauthorized', 'reason' => 'session_revoked'], 401, ['Cache-Control' => 'no-store']);
+        }
+
+        $validated = $request->validate([
+            'lanUrl' => ['required', 'string', 'max:128'],
+            'serviceVersion' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        $normalized = $this->normalizePrivateLanServiceUrl($validated['lanUrl']);
+        if ($normalized === null) {
+            return response()->json([
+                'status' => 'invalid',
+                'reason' => 'private_lan_url_required',
+            ], 422, ['Cache-Control' => 'no-store']);
+        }
+
+        $cacheKey = "anirium_service_lan_nodes_{$user->id}";
+        $ttlSeconds = 300;
+        $now = time();
+        $existing = Cache::get($cacheKey, []);
+        $nodes = is_array($existing) ? $existing : [];
+
+        $nodes = array_values(array_filter($nodes, static function (mixed $node) use ($now, $ttlSeconds, $normalized): bool {
+            if (! is_array($node) || ! isset($node['lanUrl'], $node['lastSeenAt'])) {
+                return false;
+            }
+            if ((int) $node['lastSeenAt'] + $ttlSeconds < $now) {
+                return false;
+            }
+
+            return $node['lanUrl'] !== $normalized;
+        }));
+
+        array_unshift($nodes, [
+            'lanUrl' => $normalized,
+            'serviceVersion' => isset($validated['serviceVersion']) ? substr((string) $validated['serviceVersion'], 0, 32) : null,
+            'lastSeenAt' => $now,
+        ]);
+
+        $nodes = array_slice($nodes, 0, 5);
+        Cache::put($cacheKey, $nodes, $ttlSeconds);
+
+        return response()->json([
+            'status' => 'ok',
+            'nodes' => $nodes,
+        ], 200, ['Cache-Control' => 'no-store']);
+    }
+
+    /**
+     * GET /api/service/nodes
+     * Retorna os nós LAN ativos da conta autenticada ordenados do mais recente ao mais antigo.
+     */
+    public function listNodes(Request $request)
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['status' => 'unauthorized', 'reason' => 'session_revoked'], 401, ['Cache-Control' => 'no-store']);
+        }
+
+        $cacheKey = "anirium_service_lan_nodes_{$user->id}";
+        $ttlSeconds = 300;
+        $now = time();
+        $existing = Cache::get($cacheKey, []);
+        $nodes = is_array($existing) ? $existing : [];
+
+        $activeNodes = array_values(array_filter($nodes, static function (mixed $node) use ($now, $ttlSeconds): bool {
+            return is_array($node)
+                && isset($node['lanUrl'], $node['lastSeenAt'])
+                && ((int) $node['lastSeenAt'] + $ttlSeconds >= $now);
+        }));
+
+        return response()->json([
+            'status' => 'ok',
+            'nodes' => $activeNodes,
+        ], 200, ['Cache-Control' => 'no-store']);
+    }
+
+    private function normalizePrivateLanServiceUrl(string $rawUrl): ?string
+    {
+        $parsed = parse_url(trim($rawUrl));
+        if (! is_array($parsed)) {
+            return null;
+        }
+
+        $scheme = strtolower((string) ($parsed['scheme'] ?? ''));
+        $host = (string) ($parsed['host'] ?? '');
+        $port = (int) ($parsed['port'] ?? 0);
+
+        if ($scheme !== 'http' || $host === '' || $port < 1024 || $port > 65535) {
+            return null;
+        }
+
+        if (isset($parsed['path']) && $parsed['path'] !== '' && $parsed['path'] !== '/') {
+            return null;
+        }
+
+        if (isset($parsed['query']) || isset($parsed['fragment']) || isset($parsed['user']) || isset($parsed['pass'])) {
+            return null;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+            return null;
+        }
+
+        $isPrivateLan = preg_match('/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/', $host) === 1;
+        if (! $isPrivateLan) {
+            return null;
+        }
+
+        return "http://{$host}:{$port}";
+    }
+
+    /**
      * DELETE /api/service/session
      * Libera o lease da sessão de reprodução
      */
@@ -344,6 +638,7 @@ class ServiceSessionController extends Controller
         if ($user) {
             Cache::forget("anirium_service_lease_{$user->id}");
             ServiceSessionSnapshot::forget((int) $user->id);
+            DB::table('active_service_sessions')->where('user_id', $user->id)->delete();
         }
 
         return response()->noContent(204, ['Cache-Control' => 'no-store']);

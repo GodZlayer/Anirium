@@ -6,9 +6,12 @@ import (
 )
 
 func probeSources(ctx context.Context, sources []string, probe func(string)) {
+	if len(sources) == 0 {
+		return
+	}
 	jobs := make(chan string)
 	var workers sync.WaitGroup
-	count := 8
+	count := 4
 	if len(sources) < count {
 		count = len(sources)
 	}

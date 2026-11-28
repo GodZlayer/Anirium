@@ -40,6 +40,7 @@ var startGlobalHubOnce sync.Once
 
 func ensureGlobalHubRunning() {
 	startGlobalHubOnce.Do(func() {
+		globalSessionManager.StartReaper()
 		go globalHub.run()
 	})
 }
@@ -56,6 +57,24 @@ type wsClient struct {
 	stateMu             sync.RWMutex
 	authorizedTicket    string
 	activeSubtitleTrack string
+	boundGeneration     uint64
+	sessionID           string
+}
+
+func (c *wsClient) setSessionID(sessionID string) {
+	id := strings.TrimSpace(sessionID)
+	c.stateMu.Lock()
+	c.sessionID = id
+	c.stateMu.Unlock()
+	if slot, ok := globalSessionManager.Get(id); ok {
+		slot.Touch()
+	}
+}
+
+func (c *wsClient) currentSessionID() string {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.sessionID
 }
 
 func (c *wsClient) closeSend() {
@@ -509,39 +528,136 @@ func (c *wsClient) handleCommand(cmd map[string]interface{}) {
 		go c.handleWSStartAddonConfigSession(cmd)
 	case "close_addon_config_session":
 		go c.handleWSCloseAddonConfigSession(cmd)
+	case "party_join":
+		roomID, _ := cmd["roomId"].(string)
+		author, _ := cmd["author"].(string)
+		isHost, _ := cmd["isHost"].(bool)
+		state := globalMeshHub.JoinWatchParty(strings.TrimSpace(roomID), strings.TrimSpace(author), isHost)
+		c.sendEvent("party_state", state)
+	case "party_leave":
+		state := globalMeshHub.LeaveWatchParty()
+		c.sendEvent("party_state", state)
+	case "party_state":
+		c.sendEvent("party_state", globalMeshHub.CurrentWatchPartyState())
+	case "party_sync":
+		pos, _ := cmd["position"].(float64)
+		playing, _ := cmd["playing"].(bool)
+		rate, _ := cmd["playbackRate"].(float64)
+		globalMeshHub.PublishPartySync(pos, playing, rate)
+	case "party_chat":
+		text, _ := cmd["text"].(string)
+		if msg, ok := globalMeshHub.PublishPartyChat(strings.TrimSpace(text)); ok {
+			broadcastWSEvent("party_chat", msg)
+		}
+	case "close_session":
+		sid, _ := cmd["sessionId"].(string)
+		if strings.TrimSpace(sid) == "" {
+			sid = c.currentSessionID()
+		}
+		closed := globalSessionManager.Close(sid)
+		c.sendEvent("session_closed", map[string]interface{}{
+			"sessionId": sid,
+			"closed":    closed,
+		})
+	case "get_sessions":
+		c.sendEvent("sessions", map[string]interface{}{
+			"activeCount": globalSessionManager.ActiveCount(),
+		})
 	}
 }
 
 func (c *wsClient) sendEvent(event string, payload interface{}) {
 	if event == "subtitle_data" {
-		if sub, ok := payload.(wsSubtitlePayload); ok && strings.HasPrefix(sub.TrackID, "translated-por:") && strings.Contains(sub.VTT, "-->") {
-			ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
-			if translated, _, err := translateWebVTT(ctx, sub.VTT, "pt"); err == nil && translated != "" {
-				sub.VTT = translated
-				payload = sub
+		if sub, ok := payload.(wsSubtitlePayload); ok && strings.Contains(sub.VTT, "-->") {
+			if targetLang, _, isTranslated := parseTranslatedTrackID(sub.TrackID); isTranslated {
+				ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+				if translated, _, err := translateWebVTT(ctx, sub.VTT, targetLang); translated != "" && (err == nil || translated != sub.VTT) {
+					sub.VTT = translated
+					payload = sub
+				} else if err != nil {
+					appendLog(fmt.Sprintf("Subtitle translation failed track=%s lang=%s err=%v", sub.TrackID, targetLang, err))
+				}
+				cancel()
 			}
-			cancel()
 		}
 	}
+	swarmMu.RLock()
+	gen := playbackGeneration
+	swarmMu.RUnlock()
 	data, err := json.Marshal(map[string]interface{}{
-		"event":   event,
-		"payload": payload,
+		"event":      event,
+		"generation": gen,
+		"payload":    payload,
 	})
 	if err == nil {
 		_ = c.enqueueRaw(data)
 	}
 }
 
-func broadcastWSEvent(event string, payload interface{}) {
+func broadcastToSession(sessionID, event string, payload interface{}) {
+	sid := strings.TrimSpace(sessionID)
+	var gen uint64
+	if slot, ok := globalSessionManager.Get(sid); ok {
+		slot.mu.RLock()
+		gen = slot.Generation
+		slot.mu.RUnlock()
+	} else {
+		swarmMu.RLock()
+		gen = playbackGeneration
+		swarmMu.RUnlock()
+	}
 	data, err := json.Marshal(map[string]interface{}{
-		"event":   event,
-		"payload": payload,
+		"event":      event,
+		"sessionId":  sid,
+		"generation": gen,
+		"payload":    payload,
 	})
-	if err == nil {
-		select {
-		case globalHub.broadcast <- data:
-		default:
+	if err != nil {
+		return
+	}
+	globalHub.mu.Lock()
+	clients := make([]*wsClient, 0, len(globalHub.clients))
+	for client := range globalHub.clients {
+		clients = append(clients, client)
+	}
+	globalHub.mu.Unlock()
+	for _, client := range clients {
+		client.stateMu.RLock()
+		clientSID := client.sessionID
+		client.stateMu.RUnlock()
+		if sid != "" && clientSID != "" && clientSID != sid {
+			continue
 		}
+		_ = client.enqueueRaw(data)
+	}
+}
+
+func broadcastWSEvent(event string, payload interface{}) {
+	swarmMu.RLock()
+	gen := playbackGeneration
+	swarmMu.RUnlock()
+	data, err := json.Marshal(map[string]interface{}{
+		"event":      event,
+		"generation": gen,
+		"payload":    payload,
+	})
+	if err != nil {
+		return
+	}
+	globalHub.mu.Lock()
+	clients := make([]*wsClient, 0, len(globalHub.clients))
+	for client := range globalHub.clients {
+		clients = append(clients, client)
+	}
+	globalHub.mu.Unlock()
+	for _, client := range clients {
+		client.stateMu.RLock()
+		bound := client.boundGeneration
+		client.stateMu.RUnlock()
+		if bound != 0 && gen != 0 && bound != gen {
+			continue
+		}
+		_ = client.enqueueRaw(data)
 	}
 }
 
@@ -586,7 +702,7 @@ func buildCurrentManifest() MixManifest {
 	peers := connectedPeers
 	rateSnapshot := downloadRateStr
 	variants := []MixVariant{}
-	manifestQualities := selectVariantQualities(qualities)
+	manifestQualities := expandDownscaleQualities(selectVariantQualities(qualities))
 	discoveryComplete := playbackDiscoveryComplete
 	inventoryScanning := playbackInventoryScanning
 	timelineStart, _, _ := activeContinuousWindowBoundsLocked()

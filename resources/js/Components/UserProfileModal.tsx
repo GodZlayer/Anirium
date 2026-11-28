@@ -171,11 +171,49 @@ export function UserProfileModal({
         {/* Conteúdo Dinâmico com Rolagem Interna Limpa */}
         <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
           {activeTab === "overview" && (
-            <ProfileGamificationHub
-              telemetry={telemetry}
-              onSelectTitle={handleSelectTitle}
-              activeTitleId={telemetry.titleId}
-            />
+            <div className="flex flex-col gap-4">
+              {user && (() => {
+                const isPlus = Number(user.tier || 1) >= 2;
+                const expiresAt = user.anirium_plus_expires_at ? new Date(user.anirium_plus_expires_at) : null;
+                const daysLeft = expiresAt ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 86400000)) : null;
+                return (
+                  <div className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 ${
+                    isPlus
+                      ? "border-emerald-400/30 bg-emerald-500/10"
+                      : "border-amber-400/35 bg-amber-500/10"
+                  }`}>
+                    <div className="flex flex-col gap-0.5">
+                      <span className={`text-sm font-extrabold ${isPlus ? "text-emerald-300" : "text-amber-300"}`}>
+                        {isPlus
+                          ? (daysLeft !== null ? `✨ Anirium+ Ativo · ${daysLeft} ${daysLeft === 1 ? "dia restante" : "dias restantes"}` : "✨ Anirium+ Ativo · Vitalício")
+                          : "✨ Desbloqueie o Anirium+"}
+                      </span>
+                      <span className="text-xs text-[color:var(--wc-textMuted)]">
+                        {isPlus
+                          ? (expiresAt ? `Válido até ${expiresAt.toLocaleDateString("pt-BR")} · Renovação $0.99/mês ou $9.99/ano via Pix Efí.` : "Acesso completo ao Player Pro, Add-ons e RSS.")
+                          : "15 dias grátis (1 conta Google por IPv6) · depois $0.99/mês ou $9.99/ano via Pix Efí."}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("settings")}
+                      className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-colors cursor-pointer shrink-0 ${
+                        isPlus
+                          ? "border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
+                          : "bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-lg shadow-amber-500/20"
+                      }`}
+                    >
+                      {isPlus ? "Gerenciar / Renovar Plus" : "Torne-se Plus"}
+                    </button>
+                  </div>
+                );
+              })()}
+              <ProfileGamificationHub
+                telemetry={telemetry}
+                onSelectTitle={handleSelectTitle}
+                activeTitleId={telemetry.titleId}
+              />
+            </div>
           )}
 
           {activeTab === "bookmarks" && (

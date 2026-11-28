@@ -29,6 +29,7 @@ type corePlaybackContext struct {
 	TitleNative     string                     `json:"titleNative,omitempty"`
 	Aliases         []string                   `json:"aliases,omitempty"`
 	Episode         int                        `json:"episode"`
+	AbsoluteEpisode int                        `json:"absoluteEpisode,omitempty"`
 	Season          int                        `json:"season"`
 	EpisodeCount    int                        `json:"episodeCount"`
 	Format          string                     `json:"format"`

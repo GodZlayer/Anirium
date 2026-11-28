@@ -108,9 +108,12 @@
                             </button>
 
                             <button type="button"
-                                    onclick="window.toggleUserBookmark?.('{{ $track->id ?? '' }}', 'track')"
+                                    data-bookmark-btn
+                                    data-entity-id="{{ $track->id ?? '' }}"
+                                    data-bookmarked="{{ !empty($isBookmarked) ? '1' : '0' }}"
+                                    onclick="window.toggleUserBookmark?.('{{ $track->id ?? '' }}', 'track', this)"
                                     class="px-3 py-1.5 rounded-xl bg-theme-pill border border-theme-default text-xs font-mono font-bold {{ !empty($isBookmarked) ? 'text-theme-accent border-theme-accent' : 'text-theme-muted hover:text-white' }} transition-all cursor-pointer flex items-center gap-1.5">
-                                <span>📌</span> <span data-i18n="action.bookmark">Favoritar</span>
+                                <span data-bookmark-icon>{{ !empty($isBookmarked) ? '♥' : '♡' }}</span> <span data-i18n="action.bookmark">Favoritar</span>
                             </button>
                         </div>
                     </div>

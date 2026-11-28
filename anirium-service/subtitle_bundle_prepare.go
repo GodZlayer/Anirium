@@ -253,6 +253,19 @@ func (b *subtitleBundle) run(job *subtitleBatchJob) {
 			readyCount++
 			b.bytes += len(content)
 			b.cache.rememberSubtitleWindow(subtitleWindowKey{job.source, track.StreamIndex, job.start}, content)
+			if epKey := currentEpisodeRetentionKey(); epKey != "" && len(cues) > 0 {
+				blk := persistedSubtitleBlock{
+					TrackID:  track.ID,
+					Language: track.Language,
+					Title:    track.Title,
+					Start:    job.start,
+					End:      end,
+					Complete: state.Complete,
+					VTT:      bundleVTT(cues, job.start),
+				}
+				go globalEpisodeRetention.saveEpisodeSubtitle(epKey, blk)
+				go globalEpisodeStorage.saveSubtitle(epKey, blk)
+			}
 		}
 	}
 	if readyCount == 0 && job.speculative && os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
@@ -656,7 +669,7 @@ func (b *subtitleBundle) prepareFastHead(ctx context.Context, source string, tra
 		defer b.mu.Unlock()
 		defer close(done)
 		delete(b.fastFlights, flightKey)
-		if b.closed || b.cache.ctx.Err() != nil || fastCtx.Err() != nil {
+		if b.closed || b.cache.ctx.Err() != nil || (fastCtx.Err() != nil && len(values) == 0) {
 			return
 		}
 		b.revision++
@@ -690,6 +703,9 @@ func (b *subtitleBundle) prepareFastHead(ctx context.Context, source string, tra
 			}
 			if !replaced {
 				b.fastHeads[track.ID] = append(b.fastHeads[track.ID], part)
+			}
+			if st := b.tracks[track.ID]; st != nil {
+				st.revision = b.revision
 			}
 			readyCount++
 		}

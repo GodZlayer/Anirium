@@ -50,6 +50,26 @@ func orderedExistingQualities(available []string) []string {
 	return qualities
 }
 
+// expandDownscaleQualities exposes standard lower-tier rungs (e.g. 720p, 480p)
+// when a higher-resolution source is available, since FFmpeg can downscale on demand.
+func expandDownscaleQualities(existing []string) []string {
+	ordered := orderedExistingQualities(existing)
+	if len(ordered) == 0 {
+		return ordered
+	}
+	maxPixels := qualityPixels(ordered[0])
+	if maxPixels <= 0 {
+		return ordered
+	}
+	combined := append([]string{}, ordered...)
+	for _, rung := range []string{"1080p", "720p", "480p"} {
+		if qualityPixels(rung) < maxPixels {
+			combined = append(combined, rung)
+		}
+	}
+	return orderedExistingQualities(combined)
+}
+
 // The encoder maps the first video stream. A lower-resolution stream cannot
 // contribute to a higher-quality variant simply because scaling is possible.
 func videoSupportsQuality(streams []ffprobeStream, quality string) bool {

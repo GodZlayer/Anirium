@@ -25,6 +25,26 @@ func (b *subtitleBundle) snapshot(epoch, since uint64) subtitleBundleSnapshot {
 				copy.Parts = append(copy.Parts, part)
 			}
 		}
+		if heads := b.fastHeads[state.ID]; len(heads) > 0 {
+			for _, head := range heads {
+				if head.Revision <= since {
+					continue
+				}
+				covered := false
+				for _, part := range state.Parts {
+					if !part.Failed && part.Start <= head.Start+0.05 && part.End >= head.End-0.05 {
+						covered = true
+						break
+					}
+				}
+				if !covered {
+					copy.Parts = append(copy.Parts, head)
+					if copy.Status == "preparing" {
+						copy.Status = "ready"
+					}
+				}
+			}
+		}
 		result.Tracks = append(result.Tracks, copy)
 	}
 	sort.Slice(result.Tracks, func(i, j int) bool { return result.Tracks[i].ID < result.Tracks[j].ID })
