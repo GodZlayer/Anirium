@@ -4718,6 +4718,7 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                     if (stabEl) { stabEl.classList.toggle('hidden', !(phase === 'stabilizing' && rem > 0)); stabEl.classList.toggle('flex', phase === 'stabilizing' && rem > 0); }
 
                     if (phase === 'stabilizing' && rem > 0 && cdEl) {
+                        window.__aniriumWatchPartyPhase = 'stabilizing';
                         let left = rem;
                         cdEl.textContent = `${left}s`;
                         syncCountdownTimer = setInterval(() => {
@@ -4744,6 +4745,15 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                                 cdEl.textContent = `${left}s`;
                             }
                         }, 1000);
+                    } else if (phase === 'playing' || (phase === 'stabilizing' && rem <= 0)) {
+                        window.__aniriumWatchPartyPhase = 'playing';
+                        try {
+                            document.getElementById('anirium-player-pro-iframe')?.contentWindow?.postMessage({
+                                type: 'anirium:wp:state',
+                                locked: Boolean(window.__aniriumWatchPartyLocked),
+                                phase: 'playing'
+                            }, '*');
+                        } catch {}
                     }
                 }
             };
