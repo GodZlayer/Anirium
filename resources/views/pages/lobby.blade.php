@@ -4784,11 +4784,12 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                             : `${roomState.membersCount || 1} na sala • Modo Dono de Party`;
                     }
                     window.__aniriumWatchPartyPhase = isSyncHold && rem > 0 ? phase : 'playing';
+                    const leaderLocked = Boolean(isSyncHold && rem > 0);
                     try {
                         document.querySelectorAll('iframe[src*="player-pro"], iframe#anirium-player-pro-iframe').forEach((f) => {
                             f.contentWindow?.postMessage({
                                 type: 'anirium:wp:state',
-                                locked: false,
+                                locked: leaderLocked,
                                 phase: window.__aniriumWatchPartyPhase,
                             }, '*');
                         });
@@ -4805,6 +4806,19 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                                 document.querySelectorAll('iframe[src*="player-pro"], iframe#anirium-player-pro-iframe').forEach((f) => {
                                     try { f.contentWindow?.postMessage({ type: 'anirium:wp:state', locked: false, phase: 'playing' }, '*'); } catch {}
                                 });
+                                if (activeCode) {
+                                    wpRequest(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}`)
+                                        .then((res) => {
+                                            if (res?.room) {
+                                                activeRoom = { ...res.room, isLeader: true };
+                                                renderRoomPhaseUI(activeRoom);
+                                                if (activeRoom.phase === 'playing') {
+                                                    applyRemotePlayback(activeRoom);
+                                                }
+                                            }
+                                        })
+                                        .catch(() => {});
+                                }
                             } else if (meta) {
                                 meta.textContent = `${roomState.membersCount || 1} na sala • Sync ${left}s (${roomState.minBufferedSeconds || 0}s/180s)`;
                             }
@@ -4874,13 +4888,16 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                         }, 1000);
                     } else if (phase === 'playing' || (isSyncHold && rem <= 0)) {
                         window.__aniriumWatchPartyPhase = 'playing';
-                        try {
-                            document.getElementById('anirium-player-pro-iframe')?.contentWindow?.postMessage({
-                                type: 'anirium:wp:state',
-                                locked: Boolean(window.__aniriumWatchPartyLocked),
-                                phase: 'playing'
-                            }, '*');
-                        } catch {}
+                        document.querySelectorAll('iframe[src*="player-pro"], iframe#anirium-player-pro-iframe').forEach((f) => {
+                            try {
+                                f.contentWindow?.postMessage({
+                                    type: 'anirium:wp:state',
+                                    locked: Boolean(window.__aniriumWatchPartyLocked),
+                                    phase: 'playing'
+                                }, '*');
+                            } catch {}
+                        });
+                        applyRemotePlayback({ ...roomState, phase: 'playing', status: 'playing' });
                     }
                 }
             };
@@ -5110,15 +5127,28 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
 
             async function sendControl(action, positionSeconds = 0, extra = {}) {
                 if (!activeCode || applyingRemoteSync) return;
-                await fetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}/control`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-                    body: JSON.stringify({
-                        action,
-                        positionSeconds: Math.max(0, Math.floor(positionSeconds)),
-                        ...extra,
-                    }),
-                }).catch(() => {});
+                try {
+                    const res = await fetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}/control`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                        body: JSON.stringify({
+                            action,
+                            positionSeconds: Math.max(0, Math.floor(positionSeconds)),
+                            ...extra,
+                        }),
+                    });
+                    if (res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        if (data?.room) {
+                            const localIsLeader = activeRoom ? Boolean(activeRoom.isLeader) : Boolean(data.room.isLeader);
+                            activeRoom = { ...data.room, isLeader: localIsLeader };
+                            renderRoomPhaseUI(activeRoom);
+                            if (activeRoom.phase === 'stabilizing' || activeRoom.phase === 'overtime') {
+                                applyRemotePlayback(activeRoom);
+                            }
+                        }
+                    }
+                } catch (_) {}
             }
 
             async function sendMessage(body) {
