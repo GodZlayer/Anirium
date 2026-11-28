@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	rssBracketRe = regexp.MustCompile(`\[[^\]]*\]|\([^\)]*\)`)
+	rssBracketRe  = regexp.MustCompile(`\[[^\]]*\]|\((?i:\s*(?:1080p|720p|480p|2160p|4k|web-?dl|webrip|bd|bdrip|bluray|dvdrip|hevc|x264|x265|h264|h265|10bit|8bit|aac|flac|opus|dual[\s-]*audio|multi[\s-]*sub|multisub|sub|dub|raws|batch|(?:19|20)\d{2})[^)]*)\)`)
 	rssSeasonEpRe = regexp.MustCompile(`(?i)\bS(\d{1,2})\s*E(\d{1,4})\b`)
 	rssEpDashRe   = regexp.MustCompile(`(?i)(?:^|[\s._-])(?:ep\.?\s*|e|-\s*)(\d{1,4})(?:v\d)?(?:\b|[\s._-]|$)`)
 	rssNoiseRe    = regexp.MustCompile(`(?i)\b(1080p|720p|480p|2160p|4k|hevc|x264|x265|h264|h265|10bit|8bit|webrip|web-dl|webdl|bluray|bdrip|dvdrip|mkv|mp4|aac|flac|opus|multisub|multi-sub|multi|dual|audio|dub|sub|vostfr|pt-br|ptbr|eng|jpn|raws|batch)\b`)
