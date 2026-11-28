@@ -4668,6 +4668,11 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                                 vid.pause();
                             }
                         });
+                        vid.addEventListener('ended', () => {
+                            if (activeRoom && activeRoom.mode === 'live_launch') {
+                                handleRoomEnded();
+                            }
+                        });
                     };
                     setTimeout(enforceSyncGuard, 400);
                     setTimeout(enforceSyncGuard, 1500);
@@ -4718,6 +4723,12 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                                 syncCountdownTimer = null;
                                 stabEl?.classList.add('hidden');
                                 stabEl?.classList.remove('flex');
+                                window.__aniriumWatchPartyPhase = 'playing';
+                                if (activeRoom) {
+                                    activeRoom.phase = 'playing';
+                                    activeRoom.isPlaying = true;
+                                    applyRemotePlayback(activeRoom);
+                                }
                             } else {
                                 cdEl.textContent = `${left}s`;
                             }
