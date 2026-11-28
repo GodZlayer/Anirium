@@ -766,6 +766,13 @@ class WatchPartyController extends Controller
         $isReady = $buffered >= self::TARGET_BUFFER_SECONDS;
         $now = now();
 
+        $prev = DB::table('watch_party_members')
+            ->where('room_id', $room->id)
+            ->where('user_id', $user->id)
+            ->first();
+        $prevBuffered = (int) ($prev->buffered_seconds ?? 0);
+        $prevReady = (bool) ($prev->is_ready ?? false);
+
         DB::table('watch_party_members')
             ->where('room_id', $room->id)
             ->where('user_id', $user->id)
@@ -776,6 +783,7 @@ class WatchPartyController extends Controller
                 'updated_at' => $now,
             ]);
 
+        $broadcasted = false;
         if (in_array((string) ($room->phase ?? ''), ['stabilizing', 'overtime'], true) && ! empty($room->sync_overtime_until)) {
             $unreadyCount = DB::table('watch_party_members')
                 ->where('room_id', $room->id)
@@ -794,11 +802,17 @@ class WatchPartyController extends Controller
                     app(RealtimeEventStore::class)->publish('room:'.strtoupper($room->code), 'watch_party.updated', [
                         'room' => $this->formatRoomState($room, (int) $user->id, 0),
                     ]);
+                    $broadcasted = true;
                 }
             }
         }
 
         $fresh = $this->findRoom($code);
+        if (! $broadcasted && $fresh && ($prevReady !== $isReady || abs($buffered - $prevBuffered) >= 5)) {
+            app(RealtimeEventStore::class)->publish('room:'.strtoupper($fresh->code), 'watch_party.updated', [
+                'room' => $this->formatRoomState($fresh, (int) $user->id, 0),
+            ]);
+        }
 
         return response()->json([
             'room' => $fresh ? $this->formatRoomState($fresh, (int) $user->id, 0) : null,

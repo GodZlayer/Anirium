@@ -5320,11 +5320,14 @@
                         wpLastBufferPostAt = Date.now();
                         const browserBuf = getBrowserBufferedEnd() || 0;
                         const manifestBuf = Number(state.manifest?.bufferSeconds || state.manifest?.bufferedSeconds || 0) || 0;
-                        const readyBonus = (state.initialPlaybackStarted && dom.video && dom.video.readyState >= 3) ? 180 : 0;
+                        const readyBonus = (dom.video && dom.video.readyState >= 2) ? 180 : 0;
                         window.parent.postMessage({
                             type: 'anirium:wp:buffer',
                             bufferedSeconds: Math.floor(Math.max(browserBuf, manifestBuf, readyBonus))
                         }, '*');
+                    }
+                    if (state.wpLocked && state.wpPhase === 'playing' && dom.video && !dom.video.paused && dom.video.currentTime > 0.2) {
+                        window.parent.postMessage({ type: 'anirium:wp:playing' }, '*');
                     }
                 }
             } catch {}

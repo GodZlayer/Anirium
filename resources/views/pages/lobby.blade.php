@@ -4896,7 +4896,13 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
             let lastBufferReportAt = 0;
             window.addEventListener('message', (event) => {
                 const msg = event.data;
-                if (!msg || typeof msg !== 'object' || msg.type !== 'anirium:wp:buffer' || !activeCode) return;
+                if (!msg || typeof msg !== 'object') return;
+                if (msg.type === 'anirium:wp:playing') {
+                    const stabEl = document.getElementById('wp-theater-stabilizing');
+                    if (stabEl) { stabEl.classList.add('hidden'); stabEl.classList.remove('flex'); }
+                    return;
+                }
+                if (msg.type !== 'anirium:wp:buffer' || !activeCode) return;
                 if (Date.now() - lastBufferReportAt < 4000) return;
                 lastBufferReportAt = Date.now();
                 const bufferedSeconds = Math.max(0, Math.floor(Number(msg.bufferedSeconds || 0)));
