@@ -505,7 +505,10 @@ class WatchPartyController extends Controller
             ]);
             $room = DB::table('watch_party_rooms')->where('id', $room->id)->first();
             $formattedForBroadcast = $this->formatRoomState($room, (int) $user->id, 0);
-            broadcast(new WatchPartyUpdated($room->code, $formattedForBroadcast))->toOthers();
+            try {
+                broadcast(new WatchPartyUpdated($room->code, $formattedForBroadcast))->toOthers();
+            } catch (\Throwable) {
+            }
             app(RealtimeEventStore::class)->publish('room:'.strtoupper($room->code), 'watch_party.updated', [
                 'room' => $formattedForBroadcast,
             ]);
@@ -643,7 +646,10 @@ class WatchPartyController extends Controller
         $formatted = $this->formatRoomState($updated, (int) $user->id, 0);
 
         $eventName = $updated->status === 'ended' ? 'watch_party.ended' : 'watch_party.updated';
-        broadcast(new WatchPartyUpdated($updated->code, $formatted))->toOthers();
+        try {
+            broadcast(new WatchPartyUpdated($updated->code, $formatted))->toOthers();
+        } catch (\Throwable) {
+        }
         app(RealtimeEventStore::class)->publish('room:'.strtoupper($updated->code), $eventName, [
             'room' => $formatted,
         ]);
@@ -698,7 +704,10 @@ class WatchPartyController extends Controller
             'createdAt' => $now->toIso8601String(),
         ];
 
-        broadcast(new WatchPartyMessageSent($room->code, $messagePayload))->toOthers();
+        try {
+            broadcast(new WatchPartyMessageSent($room->code, $messagePayload))->toOthers();
+        } catch (\Throwable) {
+        }
         app(RealtimeEventStore::class)->publish('room:'.strtoupper($room->code), 'watch_party.message', [
             'message' => $messagePayload,
         ]);
