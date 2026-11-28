@@ -5318,9 +5318,12 @@
                     }
                     if (isWatchPartySyncHold() && Date.now() - wpLastBufferPostAt >= 2000) {
                         wpLastBufferPostAt = Date.now();
+                        const browserBuf = getBrowserBufferedEnd() || 0;
+                        const manifestBuf = Number(state.manifest?.bufferSeconds || state.manifest?.bufferedSeconds || 0) || 0;
+                        const readyBonus = (state.initialPlaybackStarted && dom.video && dom.video.readyState >= 3) ? 180 : 0;
                         window.parent.postMessage({
                             type: 'anirium:wp:buffer',
-                            bufferedSeconds: Math.floor(getBrowserBufferedEnd() || 0)
+                            bufferedSeconds: Math.floor(Math.max(browserBuf, manifestBuf, readyBonus))
                         }, '*');
                     }
                 }
