@@ -3350,6 +3350,9 @@
                     episodeId: resolvedEpId,
                     episodeNumber: cleanEpNum,
                 });
+                document.querySelectorAll('#episode-context-stage [id*="discussion"]').forEach((el) => {
+                    el.style.display = 'none';
+                });
             }
             const stage = document.getElementById('episode-context-stage')
                 || document.getElementById('work-context-stage')
@@ -3471,6 +3474,9 @@
                     workId: workId,
                     episodeId: resolvedEpId,
                     episodeNumber: cleanEpNum,
+                });
+                document.querySelectorAll('#episode-context-stage [id*="discussion"]').forEach((el) => {
+                    el.style.display = 'none';
                 });
             }
             const stage = document.getElementById('episode-context-stage')
@@ -4770,7 +4776,12 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                     return;
                 }
 
-                if (!isLeader) {
+                if (isLeader) {
+                    const meta = document.getElementById('wp-drawer-meta');
+                    if (meta) {
+                        meta.textContent = `${roomState.membersCount || 1} na sala • Modo Dono de Party`;
+                    }
+                } else {
                     const modal = ensureTheaterModal();
                     modal.style.display = 'flex';
                     const waitEl = modal.querySelector('#wp-theater-waiting');
@@ -4913,8 +4924,8 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                             activeRoom = { ...data.room, isLeader: wasLeader || Boolean(data.room.isLeader) };
                             renderRoomPhaseUI(activeRoom);
                             const nextEp = activeRoom.episodeId || activeRoom.episode_id;
-                            if (!activeRoom.isLeader && nextEp && nextEp !== prevEp && typeof window.openEntityContext === 'function') {
-                                window.openEntityContext('episode', nextEp);
+                            if (!activeRoom.isLeader && nextEp && nextEp !== prevEp) {
+                                mountTheaterPlayer(activeRoom);
                             }
                             if (!activeRoom.isLeader) {
                                 applyRemotePlayback(activeRoom);
