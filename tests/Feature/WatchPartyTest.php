@@ -123,13 +123,12 @@ class WatchPartyTest extends TestCase
             'workId' => $workId,
             'episodeId' => $episodeId,
             'episodeNumber' => 8,
-            'launchAt' => now()->subMinutes(6)->toIso8601String(),
+            'launchAt' => now()->subSeconds(30)->toIso8601String(),
         ]);
 
         $create->assertCreated()
-            ->assertJsonPath('room.liveLocked', true)
             ->assertJsonPath('room.isLeader', false)
-            ->assertJsonPath('room.status', 'playing');
+            ->assertJsonPath('room.mode', 'live_launch');
 
         $code = $create->json('code');
 

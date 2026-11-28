@@ -4531,7 +4531,20 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
 
             const seenMessageIds = new Set();
             let lastMessageId = 0;
-            let roomDeltaTimer = null;
+
+            const wpRequest = async (url, method = 'GET', body = null) => {
+                const headers = { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf };
+                if (body !== null) headers['Content-Type'] = 'application/json';
+                const res = await fetch(url, {
+                    method,
+                    headers,
+                    credentials: 'same-origin',
+                    body: body !== null ? JSON.stringify(body) : undefined,
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+                return data;
+            };
 
             const appendMessage = (msg) => {
                 if (!msg) return;
@@ -4785,7 +4798,7 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                                 // Mantém blur ativo e consulta o servidor para confirmar se entrou em overtime ou playing
                                 cdEl.textContent = '...';
                                 if (activeCode) {
-                                    wpFetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}`)
+                                    wpRequest(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}`)
                                         .then((res) => {
                                             if (res?.room) {
                                                 activeRoom = res.room;
@@ -4902,19 +4915,6 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                     } catch (_) {}
                 });
                 roomEventSource = es;
-                if (roomDeltaTimer) { clearInterval(roomDeltaTimer); roomDeltaTimer = null; }
-                roomDeltaTimer = setInterval(() => {
-                    if (!activeCode) return;
-                    wpFetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}?afterMessageId=${lastMessageId}`)
-                        .then((res) => {
-                            if (res?.room) {
-                                activeRoom = res.room;
-                                renderRoomPhaseUI(res.room);
-                                (res.room.messages || []).forEach(appendMessage);
-                            }
-                        })
-                        .catch(() => {});
-                }, 2500);
             };
 
             let lastBufferReportAt = 0;
@@ -4927,10 +4927,10 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                     return;
                 }
                 if (msg.type !== 'anirium:wp:buffer' || !activeCode) return;
-                if (Date.now() - lastBufferReportAt < 4000) return;
+                if (Date.now() - lastBufferReportAt < 3000) return;
                 lastBufferReportAt = Date.now();
                 const bufferedSeconds = Math.max(0, Math.floor(Number(msg.bufferedSeconds || 0)));
-                wpFetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}/ready`, 'POST', { bufferedSeconds })
+                wpRequest(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}/ready`, 'POST', { bufferedSeconds })
                     .then((res) => {
                         if (res?.room) {
                             activeRoom = res.room;
