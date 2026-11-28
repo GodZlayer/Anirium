@@ -116,7 +116,7 @@ func resetPlaybackLocked() uint64 {
 	selectedAudioCandidates = nil
 	selectedAudioPolicy = AudioPolicy{}
 	audioSelectionFrozen = false
-	externalSubtitles = nil
+	// Preserva externalSubtitles para que múltiplas sessões no mesmo episódio compartilhem legendas descobertas.
 	mediaSourceMu.Lock()
 	mediaSources = map[string]mediaSource{}
 	mediaSourceMu.Unlock()

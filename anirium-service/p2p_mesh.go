@@ -17,14 +17,16 @@ const (
 )
 
 type meshMessage struct {
-	Type         string     `json:"t"` // "hello", "skip_times", "sub_offer", "sub_req", "sub_data", "party_sync", "party_chat"
-	Version      int        `json:"v"`
-	MALID        int        `json:"mal,omitempty"`
-	Episode      int        `json:"ep,omitempty"`
-	SkipTimes    *SkipTimes `json:"skip,omitempty"`
-	SubLang      string     `json:"lang,omitempty"`
-	SubVTT       string     `json:"vtt,omitempty"`
-	RoomID       string     `json:"room,omitempty"`
+	Type         string             `json:"t"` // "hello", "skip_times", "sub_offer", "sub_req", "sub_data", "sub_share", "peer_pex", "party_sync", "party_chat"
+	Version      int                `json:"v"`
+	MALID        int                `json:"mal,omitempty"`
+	Episode      int                `json:"ep,omitempty"`
+	SkipTimes    *SkipTimes         `json:"skip,omitempty"`
+	SubLang      string             `json:"lang,omitempty"`
+	SubVTT       string             `json:"vtt,omitempty"`
+	SubLinks     []ProviderSubtitle `json:"subLinks,omitempty"`
+	Peers        []string           `json:"peers,omitempty"`
+	RoomID       string             `json:"room,omitempty"`
 	Author       string     `json:"author,omitempty"`
 	MsgID        string     `json:"mid,omitempty"`
 	Text         string     `json:"text,omitempty"`
@@ -112,6 +114,57 @@ func (h *aniriumMeshHub) PublishSkipTimes(malID, ep int, st *SkipTimes) {
 		MALID:     malID,
 		Episode:   ep,
 		SkipTimes: st,
+	}
+	for _, pc := range peers {
+		go h.sendToPeer(pc, msg)
+	}
+}
+
+func (h *aniriumMeshHub) PublishSubtitleLinks(malID, ep int, subs []ProviderSubtitle) {
+	if len(subs) == 0 {
+		return
+	}
+	safe := make([]ProviderSubtitle, 0, len(subs))
+	for _, s := range subs {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(s.URL)), "https://") {
+			safe = append(safe, s)
+			if len(safe) >= 24 {
+				break
+			}
+		}
+	}
+	if len(safe) == 0 {
+		return
+	}
+	h.mu.RLock()
+	peers := h.snapshotPeersLocked()
+	h.mu.RUnlock()
+	msg := meshMessage{
+		Type:     "sub_share",
+		Version:  aniriumMeshProtocolVer,
+		MALID:    malID,
+		Episode:  ep,
+		SubLinks: safe,
+	}
+	for _, pc := range peers {
+		go h.sendToPeer(pc, msg)
+	}
+}
+
+func (h *aniriumMeshHub) PublishPeerPEX(addrs []string) {
+	if len(addrs) == 0 {
+		return
+	}
+	if len(addrs) > 40 {
+		addrs = addrs[:40]
+	}
+	h.mu.RLock()
+	peers := h.snapshotPeersLocked()
+	h.mu.RUnlock()
+	msg := meshMessage{
+		Type:    "peer_pex",
+		Version: aniriumMeshProtocolVer,
+		Peers:   addrs,
 	}
 	for _, pc := range peers {
 		go h.sendToPeer(pc, msg)

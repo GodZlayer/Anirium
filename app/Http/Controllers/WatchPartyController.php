@@ -840,9 +840,14 @@ class WatchPartyController extends Controller
         }
 
         $cacheKey = 'wp:peers:'.strtoupper($room->code);
+        $subsCacheKey = 'wp:subs:'.strtoupper($room->code);
         $existing = Cache::get($cacheKey, []);
         if (! is_array($existing)) {
             $existing = [];
+        }
+        $existingSubs = Cache::get($subsCacheKey, []);
+        if (! is_array($existingSubs)) {
+            $existingSubs = [];
         }
 
         if ($request->isMethod('post')) {
@@ -863,10 +868,33 @@ class WatchPartyController extends Controller
                 }
                 Cache::put($cacheKey, $existing, now()->addMinutes(10));
             }
+
+            $incomingSubs = $request->input('subtitles', []);
+            if (is_array($incomingSubs)) {
+                foreach ($incomingSubs as $sub) {
+                    if (! is_array($sub)) {
+                        continue;
+                    }
+                    $url = trim((string) ($sub['url'] ?? ''));
+                    if ($url === '' || ! str_starts_with(strtolower($url), 'https://')) {
+                        continue;
+                    }
+                    $existingSubs[$url] = [
+                        'url' => $url,
+                        'lang' => substr(trim((string) ($sub['lang'] ?? 'und')), 0, 16),
+                        'label' => substr(trim((string) ($sub['label'] ?? 'Legenda')), 0, 80),
+                    ];
+                }
+                if (count($existingSubs) > 30) {
+                    $existingSubs = array_slice($existingSubs, -30, 30, true);
+                }
+                Cache::put($subsCacheKey, $existingSubs, now()->addMinutes(10));
+            }
         }
 
         return response()->json([
             'peers' => array_keys($existing),
+            'subtitles' => array_values($existingSubs),
         ]);
     }
 

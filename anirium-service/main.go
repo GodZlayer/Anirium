@@ -36,7 +36,7 @@ var iconData []byte
 var shutdownTorrentClient func()
 
 // Injected by the release builder; installer and service share one version.
-var serviceVersion = "2.3.3"
+var serviceVersion = "2.4.0"
 
 //go:embed assets/Anirium-FullVersionLogo.png
 var logoData []byte
@@ -332,8 +332,10 @@ var (
 )
 
 const (
-	uploadBytesPerPlayerPerSec = 100 * 1024
-	uploadBurstPerPlayerBytes  = 32 * 1024
+	uploadBytesPerPlayerPerSec     = 100 * 1024
+	uploadBurstPerPlayerBytes      = 32 * 1024
+	uploadBytesPerRoomMemberPerSec = 250 * 1024
+	uploadRoomMaxBytesPerSec       = 1536 * 1024 // 1.5 MB/s teto justo cooperativo em sala
 )
 
 func updateUploadRateLimit(activePlayers int) {
@@ -342,6 +344,19 @@ func updateUploadRateLimit(activePlayers int) {
 	}
 	torrentUploadRateLimiter.SetLimit(rate.Limit(activePlayers * uploadBytesPerPlayerPerSec))
 	torrentUploadRateLimiter.SetBurst(activePlayers * uploadBurstPerPlayerBytes)
+}
+
+func updateWatchPartyUploadLimit(roomMembers int) {
+	if roomMembers <= 1 {
+		updateUploadRateLimit(1)
+		return
+	}
+	limitBytes := roomMembers * uploadBytesPerRoomMemberPerSec
+	if limitBytes > uploadRoomMaxBytesPerSec {
+		limitBytes = uploadRoomMaxBytesPerSec
+	}
+	torrentUploadRateLimiter.SetLimit(rate.Limit(limitBytes))
+	torrentUploadRateLimiter.SetBurst(limitBytes / 3)
 }
 
 // ---------- Episode cache structures ----------
