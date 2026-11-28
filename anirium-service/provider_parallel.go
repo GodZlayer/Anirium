@@ -75,14 +75,11 @@ func searchProviderServers(query PlaybackPrepareRequest, parents ...context.Cont
 	}
 	strict := make([]ProviderSearchResult, 0, len(all))
 	for _, r := range all {
-		if strings.TrimSpace(r.Title) == "" || rssItemMatchesRequest(r.Title, query) {
+		if strings.TrimSpace(r.Title) != "" && rssItemMatchesRequest(r.Title, query) {
 			strict = append(strict, r)
 		}
 	}
-	if len(strict) > 0 {
-		return strict
-	}
-	return all
+	return strict
 }
 
 func searchSubtitleProviders(query PlaybackPrepareRequest, parents ...context.Context) []ProviderSubtitle {

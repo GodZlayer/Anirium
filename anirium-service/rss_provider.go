@@ -19,7 +19,7 @@ var (
 	rssSeasonEpRe = regexp.MustCompile(`(?i)\bS(\d{1,2})\s*E(\d{1,4})\b`)
 	rssEpDashRe   = regexp.MustCompile(`(?i)(?:^|[\s._-])(?:ep\.?\s*|e|-\s*)(\d{1,4})(?:v\d)?(?:\b|[\s._-]|$)`)
 	rssNoiseRe    = regexp.MustCompile(`(?i)\b(1080p|720p|480p|2160p|4k|hevc|x264|x265|h264|h265|10bit|8bit|webrip|web-dl|webdl|bluray|bdrip|dvdrip|mkv|mp4|aac|flac|opus|multisub|multi-sub|multi|dual|audio|dub|sub|vostfr|pt-br|ptbr|eng|jpn|raws|batch)\b`)
-	rssTokenRe    = regexp.MustCompile(`[a-z0-9]+`)
+	rssTokenRe    = regexp.MustCompile(`[\p{L}\p{N}]+`)
 )
 
 func rssTokenize(s string) []string {
@@ -60,13 +60,23 @@ func rssExtractTitleAndEpisode(rawTitle string) (string, int, int) {
 }
 
 func rssItemMatchesRequest(rawTitle string, query PlaybackPrepareRequest) bool {
-	candidates := []string{query.TitleRomaji, query.Title, query.TitleEnglish}
+	candidates := make([]string, 0, 4+len(query.Aliases))
+	candidates = append(candidates, query.TitleRomaji, query.Title, query.TitleEnglish, query.TitleNative)
+	candidates = append(candidates, query.Aliases...)
+
 	expectedSets := make([][]string, 0, len(candidates))
+	seenSig := make(map[string]struct{}, len(candidates))
 	for _, c := range candidates {
 		toks := rssTokenize(c)
-		if len(toks) > 0 {
-			expectedSets = append(expectedSets, toks)
+		if len(toks) == 0 {
+			continue
 		}
+		sig := strings.Join(toks, " ")
+		if _, dup := seenSig[sig]; dup {
+			continue
+		}
+		seenSig[sig] = struct{}{}
+		expectedSets = append(expectedSets, toks)
 	}
 	if len(expectedSets) == 0 {
 		return true
@@ -92,25 +102,43 @@ func rssItemMatchesRequest(rawTitle string, query PlaybackPrepareRequest) bool {
 		}
 	}
 
-	// 2. Validação estrita do título: exige correspondência exata de tokens (rejeita subtítulos extras como TYBW, Musume, etc.)
+	// 2. Validação estrita do título: exige correspondência 100% com uma das variações oficiais
+	// (ou combinação exata de duas variações oficiais da mesma obra, ex: Romaji + English).
 	gotTokens := rssTokenize(titlePart)
 	if len(gotTokens) == 0 {
 		return false
 	}
 
-	for _, exp := range expectedSets {
-		if len(gotTokens) != len(exp) {
-			continue
+	tokensEqual := func(a, b []string) bool {
+		if len(a) != len(b) {
+			return false
 		}
-		match := true
-		for i := range exp {
-			if gotTokens[i] != exp[i] {
-				match = false
-				break
+		for i := range a {
+			if a[i] != b[i] {
+				return false
 			}
 		}
-		if match {
+		return true
+	}
+
+	for _, exp := range expectedSets {
+		if tokensEqual(gotTokens, exp) {
 			return true
+		}
+	}
+	for i := range expectedSets {
+		for j := range expectedSets {
+			if i == j {
+				continue
+			}
+			if len(gotTokens) == len(expectedSets[i])+len(expectedSets[j]) {
+				combined := make([]string, 0, len(gotTokens))
+				combined = append(combined, expectedSets[i]...)
+				combined = append(combined, expectedSets[j]...)
+				if tokensEqual(gotTokens, combined) {
+					return true
+				}
+			}
 		}
 	}
 	return false
