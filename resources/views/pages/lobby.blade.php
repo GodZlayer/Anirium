@@ -4909,13 +4909,16 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                         const data = JSON.parse(e.data);
                         if (data.room) {
                             const prevEp = activeRoom?.episodeId || activeRoom?.episode_id;
-                            activeRoom = data.room;
-                            renderRoomPhaseUI(data.room);
-                            const nextEp = data.room.episodeId || data.room.episode_id;
-                            if (nextEp && nextEp !== prevEp && typeof window.openEntityContext === 'function') {
+                            const wasLeader = Boolean(activeRoom?.isLeader);
+                            activeRoom = { ...data.room, isLeader: wasLeader || Boolean(data.room.isLeader) };
+                            renderRoomPhaseUI(activeRoom);
+                            const nextEp = activeRoom.episodeId || activeRoom.episode_id;
+                            if (!activeRoom.isLeader && nextEp && nextEp !== prevEp && typeof window.openEntityContext === 'function') {
                                 window.openEntityContext('episode', nextEp);
                             }
-                            applyRemotePlayback(data.room);
+                            if (!activeRoom.isLeader) {
+                                applyRemotePlayback(activeRoom);
+                            }
                         }
                     } catch (_) {}
                 });
