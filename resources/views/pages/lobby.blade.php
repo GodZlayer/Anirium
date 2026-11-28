@@ -4529,7 +4529,18 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 return drawer;
             };
 
+            const seenMessageIds = new Set();
+            let lastMessageId = 0;
+            let roomDeltaTimer = null;
+
             const appendMessage = (msg) => {
+                if (!msg) return;
+                const msgId = Number(msg.id || 0);
+                if (msgId > 0) {
+                    if (seenMessageIds.has(msgId)) return;
+                    seenMessageIds.add(msgId);
+                    if (msgId > lastMessageId) lastMessageId = msgId;
+                }
                 const lists = [document.getElementById('wp-messages-list'), document.getElementById('wp-theater-messages')].filter(Boolean);
                 const who = msg.userHandle ? `@${msg.userHandle}` : (msg.user?.handle ? `@${msg.user.handle}` : (msg.userName || msg.user?.name || 'Membro'));
                 for (const list of lists) {
@@ -4891,6 +4902,19 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                     } catch (_) {}
                 });
                 roomEventSource = es;
+                if (roomDeltaTimer) { clearInterval(roomDeltaTimer); roomDeltaTimer = null; }
+                roomDeltaTimer = setInterval(() => {
+                    if (!activeCode) return;
+                    wpFetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}?afterMessageId=${lastMessageId}`)
+                        .then((res) => {
+                            if (res?.room) {
+                                activeRoom = res.room;
+                                renderRoomPhaseUI(res.room);
+                                (res.room.messages || []).forEach(appendMessage);
+                            }
+                        })
+                        .catch(() => {});
+                }, 2500);
             };
 
             let lastBufferReportAt = 0;

@@ -5268,9 +5268,18 @@
                     const clockOffset = Number((window.parent && window.parent !== window && window.parent.__aniriumServerClockOffsetMs) || 0);
                     if (syncUntil > 0) {
                         const startAt = Math.max(0, ((Date.now() + clockOffset) - syncUntil) / 1000);
-                        if (startAt > 0.4 && startAt < 15) {
+                        if (startAt > 0.15 && startAt < 30) {
                             dom.video.currentTime = startAt;
                         }
+                        setTimeout(() => {
+                            try {
+                                if (!dom.video || dom.video.paused) return;
+                                const targetNow = Math.max(0, ((Date.now() + clockOffset) - syncUntil) / 1000);
+                                if (Math.abs((dom.video.currentTime || 0) - targetNow) > 0.35 && targetNow < 45) {
+                                    dom.video.currentTime = targetNow;
+                                }
+                            } catch {}
+                        }, 2000);
                     }
                 } catch {}
             }
