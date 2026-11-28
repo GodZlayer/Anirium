@@ -406,7 +406,7 @@ class WatchPartyController extends Controller
 
         $validated = $request->validate([
             'mode' => ['nullable', 'string', 'in:party,live_launch'],
-            'workId' => ['required', 'uuid'],
+            'workId' => ['nullable', 'uuid'],
             'episodeId' => ['nullable', 'uuid'],
             'episodeNumber' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'launchAt' => ['nullable', 'date'],
@@ -415,7 +415,10 @@ class WatchPartyController extends Controller
         ]);
 
         $mode = $validated['mode'] ?? 'party';
-        $workId = strtolower($validated['workId']);
+        if ($mode === 'live_launch' && empty($validated['workId'])) {
+            return response()->json(['message' => 'The work id field is required for live_launch.'], 422);
+        }
+        $workId = isset($validated['workId']) ? strtolower($validated['workId']) : null;
         $episodeId = isset($validated['episodeId']) ? strtolower($validated['episodeId']) : null;
         $now = now();
 

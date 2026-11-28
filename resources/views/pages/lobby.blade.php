@@ -4994,6 +4994,28 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 applyRemotePlayback(activeRoom);
             }
 
+            async function startPartyMode(options = {}) {
+                const res = await fetch('/api/watch-party/rooms', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                    body: JSON.stringify({
+                        mode: 'party',
+                        password: options.password || null,
+                    }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    alert(data.message || 'Não foi possível iniciar o Modo Party (exclusivo Anirium+).');
+                    return;
+                }
+                const code = data.code || data.room?.code;
+                if (code) {
+                    await openRoom(code, options.password || '');
+                    const meta = document.getElementById('wp-drawer-meta');
+                    if (meta) meta.textContent = 'Modo Dono de Party ativo • Escolha qualquer episódio no catálogo';
+                }
+            }
+
             async function createRoom(episodeId, options = {}) {
                 if (!episodeId) return;
                 const stage = document.getElementById('episode-context-stage') || document.getElementById('work-context-stage');
@@ -5058,7 +5080,7 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 }
             });
 
-            return { openRoom, createRoom, sendControl, sendMessage, leaveRoom, getActiveCode: () => activeCode };
+            return { openRoom, createRoom, startPartyMode, sendControl, sendMessage, leaveRoom, getActiveCode: () => activeCode };
         })();
 
         // Inicializa estado ao carregar

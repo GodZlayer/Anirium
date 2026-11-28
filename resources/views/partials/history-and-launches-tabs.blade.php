@@ -38,18 +38,27 @@
             </div>
         </div>
 
-        <form id="launches-handle-form" class="flex items-center gap-2">
-            <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-theme-default bg-theme-pill text-xs focus-within:border-theme-highlight transition-all flex-1 sm:w-64">
-                <span class="text-theme-accent font-bold">@</span>
-                <input id="launches-handle-input"
-                       type="text"
-                       placeholder="Entrar na sala de um amigo..."
-                       class="bg-transparent border-none outline-none w-full text-xs text-white placeholder-slate-500 font-medium">
-            </div>
-            <button type="submit" class="px-4 py-2 rounded-full bg-theme-accent text-theme-inverse text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer shrink-0">
-                Entrar
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button"
+                    id="launches-start-party-btn"
+                    onclick="window.AniriumWatchParty?.startPartyMode()"
+                    class="px-4 py-2 rounded-full bg-violet-600 hover:bg-violet-500 text-white text-xs font-extrabold tracking-wide shadow-md transition cursor-pointer shrink-0 flex items-center gap-1.5">
+                <span>🎬</span>
+                <span>INICIAR MODO PARTY</span>
             </button>
-        </form>
+            <form id="launches-handle-form" class="flex items-center gap-2">
+                <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-theme-default bg-theme-pill text-xs focus-within:border-theme-highlight transition-all flex-1 sm:w-64">
+                    <span class="text-theme-accent font-bold">@</span>
+                    <input id="launches-handle-input"
+                           type="text"
+                           placeholder="Entrar na sala de um amigo..."
+                           class="bg-transparent border-none outline-none w-full text-xs text-white placeholder-slate-500 font-medium">
+                </div>
+                <button type="submit" class="px-4 py-2 rounded-full bg-theme-accent text-theme-inverse text-xs font-bold shadow-md hover:opacity-90 transition cursor-pointer shrink-0">
+                    Entrar
+                </button>
+            </form>
+        </div>
     </div>
 
     <div id="launches-handle-result" class="hidden p-4 rounded-3xl border border-theme-highlight/40 bg-theme-card backdrop-blur-xl shadow-lg text-xs space-y-2 flex-none"></div>
