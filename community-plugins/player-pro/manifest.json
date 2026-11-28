@@ -2,8 +2,10 @@
   "id": "player-pro",
   "name": "Anirium Player Pro",
   "version": "1.0.0",
-  "description": "Cliente de reprodução do Anirium Service: exibe as qualidades, áudios e legendas entregues pelo serviço. Também reproduz arquivos locais e links HTTP diretos.",
+  "description": "Cliente de reprodução externo do Anirium Service: exibe as qualidades, áudios e legendas entregues pelo serviço. Também reproduz arquivos locais e links HTTP diretos.",
   "author": "Anirium Community & TGCode",
+  "category": "engine.renderer",
+  "mediaType": "video",
   "type": "official-plus",
   "origin": "official",
   "capabilities": [
@@ -25,6 +27,7 @@
     "ui.player.render",
     "playback.client"
   ],
-  "entrypoint": "src/addons/player-pro/PlayerProComponent.tsx",
+  "entrypoint": "src/entry.ts",
+  "entryScriptUrl": "https://godzlayer.github.io/anirium-player-pro/dist/player-pro.js",
   "enabled": true
 }

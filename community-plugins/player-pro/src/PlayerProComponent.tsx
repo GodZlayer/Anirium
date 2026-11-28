@@ -120,7 +120,7 @@ export default function PlayerProComponent({
 	const windowTargetRef = useRef<{ position: number; playing: boolean } | null>(null);
 	const episodeResumeKey = buildEpisodeResumeKey({ episodeId: catalogIdentity?.episodeId, workId: catalogIdentity?.workId, animeId: anime?.id, episodeNum: initialEpisode });
 	const initialResumeSnapshot = useMemo(() => loadEpisodeResume(episodeResumeKey), [episodeResumeKey]);
-	const initialResumeSeconds = Math.max(0, Number.isFinite(initialPosition) ? Number(initialPosition) : (initialResumeSnapshot?.position ?? 0));
+	const initialResumeSeconds = (window as any).__aniriumWatchPartyLocked ? 0 : /* wpRoomResumeGuard */ Math.max(0, Number.isFinite(initialPosition) ? Number(initialPosition) : (initialResumeSnapshot?.position ?? 0));
 	const authorizationResumeRef = useRef<{ position: number; playing: boolean } | null>(initialResumeSeconds > 0 ? { position: initialResumeSeconds, playing: true } : null);
 	const lastResumeSavedAtRef = useRef<number>(0);
 	const latestResumeStateRef = useRef({ position: initialResumeSeconds, duration: 0, quality: "", audio: "", subtitle: "" });
