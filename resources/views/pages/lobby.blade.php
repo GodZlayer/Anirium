@@ -4623,7 +4623,55 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                         return;
                     }
                     const html = await res.text();
-                    slot.innerHTML = `<style>#wp-theater-player-slot header,#wp-theater-player-slot #ep-info-popover,#wp-theater-player-slot [id*="discussion"],#wp-theater-player-slot [id*="episodes-list"]{display:none!important;}</style><div class="w-full h-full overflow-y-auto">${html}</div>`;
+                    slot.innerHTML = `<style>
+                        #wp-theater-player-slot { position:relative!important; width:100%!important; height:100%!important; overflow:hidden!important; background:#000!important; }
+                        #wp-theater-player-slot > div { position:relative!important; width:100%!important; height:100%!important; padding:0!important; margin:0!important; max-width:none!important; }
+                        #wp-theater-player-slot header,
+                        #wp-theater-player-slot aside,
+                        #wp-theater-player-slot #ep-info-popover,
+                        #wp-theater-player-slot [id*="discussion"] { display:none!important; }
+                        #wp-theater-player-slot #episode-inline-player-stage {
+                            position:fixed!important;
+                            top:48px!important;
+                            left:0!important;
+                            right:320px!important;
+                            bottom:0!important;
+                            width:auto!important;
+                            height:auto!important;
+                            border-radius:0!important;
+                            z-index:10!important;
+                            background:#000!important;
+                        }
+                        @media (max-width: 1023px) {
+                            #wp-theater-player-slot #episode-inline-player-stage { right:0!important; bottom:256px!important; }
+                        }
+                        #wp-theater-player-slot.wp-locked input[type="range"],
+                        #wp-theater-player-slot.wp-locked [data-play-toggle],
+                        #wp-theater-player-slot.wp-locked button[title*="Play"],
+                        #wp-theater-player-slot.wp-locked button[title*="Pausar"],
+                        #wp-theater-player-slot.wp-locked button[title*="Reproduzir"],
+                        #wp-theater-player-slot.wp-locked button[title*="Avançar"],
+                        #wp-theater-player-slot.wp-locked button[title*="Voltar"] { pointer-events:none!important; opacity:0.3!important; }
+                    </style><div class="w-full h-full overflow-hidden">${html}</div>`;
+                    if (activeRoom && (!activeRoom.isLeader || activeRoom.mode === 'live_launch' || activeRoom.phase === 'stabilizing')) {
+                        slot.classList.add('wp-locked');
+                    } else {
+                        slot.classList.remove('wp-locked');
+                    }
+                    // Trava real no elemento <video>: impede autoplay durante sync mode (stabilizing)
+                    const enforceSyncGuard = () => {
+                        const vid = slot.querySelector('video');
+                        if (!vid || vid.dataset.wpGuarded === '1') return;
+                        vid.dataset.wpGuarded = '1';
+                        vid.addEventListener('play', () => {
+                            if (activeRoom && activeRoom.phase === 'stabilizing') {
+                                vid.pause();
+                            }
+                        });
+                    };
+                    setTimeout(enforceSyncGuard, 400);
+                    setTimeout(enforceSyncGuard, 1500);
+                    setTimeout(enforceSyncGuard, 3500);
                     slot.querySelectorAll('script').forEach((oldScript) => {
                         const s = document.createElement('script');
                         if (oldScript.src) s.src = oldScript.src;

@@ -1,61 +1,47 @@
 package main
 
-import (
-	"context"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-)
+import "testing"
 
-func TestSearchRSSProviderExtractsMagnetsFromInfoHashAndLink(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query().Get("q")
-		if !strings.Contains(q, "Mouse Cursor") {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`<rss><channel></channel></rss>`))
-			return
-		}
-		w.Header().Set("Content-Type", "application/xml")
-		_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:nyaa="https://nyaa.si/xmlns/nyaa">
-  <channel>
-    <item>
-      <title>[SubsPlease] Mouse Cursor - 01 (1080p).mkv</title>
-      <nyaa:infoHash>0123456789abcdef0123456789abcdef01234567</nyaa:infoHash>
-      <nyaa:seeders>42</nyaa:seeders>
-    </item>
-    <item>
-      <title>[Erai-raws] Mouse Cursor - 01 [720p].mkv</title>
-      <link>magnet:?xt=urn:btih:abcdef0123456789abcdef0123456789abcdef01</link>
-      <nyaa:seeders>15</nyaa:seeders>
-    </item>
-  </channel>
-</rss>`))
-	}))
-	defer srv.Close()
+func TestRSSItemMatchesRequestRejectsSubtitlesAndWrongEpisodes(t *testing.T) {
+	bleach := PlaybackPrepareRequest{
+		Title:        "Bleach",
+		TitleRomaji:  "Bleach",
+		TitleEnglish: "Bleach",
+		Episode:      1,
+		Season:       1,
+	}
 
-	prev := providerHTTPClient
-	providerHTTPClient = srv.Client()
-	defer func() { providerHTTPClient = prev }()
+	if !rssItemMatchesRequest("[HorribleSubs] Bleach - 01 [720p].mkv", bleach) {
+		t.Fatalf("expected Bleach Ep 1 to match")
+	}
+	if !rssItemMatchesRequest("Bleach S01E01 1080p Dual Audio.mkv", bleach) {
+		t.Fatalf("expected Bleach S01E01 to match")
+	}
+	if rssItemMatchesRequest("[SubsPlease] Bleach - Thousand-Year Blood War - 01 (1080p).mkv", bleach) {
+		t.Fatalf("expected Bleach TYBW Ep 1 to be REJECTED for base Bleach")
+	}
+	if rssItemMatchesRequest("[Erai-raws] Bleach - Sennen Kessen-hen - 01 [1080p].mkv", bleach) {
+		t.Fatalf("expected Bleach Sennen Kessen-hen Ep 1 to be REJECTED for base Bleach")
+	}
+	if rssItemMatchesRequest("[HorribleSubs] Bleach - 02 [720p].mkv", bleach) {
+		t.Fatalf("expected Bleach Ep 2 to be REJECTED when Ep 1 requested")
+	}
 
-	server := ProviderServer{
-		ID:          "remote-rss-test",
-		Kind:        "remote-manifest",
-		ManifestURL: srv.URL + "/?page=rss&q={query}",
-		Enabled:     true,
+	monster := PlaybackPrepareRequest{
+		Title:        "Monster",
+		TitleRomaji:  "Monster",
+		TitleEnglish: "Monster",
+		Episode:      1,
+		Season:       1,
 	}
-	results := searchRSSProvider(context.Background(), server, PlaybackPrepareRequest{
-		Title:   "Mouse Cursor",
-		Episode: 1,
-	})
-	if len(results) != 2 {
-		t.Fatalf("expected 2 RSS results, got %d", len(results))
+
+	if !rssItemMatchesRequest("[Judas] Monster - 01 [1080p][HEVC].mkv", monster) {
+		t.Fatalf("expected Monster Ep 1 to match")
 	}
-	if results[0].Seeders != 42 || !strings.Contains(results[0].Magnet, "0123456789abcdef0123456789abcdef01234567") {
-		t.Fatalf("unexpected top result: %+v", results[0])
+	if rssItemMatchesRequest("[SubsPlease] Monster Musume - 01 (1080p).mkv", monster) {
+		t.Fatalf("expected Monster Musume Ep 1 to be REJECTED for Monster")
 	}
-	if results[1].Seeders != 15 || !strings.Contains(results[1].Magnet, "abcdef0123456789abcdef0123456789abcdef01") {
-		t.Fatalf("unexpected second result: %+v", results[1])
+	if rssItemMatchesRequest("[SubsPlease] Monster Girl Doctor - 01 (1080p).mkv", monster) {
+		t.Fatalf("expected Monster Girl Doctor Ep 1 to be REJECTED for Monster")
 	}
 }

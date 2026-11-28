@@ -7,11 +7,114 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
+	"sync"
 )
+
+var (
+	rssBracketRe = regexp.MustCompile(`\[[^\]]*\]|\([^\)]*\)`)
+	rssSeasonEpRe = regexp.MustCompile(`(?i)\bS(\d{1,2})\s*E(\d{1,4})\b`)
+	rssEpDashRe   = regexp.MustCompile(`(?i)(?:^|[\s._-])(?:ep\.?\s*|e|-\s*)(\d{1,4})(?:v\d)?(?:\b|[\s._-]|$)`)
+	rssNoiseRe    = regexp.MustCompile(`(?i)\b(1080p|720p|480p|2160p|4k|hevc|x264|x265|h264|h265|10bit|8bit|webrip|web-dl|webdl|bluray|bdrip|dvdrip|mkv|mp4|aac|flac|opus|multisub|multi-sub|multi|dual|audio|dub|sub|vostfr|pt-br|ptbr|eng|jpn|raws|batch)\b`)
+	rssTokenRe    = regexp.MustCompile(`[a-z0-9]+`)
+)
+
+func rssTokenize(s string) []string {
+	s = strings.ToLower(strings.NewReplacer("'", "", "’", "", "`", "", "-", " ", "_", " ", ".", " ", ":", " ", "!", " ", "?", " ").Replace(s))
+	raw := rssTokenRe.FindAllString(s, -1)
+	out := make([]string, 0, len(raw))
+	for _, t := range raw {
+		if t == "" || rssNoiseRe.MatchString(t) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+func rssExtractTitleAndEpisode(rawTitle string) (string, int, int) {
+	cleaned := rssBracketRe.ReplaceAllString(rawTitle, " ")
+	cleaned = strings.TrimSpace(cleaned)
+	season := 0
+	ep := 0
+	titlePart := cleaned
+
+	if loc := rssSeasonEpRe.FindStringSubmatchIndex(cleaned); loc != nil {
+		season, _ = strconv.Atoi(cleaned[loc[2]:loc[3]])
+		ep, _ = strconv.Atoi(cleaned[loc[4]:loc[5]])
+		titlePart = strings.TrimSpace(cleaned[:loc[0]])
+	} else {
+		// Procura último padrão "- 01" ou "Ep 01" ou número isolado no final
+		all := rssEpDashRe.FindAllStringSubmatchIndex(cleaned, -1)
+		if len(all) > 0 {
+			last := all[len(all)-1]
+			ep, _ = strconv.Atoi(cleaned[last[2]:last[3]])
+			titlePart = strings.TrimSpace(cleaned[:last[0]])
+		}
+	}
+	titlePart = rssNoiseRe.ReplaceAllString(titlePart, " ")
+	return strings.TrimSpace(titlePart), season, ep
+}
+
+func rssItemMatchesRequest(rawTitle string, query PlaybackPrepareRequest) bool {
+	candidates := []string{query.TitleRomaji, query.Title, query.TitleEnglish}
+	expectedSets := make([][]string, 0, len(candidates))
+	for _, c := range candidates {
+		toks := rssTokenize(c)
+		if len(toks) > 0 {
+			expectedSets = append(expectedSets, toks)
+		}
+	}
+	if len(expectedSets) == 0 {
+		return true
+	}
+
+	titlePart, season, ep := rssExtractTitleAndEpisode(rawTitle)
+
+	// 1. Validação exata de episódio e temporada
+	isMovie := query.Format == "MOVIE" && query.EpisodeCount == 1 && query.Episode <= 1
+	if !isMovie && query.Episode > 0 {
+		if ep <= 0 {
+			return false
+		}
+		if ep != query.Episode && (query.AbsoluteEpisode <= 0 || ep != query.AbsoluteEpisode) {
+			return false
+		}
+		reqSeason := query.Season
+		if reqSeason < 1 {
+			reqSeason = 1
+		}
+		if season > 0 && season != reqSeason {
+			return false
+		}
+	}
+
+	// 2. Validação estrita do título: exige correspondência exata de tokens (rejeita subtítulos extras como TYBW, Musume, etc.)
+	gotTokens := rssTokenize(titlePart)
+	if len(gotTokens) == 0 {
+		return false
+	}
+
+	for _, exp := range expectedSets {
+		if len(gotTokens) != len(exp) {
+			continue
+		}
+		match := true
+		for i := range exp {
+			if gotTokens[i] != exp[i] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
 
 func isRSSProviderURL(raw string) bool {
 	u := strings.ToLower(strings.TrimSpace(raw))
@@ -78,26 +181,41 @@ func buildRSSSearchQueries(query PlaybackPrepareRequest) []string {
 		seen[norm] = true
 		titles = append(titles, clean)
 	}
-	addTitle(query.Title)
 	addTitle(query.TitleRomaji)
+	addTitle(query.Title)
 	addTitle(query.TitleEnglish)
+	addTitle(query.TitleNative)
 	for _, alias := range query.Aliases {
 		addTitle(alias)
 	}
 	if len(titles) == 0 {
 		return nil
 	}
-	if len(titles) > 4 {
-		titles = titles[:4]
-	}
 
 	out := []string{}
+	seenQuery := map[string]bool{}
+	addQuery := func(q string) {
+		q = strings.TrimSpace(q)
+		if q == "" || seenQuery[q] {
+			return
+		}
+		seenQuery[q] = true
+		out = append(out, q)
+	}
 	isMovie := query.Format == "MOVIE" && query.EpisodeCount == 1 && query.Episode <= 1
+	season := query.Season
+	if season < 1 {
+		season = 1
+	}
 	for _, title := range titles {
 		if isMovie || query.Episode < 1 {
-			out = append(out, title)
-		} else {
-			out = append(out, fmt.Sprintf("%s %02d", title, query.Episode))
+			addQuery(title)
+			continue
+		}
+		addQuery(fmt.Sprintf("%s %02d", title, query.Episode))
+		addQuery(fmt.Sprintf("%s S%02dE%02d", title, season, query.Episode))
+		if query.AbsoluteEpisode > 0 && query.AbsoluteEpisode != query.Episode {
+			addQuery(fmt.Sprintf("%s %02d", title, query.AbsoluteEpisode))
 		}
 	}
 	return out
@@ -134,66 +252,86 @@ func searchRSSProvider(parent context.Context, server ProviderServer, query Play
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-	defer cancel()
+	ctx := parent
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	type scored struct {
 		result  ProviderSearchResult
 		seeders int
 	}
-	byHash := map[string]scored{}
+	var (
+		mu     sync.Mutex
+		byHash = map[string]scored{}
+		wg     sync.WaitGroup
+		sem    = make(chan struct{}, 4)
+	)
 
 	for _, term := range terms {
 		if ctx.Err() != nil {
 			break
 		}
-		endpoint := buildRSSEndpoint(server.ManifestURL, term)
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-		if err != nil {
-			continue
-		}
-		req.Header.Set("Accept", "application/rss+xml, application/xml, text/xml")
-		resp, err := providerHTTPClient.Do(req)
-		if err != nil {
-			continue
-		}
-		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
-		resp.Body.Close()
-		if readErr != nil || resp.StatusCode != http.StatusOK {
-			continue
-		}
-		var doc rssDocument
-		if err := xml.Unmarshal(body, &doc); err != nil {
-			continue
-		}
-		for _, item := range doc.Channel.Items {
-			magnet := rssItemMagnet(item)
-			if magnet == "" {
-				continue
+		wg.Add(1)
+		go func(term string) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
 			}
-			hash, ok := normalizedMagnetHash(magnet)
-			if !ok {
-				continue
+			defer func() { <-sem }()
+
+			endpoint := buildRSSEndpoint(server.ManifestURL, term)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+			if err != nil {
+				return
 			}
-			seeders, _ := strconv.Atoi(strings.TrimSpace(item.Seeders))
-			if existing, exists := byHash[hash]; exists && existing.seeders >= seeders {
-				continue
+			req.Header.Set("Accept", "application/rss+xml, application/xml, text/xml")
+			resp, err := providerHTTPClient.Do(req)
+			if err != nil {
+				return
 			}
-			byHash[hash] = scored{
-				result: ProviderSearchResult{
-					Provider: server.ID,
-					Title:    strings.TrimSpace(item.Title),
-					Magnet:   magnet,
-					Seeders:  seeders,
-				},
-				seeders: seeders,
+			body, readErr := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+			resp.Body.Close()
+			if readErr != nil || resp.StatusCode != http.StatusOK {
+				return
 			}
-		}
-		// Continue across title variants to maximize subtitle/audio/quality variety.
-		if len(byHash) >= 40 {
-			break
-		}
+			var doc rssDocument
+			if err := xml.Unmarshal(body, &doc); err != nil {
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			for _, item := range doc.Channel.Items {
+				if !rssItemMatchesRequest(item.Title, query) {
+					continue
+				}
+				magnet := rssItemMagnet(item)
+				if magnet == "" {
+					continue
+				}
+				hash, ok := normalizedMagnetHash(magnet)
+				if !ok {
+					continue
+				}
+				seeders, _ := strconv.Atoi(strings.TrimSpace(item.Seeders))
+				if existing, exists := byHash[hash]; exists && existing.seeders >= seeders {
+					continue
+				}
+				byHash[hash] = scored{
+					result: ProviderSearchResult{
+						Provider: server.ID,
+						Title:    strings.TrimSpace(item.Title),
+						Magnet:   magnet,
+						Seeders:  seeders,
+					},
+					seeders: seeders,
+				}
+			}
+		}(term)
 	}
+	wg.Wait()
 
 	list := make([]scored, 0, len(byHash))
 	for _, s := range byHash {
@@ -207,9 +345,6 @@ func searchRSSProvider(parent context.Context, server ProviderServer, query Play
 		}
 		return list[i].seeders > list[j].seeders
 	})
-	if len(list) > 40 {
-		list = list[:40]
-	}
 	results := make([]ProviderSearchResult, 0, len(list))
 	for _, s := range list {
 		results = append(results, s.result)
