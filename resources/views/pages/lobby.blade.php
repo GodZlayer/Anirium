@@ -4918,22 +4918,26 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
 
             const applyRemotePlayback = (roomState) => {
                 if (!roomState) return;
-                const targetPos = Number(roomState.position_seconds ?? roomState.positionSeconds ?? 0);
-                const isPlaying = Boolean(roomState.is_playing ?? roomState.isPlaying);
+                const targetPos = Number(roomState.effectivePositionSeconds ?? roomState.position_seconds ?? roomState.positionSeconds ?? 0);
+                const status = String(roomState.status || (roomState.isPlaying ? 'playing' : 'paused'));
+                const isSyncHold = roomState.phase === 'stabilizing' || roomState.phase === 'overtime';
+                const isPlaying = !isSyncHold && status === 'playing';
                 applyingRemoteSync = true;
                 try {
-                    const iframe = document.querySelector('iframe[src*="player-pro"], iframe#player-pro-iframe');
-                    if (iframe?.contentWindow) {
-                        iframe.contentWindow.postMessage({
-                            type: 'anirium:watch-party:sync',
-                            code: activeCode,
-                            isPlaying: roomState.phase === 'stabilizing' ? false : isPlaying,
-                            positionSeconds: targetPos,
-                            controlsLocked: !roomState.isLeader || roomState.mode === 'live_launch' || roomState.phase === 'stabilizing',
-                            phase: roomState.phase || 'playing',
-                            syncRemainingSeconds: Number(roomState.syncRemainingSeconds || 0),
-                        }, '*');
-                    }
+                    document.querySelectorAll('iframe[src*="player-pro"], iframe#anirium-player-pro-iframe').forEach((iframe) => {
+                        if (iframe?.contentWindow) {
+                            iframe.contentWindow.postMessage({
+                                type: 'anirium:watch-party:sync',
+                                code: activeCode,
+                                status: isSyncHold ? 'paused' : status,
+                                isPlaying: isPlaying,
+                                positionSeconds: targetPos,
+                                controlsLocked: !roomState.isLeader || roomState.mode === 'live_launch' || isSyncHold,
+                                phase: roomState.phase || 'playing',
+                                syncRemainingSeconds: Number(roomState.syncRemainingSeconds || 0),
+                            }, '*');
+                        }
+                    });
                     const vid = document.querySelector('video');
                     if (vid) {
                         if (Math.abs((vid.currentTime || 0) - targetPos) > 1.5) vid.currentTime = targetPos;
