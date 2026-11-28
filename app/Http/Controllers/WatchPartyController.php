@@ -380,6 +380,30 @@ class WatchPartyController extends Controller
             return $error;
         }
 
+        $rawEpisodeId = $request->input('episodeId', $request->input('episode_id'));
+        $rawWorkId = $request->input('workId', $request->input('work_id'));
+        $rawEpisodeNumber = $request->input('episodeNumber', $request->input('episode_number'));
+
+        if (empty($rawWorkId) && is_string($rawEpisodeId) && $rawEpisodeId !== '') {
+            if (preg_match('/^([0-9a-f\-]{36}):ep:(\d+)$/i', $rawEpisodeId, $m)) {
+                $rawWorkId = $m[1];
+                $rawEpisodeNumber = $rawEpisodeNumber ?? (int) $m[2];
+                $rawEpisodeId = null;
+            } else {
+                $epRow = DB::table('catalog_episodes')->where('id', $rawEpisodeId)->first();
+                if ($epRow) {
+                    $rawWorkId = $epRow->work_id;
+                    $rawEpisodeNumber = $rawEpisodeNumber ?? (int) ($epRow->number ?? 1);
+                }
+            }
+        }
+
+        $request->merge(array_filter([
+            'workId' => $rawWorkId,
+            'episodeId' => $rawEpisodeId,
+            'episodeNumber' => $rawEpisodeNumber,
+        ], fn ($v) => $v !== null && $v !== ''));
+
         $validated = $request->validate([
             'mode' => ['nullable', 'string', 'in:party,live_launch'],
             'workId' => ['required', 'uuid'],

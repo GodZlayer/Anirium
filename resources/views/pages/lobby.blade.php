@@ -4996,10 +4996,14 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
 
             async function createRoom(episodeId, options = {}) {
                 if (!episodeId) return;
+                const stage = document.getElementById('episode-context-stage') || document.getElementById('work-context-stage');
+                const workId = options.workId || stage?.getAttribute('data-work-id') || null;
                 const res = await fetch('/api/watch-party/rooms', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
                     body: JSON.stringify({
+                        workId: workId,
+                        episodeId: episodeId,
                         episode_id: episodeId,
                         password: options.password || null,
                     }),
