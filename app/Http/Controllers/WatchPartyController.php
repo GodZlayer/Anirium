@@ -418,7 +418,7 @@ class WatchPartyController extends Controller
         if ($mode === 'live_launch' && empty($validated['workId'])) {
             return response()->json(['message' => 'The work id field is required for live_launch.'], 422);
         }
-        $workId = isset($validated['workId']) ? strtolower($validated['workId']) : null;
+        $workId = isset($validated['workId']) ? strtolower($validated['workId']) : '';
         $episodeId = isset($validated['episodeId']) ? strtolower($validated['episodeId']) : null;
         $now = now();
 
