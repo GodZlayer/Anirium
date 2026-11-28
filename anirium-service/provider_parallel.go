@@ -83,7 +83,7 @@ func searchProviderServers(query PlaybackPrepareRequest, parents ...context.Cont
 }
 
 func searchSubtitleProviders(query PlaybackPrepareRequest, parents ...context.Context) []ProviderSubtitle {
-	results := parallelProviderSearchWithGrace(query, parents, 1500*time.Millisecond, searchSubtitleProvidersSubset)
+	results := parallelProviderSearchWithGrace(query, parents, 3500*time.Millisecond, searchSubtitleProvidersSubset)
 	unique := []ProviderSubtitle{}
 	seen := map[string]bool{}
 	for _, result := range results {

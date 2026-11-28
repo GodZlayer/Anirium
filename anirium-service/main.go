@@ -36,7 +36,7 @@ var iconData []byte
 var shutdownTorrentClient func()
 
 // Injected by the release builder; installer and service share one version.
-var serviceVersion = "2.4.0"
+var serviceVersion = "2.4.1"
 
 //go:embed assets/Anirium-FullVersionLogo.png
 var logoData []byte
