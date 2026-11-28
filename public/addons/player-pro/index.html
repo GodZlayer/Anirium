@@ -2648,7 +2648,7 @@
             dom.iconPlay.style.display = 'none';
             dom.iconPause.style.display = 'block';
             resetIdleTimer();
-            if (!state.wpLocked && window.parent && window.parent !== window) {
+            if (!state.wpLocked && state.wpPhase === 'playing' && window.parent && window.parent !== window) {
                 try { window.parent.postMessage({ type: 'anirium:wp:leader-control', action: 'play', positionSeconds: Math.floor(getEpisodeTime() || 0) }, '*'); } catch {}
             }
         });
@@ -2657,13 +2657,13 @@
             dom.iconPlay.style.display = 'block';
             dom.iconPause.style.display = 'none';
             resetIdleTimer();
-            if (!state.wpLocked && window.parent && window.parent !== window) {
+            if (!state.wpLocked && state.wpPhase === 'playing' && window.parent && window.parent !== window) {
                 try { window.parent.postMessage({ type: 'anirium:wp:leader-control', action: 'pause', positionSeconds: Math.floor(getEpisodeTime() || 0) }, '*'); } catch {}
             }
         });
 
         dom.video.addEventListener('seeked', () => {
-            if (!state.wpLocked && window.parent && window.parent !== window) {
+            if (!state.wpLocked && state.wpPhase === 'playing' && window.parent && window.parent !== window) {
                 try { window.parent.postMessage({ type: 'anirium:wp:leader-control', action: 'seek', positionSeconds: Math.floor(getEpisodeTime() || 0) }, '*'); } catch {}
             }
         });
@@ -5267,11 +5267,11 @@
         });
 
         function isWatchPartySyncHold() {
-            return Boolean(state.wpLocked && (state.wpPhase === 'stabilizing' || state.wpPhase === 'overtime'));
+            return state.wpPhase === 'stabilizing' || state.wpPhase === 'overtime';
         }
 
         function ensureWatchPartyAutoplay() {
-            if (!state.wpLocked || state.wpPhase !== 'playing' || !dom.video) return;
+            if (state.wpPhase !== 'playing' || !dom.video) return;
             if (!dom.video.paused) return;
             if (!state.wpInitialAligned) {
                 state.wpInitialAligned = true;

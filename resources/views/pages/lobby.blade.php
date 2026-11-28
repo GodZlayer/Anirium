@@ -3350,11 +3350,7 @@
                     episodeId: resolvedEpId,
                     episodeNumber: cleanEpNum,
                 });
-                const discList = document.getElementById('discussion-comments-list');
-                const discSection = discList?.closest('section, .rounded-2xl, .rounded-3xl') || discList?.parentElement;
-                if (discSection) {
-                    discSection.style.display = 'none';
-                }
+                window.AniriumWatchParty.dockChatIntoEpisode?.();
             }
             const stage = document.getElementById('episode-context-stage')
                 || document.getElementById('work-context-stage')
@@ -3477,11 +3473,7 @@
                     episodeId: resolvedEpId,
                     episodeNumber: cleanEpNum,
                 });
-                const discList = document.getElementById('discussion-comments-list');
-                const discSection = discList?.closest('section, .rounded-2xl, .rounded-3xl') || discList?.parentElement;
-                if (discSection) {
-                    discSection.style.display = 'none';
-                }
+                window.AniriumWatchParty.dockChatIntoEpisode?.();
             }
             const stage = document.getElementById('episode-context-stage')
                 || document.getElementById('work-context-stage')
@@ -5151,7 +5143,33 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 }
             });
 
-            return { openRoom, createRoom, startPartyMode, sendControl, sendMessage, leaveRoom, getActiveCode: () => activeCode, isLeader: () => Boolean(activeRoom?.isLeader) };
+            const dockChatIntoEpisode = () => {
+                const drawer = ensureDrawer();
+                const discContainer = document.getElementById('entity-discussions-container');
+                if (!discContainer) return;
+                Array.from(discContainer.children).forEach((child) => {
+                    if (child !== drawer) {
+                        child.dataset.wpHiddenByParty = '1';
+                        child.style.display = 'none';
+                    }
+                });
+                drawer.style.cssText = 'position:relative;width:100%;height:420px;border-radius:16px;border:1px solid rgba(139,92,246,0.35);background:rgba(13,13,19,0.96);color:#f4f4f5;display:flex;flex-direction:column;overflow:hidden;';
+                discContainer.appendChild(drawer);
+            };
+
+            const undockChatToFloating = () => {
+                const drawer = document.getElementById('anirium-wp-drawer');
+                document.querySelectorAll('[data-wp-hidden-by-party="1"]').forEach((el) => {
+                    el.style.display = '';
+                    delete el.dataset.wpHiddenByParty;
+                });
+                if (drawer && drawer.parentElement !== document.body) {
+                    drawer.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99990;width:320px;max-width:92vw;border-radius:16px;border:1px solid rgba(139,92,246,0.35);background:rgba(13,13,19,0.96);color:#f4f4f5;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.8);';
+                    document.body.appendChild(drawer);
+                }
+            };
+
+            return { openRoom, createRoom, startPartyMode, sendControl, sendMessage, leaveRoom, dockChatIntoEpisode, undockChatToFloating, getActiveCode: () => activeCode, isLeader: () => Boolean(activeRoom?.isLeader) };
         })();
 
         // Inicializa estado ao carregar

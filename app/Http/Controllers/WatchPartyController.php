@@ -606,7 +606,8 @@ class WatchPartyController extends Controller
         $validated = $request->validate([
             'action' => ['required', 'string', 'in:play,pause,seek,change_episode,episode_ended,end'],
             'positionSeconds' => ['nullable', 'numeric', 'min:0', 'max:86400'],
-            'episodeId' => ['nullable', 'uuid'],
+            'workId' => ['nullable', 'uuid'],
+            'episodeId' => ['nullable', 'string', 'max:80'],
             'episodeNumber' => ['nullable', 'integer', 'min:0', 'max:100000'],
         ]);
 
@@ -615,9 +616,15 @@ class WatchPartyController extends Controller
         $live = $this->computeLiveState($room, $now);
         $currentPos = $live['effectivePositionSeconds'];
         $updates = ['updated_at' => $now, 'playback_updated_at' => $now];
+        $inSyncHold = in_array((string) ($room->phase ?? ''), ['stabilizing', 'overtime'], true)
+            && ! empty($room->sync_lock_until)
+            && $now->lessThan(Carbon::parse($room->sync_lock_until));
 
         switch ($action) {
             case 'play':
+                if ($inSyncHold) {
+                    return response()->json(['room' => $this->formatRoomState($room, (int) $user->id, 0)]);
+                }
                 $pos = isset($validated['positionSeconds']) ? (float) $validated['positionSeconds'] : $currentPos;
                 $updates['status'] = 'playing';
                 $updates['phase'] = 'playing';
@@ -627,6 +634,9 @@ class WatchPartyController extends Controller
                 break;
 
             case 'pause':
+                if ($inSyncHold) {
+                    return response()->json(['room' => $this->formatRoomState($room, (int) $user->id, 0)]);
+                }
                 $pos = isset($validated['positionSeconds']) ? (float) $validated['positionSeconds'] : $currentPos;
                 $updates['status'] = 'paused';
                 $updates['phase'] = 'playing';
@@ -643,13 +653,22 @@ class WatchPartyController extends Controller
                 break;
 
             case 'change_episode':
+                if (! empty($validated['workId'])) {
+                    $updates['work_id'] = strtolower($validated['workId']);
+                }
                 $updates['episode_id'] = isset($validated['episodeId']) ? strtolower($validated['episodeId']) : $room->episode_id;
                 $updates['episode_number'] = $validated['episodeNumber'] ?? $room->episode_number;
-                $updates['status'] = 'lobby_loading';
+                $updates['status'] = 'playing';
                 $updates['phase'] = 'stabilizing';
                 $updates['sync_lock_until'] = $now->copy()->addSeconds(60);
+                $updates['sync_overtime_until'] = null;
                 $updates['playback_position_seconds'] = 0;
                 $updates['live_edge_seconds'] = 0;
+                DB::table('watch_party_members')->where('room_id', $room->id)->update([
+                    'buffered_seconds' => 0,
+                    'is_ready' => false,
+                    'updated_at' => $now,
+                ]);
                 break;
 
             case 'episode_ended':
