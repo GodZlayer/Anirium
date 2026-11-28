@@ -36,7 +36,7 @@ var iconData []byte
 var shutdownTorrentClient func()
 
 // Injected by the release builder; installer and service share one version.
-var serviceVersion = "2.3.0"
+var serviceVersion = "2.3.1"
 
 //go:embed assets/Anirium-FullVersionLogo.png
 var logoData []byte
@@ -1279,7 +1279,7 @@ func wipePreviousVersionState(currentVersion string) {
 	if err != nil || strings.TrimSpace(base) == "" {
 		return
 	}
-	root := filepath.Join(base, "anirium-service")
+	root := filepath.Join(base, "Anirium")
 	versionFile := filepath.Join(root, "version.txt")
 	if data, err := os.ReadFile(versionFile); err == nil && strings.TrimSpace(string(data)) == strings.TrimSpace(currentVersion) {
 		return
