@@ -739,7 +739,9 @@ class WatchPartyController extends Controller
 
     private const TARGET_BUFFER_SECONDS = 180;
 
-    private const MAX_OVERTIME_SECONDS = 60;
+    private const OVERTIME_STAGE_1_SECONDS = 300; // +5 min
+
+    private const OVERTIME_STAGE_2_SECONDS = 600; // +10 min total max
 
     private function findRoom(string $code): ?object
     {
@@ -949,19 +951,32 @@ class WatchPartyController extends Controller
         $allBufferedReady = $members->isNotEmpty()
             && $members->every(fn ($m) => (int) ($m->buffered_seconds ?? 0) >= self::TARGET_BUFFER_SECONDS);
 
+        $overtimeStage = 0;
         if ($room->status === 'ended') {
             $phase = 'ended';
         } elseif ($phase === 'stabilizing' && $syncRemainingSeconds <= 0) {
             if ($members->isNotEmpty() && ! $allBufferedReady && $syncLockUntil) {
+                $stage1Limit = $syncLockUntil->copy()->addSeconds(self::OVERTIME_STAGE_1_SECONDS);
+                $stage2Limit = $syncLockUntil->copy()->addSeconds(self::OVERTIME_STAGE_2_SECONDS);
+
                 if (! $overtimeUntil) {
-                    $overtimeUntil = $syncLockUntil->copy()->addSeconds(self::MAX_OVERTIME_SECONDS);
+                    $overtimeUntil = $stage1Limit;
+                    DB::table('watch_party_rooms')->where('id', $room->id)->update([
+                        'sync_overtime_until' => $overtimeUntil,
+                        'updated_at' => $now,
+                    ]);
+                } elseif ($now->greaterThanOrEqualTo($stage1Limit) && $overtimeUntil->lessThan($stage2Limit) && $minBufferedSeconds > 0) {
+                    // Torrent lento mas progredindo: estende para estágio 2 (+10 min máx.)
+                    $overtimeUntil = $stage2Limit;
                     DB::table('watch_party_rooms')->where('id', $room->id)->update([
                         'sync_overtime_until' => $overtimeUntil,
                         'updated_at' => $now,
                     ]);
                 }
+
                 if ($now->lessThan($overtimeUntil)) {
                     $phase = 'overtime';
+                    $overtimeStage = $overtimeUntil->greaterThan($stage1Limit) ? 2 : 1;
                     $effectiveSyncUntil = $overtimeUntil;
                     $syncRemainingSeconds = (int) $now->diffInSeconds($overtimeUntil);
                 } else {
@@ -989,6 +1004,8 @@ class WatchPartyController extends Controller
             'status' => $live['effectiveStatus'],
             'phase' => $phase,
             'isOvertime' => $phase === 'overtime',
+            'overtimeStage' => $overtimeStage,
+            'canLeaveFromOverlay' => $overtimeStage >= 1,
             'targetBufferSeconds' => self::TARGET_BUFFER_SECONDS,
             'minBufferedSeconds' => $minBufferedSeconds,
             'syncLockUntil' => $effectiveSyncUntil?->toIso8601String(),

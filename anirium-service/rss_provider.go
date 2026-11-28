@@ -15,11 +15,12 @@ import (
 )
 
 var (
-	rssBracketRe  = regexp.MustCompile(`\[[^\]]*\]|\((?i:\s*(?:1080p|720p|480p|2160p|4k|web-?dl|webrip|bd|bdrip|bluray|dvdrip|hevc|x264|x265|h264|h265|10bit|8bit|aac|flac|opus|dual[\s-]*audio|multi[\s-]*sub|multisub|sub|dub|raws|batch|(?:19|20)\d{2})[^)]*)\)`)
-	rssSeasonEpRe = regexp.MustCompile(`(?i)\bS(\d{1,2})\s*E(\d{1,4})\b`)
-	rssEpDashRe   = regexp.MustCompile(`(?i)(?:^|[\s._-])(?:ep\.?\s*|e|-\s*)(\d{1,4})(?:v\d)?(?:\b|[\s._-]|$)`)
-	rssNoiseRe    = regexp.MustCompile(`(?i)\b(1080p|720p|480p|2160p|4k|hevc|x264|x265|h264|h265|10bit|8bit|webrip|web-dl|webdl|bluray|bdrip|dvdrip|mkv|mp4|aac|flac|opus|multisub|multi-sub|multi|dual|audio|dub|sub|vostfr|pt-br|ptbr|eng|jpn|raws|batch)\b`)
-	rssTokenRe    = regexp.MustCompile(`[\p{L}\p{N}]+`)
+	rssBracketRe    = regexp.MustCompile(`\[[^\]]*\]|\((?i:\s*(?:1080p|720p|480p|2160p|4k|web-?dl|webrip|bd|bdrip|bluray|dvdrip|hevc|x264|x265|h264|h265|10bit|8bit|aac|flac|opus|dual[\s-]*audio|multi[\s-]*sub|multisub|sub|dub|raws|batch|tri-?[áa]udio|legendado|(?:19|20)\d{2})[^)]*)\)`)
+	rssBatchRangeRe = regexp.MustCompile(`(?i)(?:^|[\s._\-\[\(])(?:ep\.?\s*|episodes?\s*)?(\d{1,4})\s*(?:-|~|to)\s*(\d{1,4})(?:\b|[\s._\-\]\)]|$)`)
+	rssSeasonEpRe   = regexp.MustCompile(`(?i)\bS(\d{1,2})\s*E(\d{1,4})\b`)
+	rssEpDashRe     = regexp.MustCompile(`(?i)(?:^|[\s._-])(?:ep\.?\s*|e|-\s*)(\d{1,4})(?:v\d)?(?:\b|[\s._-]|$)`)
+	rssNoiseRe      = regexp.MustCompile(`(?i)\b(1080p|720p|480p|2160p|4k|hevc|x264|x265|h264|h265|10bit|8bit|webrip|web-dl|webdl|bluray|bdrip|dvdrip|mkv|mp4|aac|flac|opus|multisub|multi-sub|multi|dual|audio|dub|sub|vostfr|pt-br|ptbr|eng|jpn|raws|batch)\b`)
+	rssTokenRe      = regexp.MustCompile(`[\p{L}\p{N}]+`)
 )
 
 func rssTokenize(s string) []string {
@@ -35,28 +36,41 @@ func rssTokenize(s string) []string {
 	return out
 }
 
-func rssExtractTitleAndEpisode(rawTitle string) (string, int, int) {
-	cleaned := rssBracketRe.ReplaceAllString(rawTitle, " ")
+func rssExtractTitleAndEpisode(rawTitle string) (string, int, int, int, int) {
+	// Detecta batch range antes de remover colchetes (ex: [01-13], 01 ~ 13, 01-04)
+	epStart, epEnd := 0, 0
+	titleForRange := rawTitle
+	if loc := rssBatchRangeRe.FindStringSubmatchIndex(rawTitle); loc != nil {
+		sNum, _ := strconv.Atoi(rawTitle[loc[2]:loc[3]])
+		eNum, _ := strconv.Atoi(rawTitle[loc[4]:loc[5]])
+		if sNum > 0 && eNum >= sNum && (eNum-sNum) <= 1500 && !(sNum >= 1900 && eNum <= 2100) {
+			epStart, epEnd = sNum, eNum
+			titleForRange = strings.TrimSpace(rawTitle[:loc[0]])
+		}
+	}
+
+	cleaned := rssBracketRe.ReplaceAllString(titleForRange, " ")
 	cleaned = strings.TrimSpace(cleaned)
 	season := 0
 	ep := 0
 	titlePart := cleaned
 
-	if loc := rssSeasonEpRe.FindStringSubmatchIndex(cleaned); loc != nil {
-		season, _ = strconv.Atoi(cleaned[loc[2]:loc[3]])
-		ep, _ = strconv.Atoi(cleaned[loc[4]:loc[5]])
-		titlePart = strings.TrimSpace(cleaned[:loc[0]])
-	} else {
-		// Procura último padrão "- 01" ou "Ep 01" ou número isolado no final
-		all := rssEpDashRe.FindAllStringSubmatchIndex(cleaned, -1)
-		if len(all) > 0 {
-			last := all[len(all)-1]
-			ep, _ = strconv.Atoi(cleaned[last[2]:last[3]])
-			titlePart = strings.TrimSpace(cleaned[:last[0]])
+	if epStart == 0 {
+		if loc := rssSeasonEpRe.FindStringSubmatchIndex(cleaned); loc != nil {
+			season, _ = strconv.Atoi(cleaned[loc[2]:loc[3]])
+			ep, _ = strconv.Atoi(cleaned[loc[4]:loc[5]])
+			titlePart = strings.TrimSpace(cleaned[:loc[0]])
+		} else {
+			all := rssEpDashRe.FindAllStringSubmatchIndex(cleaned, -1)
+			if len(all) > 0 {
+				last := all[len(all)-1]
+				ep, _ = strconv.Atoi(cleaned[last[2]:last[3]])
+				titlePart = strings.TrimSpace(cleaned[:last[0]])
+			}
 		}
 	}
 	titlePart = rssNoiseRe.ReplaceAllString(titlePart, " ")
-	return strings.TrimSpace(titlePart), season, ep
+	return strings.TrimSpace(titlePart), season, ep, epStart, epEnd
 }
 
 func rssItemMatchesRequest(rawTitle string, query PlaybackPrepareRequest) bool {
@@ -82,16 +96,21 @@ func rssItemMatchesRequest(rawTitle string, query PlaybackPrepareRequest) bool {
 		return true
 	}
 
-	titlePart, season, ep := rssExtractTitleAndEpisode(rawTitle)
+	titlePart, season, ep, epStart, epEnd := rssExtractTitleAndEpisode(rawTitle)
 
-	// 1. Validação exata de episódio e temporada
+	// 1. Validação exata de episódio (avulso ou dentro de intervalo batch 01-13)
 	isMovie := query.Format == "MOVIE" && query.EpisodeCount == 1 && query.Episode <= 1
 	if !isMovie && query.Episode > 0 {
-		if ep <= 0 {
-			return false
-		}
-		if ep != query.Episode && (query.AbsoluteEpisode <= 0 || ep != query.AbsoluteEpisode) {
-			return false
+		inBatch := epStart > 0 && epEnd >= epStart &&
+			((query.Episode >= epStart && query.Episode <= epEnd) ||
+				(query.AbsoluteEpisode > 0 && query.AbsoluteEpisode >= epStart && query.AbsoluteEpisode <= epEnd))
+		if !inBatch {
+			if ep <= 0 {
+				return false
+			}
+			if ep != query.Episode && (query.AbsoluteEpisode <= 0 || ep != query.AbsoluteEpisode) {
+				return false
+			}
 		}
 		reqSeason := query.Season
 		if reqSeason < 1 {
@@ -102,13 +121,7 @@ func rssItemMatchesRequest(rawTitle string, query PlaybackPrepareRequest) bool {
 		}
 	}
 
-	// 2. Validação estrita do título: exige correspondência 100% com uma das variações oficiais
-	// (ou combinação exata de duas variações oficiais da mesma obra, ex: Romaji + English).
-	gotTokens := rssTokenize(titlePart)
-	if len(gotTokens) == 0 {
-		return false
-	}
-
+	// 2. Validação estrita do título (suporta segmentos separados por "/" como "Chinês / Hellsing")
 	tokensEqual := func(a, b []string) bool {
 		if len(a) != len(b) {
 			return false
@@ -121,23 +134,40 @@ func rssItemMatchesRequest(rawTitle string, query PlaybackPrepareRequest) bool {
 		return true
 	}
 
-	for _, exp := range expectedSets {
-		if tokensEqual(gotTokens, exp) {
-			return true
+	matchesAnyExpected := func(gotTokens []string) bool {
+		if len(gotTokens) == 0 {
+			return false
 		}
-	}
-	for i := range expectedSets {
-		for j := range expectedSets {
-			if i == j {
-				continue
+		for _, exp := range expectedSets {
+			if tokensEqual(gotTokens, exp) {
+				return true
 			}
-			if len(gotTokens) == len(expectedSets[i])+len(expectedSets[j]) {
-				combined := make([]string, 0, len(gotTokens))
-				combined = append(combined, expectedSets[i]...)
-				combined = append(combined, expectedSets[j]...)
-				if tokensEqual(gotTokens, combined) {
-					return true
+		}
+		for i := range expectedSets {
+			for j := range expectedSets {
+				if i == j {
+					continue
 				}
+				if len(gotTokens) == len(expectedSets[i])+len(expectedSets[j]) {
+					combined := make([]string, 0, len(gotTokens))
+					combined = append(combined, expectedSets[i]...)
+					combined = append(combined, expectedSets[j]...)
+					if tokensEqual(gotTokens, combined) {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
+
+	if matchesAnyExpected(rssTokenize(titlePart)) {
+		return true
+	}
+	if strings.Contains(titlePart, "/") {
+		for _, seg := range strings.Split(titlePart, "/") {
+			if matchesAnyExpected(rssTokenize(seg)) {
+				return true
 			}
 		}
 	}

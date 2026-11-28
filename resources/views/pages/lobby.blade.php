@@ -4586,6 +4586,7 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                                 <div class="text-4xl font-mono font-black text-violet-400" id="wp-stabilize-countdown">60s</div>
                                 <h3 id="wp-stabilize-heading" class="text-base font-bold text-white">Estabilizando e sincronizando todos via rede torrent P2P...</h3>
                                 <p id="wp-stabilize-sub" class="text-xs text-zinc-400 max-w-md">Baixando buffer de segurança (3 min) pelo anirium-service para iniciar todos no tempo exato.</p>
+                                <button type="button" id="wp-stabilize-leave" class="hidden mt-2 px-4 py-2 rounded-lg bg-red-600/90 hover:bg-red-500 text-xs font-semibold text-white">Sair da Sala</button>
                             </div>
                         </div>
                     </div>
@@ -4603,6 +4604,7 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 `;
                 document.body.appendChild(modal);
                 modal.querySelector('#wp-theater-leave')?.addEventListener('click', () => leaveRoom());
+                modal.querySelector('#wp-stabilize-leave')?.addEventListener('click', () => leaveRoom());
                 modal.querySelector('#wp-theater-chat-form')?.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const inp = modal.querySelector('#wp-theater-chat-input');
@@ -4721,13 +4723,19 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                     const cdEl = modal.querySelector('#wp-stabilize-countdown');
                     const headEl = modal.querySelector('#wp-stabilize-heading');
                     const subEl = modal.querySelector('#wp-stabilize-sub');
+                    const leaveOverlayBtn = modal.querySelector('#wp-stabilize-leave');
                     const memEl = modal.querySelector('#wp-theater-members');
                     if (memEl) memEl.textContent = `${roomState.membersCount || 1} na sala`;
 
                     if (headEl) {
                         headEl.textContent = roomState.isOvertime
-                            ? 'Sobretempo de sincronização (+60s máx.) — aguardando buffer de todos...'
+                            ? (roomState.overtimeStage >= 2
+                                ? 'Sobretempo estendido (+10 min máx.) — torrent lento, compartilhando peers P2P...'
+                                : 'Sobretempo de sincronização (+5 min) — aguardando buffer de todos...')
                             : 'Estabilizando e sincronizando todos via rede torrent P2P...';
+                    }
+                    if (leaveOverlayBtn) {
+                        leaveOverlayBtn.classList.toggle('hidden', !roomState.canLeaveFromOverlay && !roomState.isOvertime);
                     }
                     if (subEl && typeof roomState.minBufferedSeconds === 'number') {
                         const targetBuf = Number(roomState.targetBufferSeconds || 180);
@@ -4746,20 +4754,24 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                             if (left <= 0) {
                                 clearInterval(syncCountdownTimer);
                                 syncCountdownTimer = null;
-                                stabEl?.classList.add('hidden');
-                                stabEl?.classList.remove('flex');
-                                window.__aniriumWatchPartyPhase = 'playing';
-                                try {
-                                    document.getElementById('anirium-player-pro-iframe')?.contentWindow?.postMessage({
-                                        type: 'anirium:wp:state',
-                                        locked: Boolean(window.__aniriumWatchPartyLocked),
-                                        phase: 'playing'
-                                    }, '*');
-                                } catch {}
-                                if (activeRoom) {
-                                    activeRoom.phase = 'playing';
-                                    activeRoom.isPlaying = true;
-                                    applyRemotePlayback(activeRoom);
+                                // Mantém blur ativo e consulta o servidor para confirmar se entrou em overtime ou playing
+                                cdEl.textContent = '...';
+                                if (activeCode) {
+                                    wpFetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}`)
+                                        .then((res) => {
+                                            if (res?.room) {
+                                                activeRoom = res.room;
+                                                renderRoomPhaseUI(res.room);
+                                                if (res.room.phase === 'playing') {
+                                                    applyRemotePlayback(res.room);
+                                                }
+                                            }
+                                        })
+                                        .catch(() => {
+                                            stabEl?.classList.add('hidden');
+                                            stabEl?.classList.remove('flex');
+                                            window.__aniriumWatchPartyPhase = 'playing';
+                                        });
                                 }
                             } else {
                                 cdEl.textContent = `${left}s`;
