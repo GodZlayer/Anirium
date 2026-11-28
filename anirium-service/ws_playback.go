@@ -217,12 +217,67 @@ func executePlaybackPrepare(ctx context.Context, input PlaybackPrepareRequest, a
 		}
 	}
 	swarmMu.Lock()
+	sameActiveEpisode := playbackGeneration > 0 &&
+		len(activeLinks) > 0 &&
+		currentCatalogIdentity.WorkID != "" &&
+		currentCatalogIdentity.WorkID == input.CatalogIdentity.WorkID &&
+		requestedEpisode.Episode == input.Episode &&
+		requestedEpisode.Season == input.Season
+	if sameActiveEpisode {
+		seenSub := make(map[string]bool, len(externalSubtitles))
+		for _, s := range externalSubtitles {
+			seenSub[s.URL] = true
+		}
+		for _, s := range providerSubtitles {
+			if !seenSub[s.URL] {
+				seenSub[s.URL] = true
+				externalSubtitles = append(externalSubtitles, s)
+			}
+		}
+		generation := playbackGeneration
+		probeContext := playbackContext
+		workers := playbackWorkers
+		activeMagnetsCopy := append([]string(nil), playbackMagnets...)
+		swarmMu.Unlock()
+		ticket, ticketErr := issuePlaybackGrant(input.Token, input.DeviceID, authorization.AccountID, authorization.PlayerSessionID)
+		if ticketErr != nil {
+			return playbackPrepareOutcome{
+				StatusCode: http.StatusInternalServerError,
+				PlainError: "Playback credential unavailable",
+			}
+		}
+		slot := globalSessionManager.CreateOrReplace(authorization.PlayerSessionID, ticket, generation)
+		slot.mu.Lock()
+		slot.CatalogIdentity = input.CatalogIdentity
+		slot.mu.Unlock()
+		if workers != nil && probeContext != nil {
+			workers.Add(1)
+			go func() {
+				defer workers.Done()
+				watchPlaybackAuthorization(probeContext, generation, ticket, 30*time.Second, activeMagnetsCopy...)
+			}()
+		}
+		appendLog(fmt.Sprintf("[MultiSession] Reused active playback generation=%d for %s ep=%d (shared subs=%d)", generation, input.Title, input.Episode, len(externalSubtitles)))
+		return playbackPrepareOutcome{
+			StatusCode: http.StatusOK,
+			Body: map[string]interface{}{
+				"success":         true,
+				"status":          "preparing",
+				"sources":         len(activeMagnetsCopy),
+				"playbackTicket":  ticket,
+				"providerStatus":  input.ManifestSnapshots.statusByID(),
+				"catalogIdentity": input.CatalogIdentity,
+			},
+		}
+	}
 	requestedEpisode = episodeContext{Episode: input.Episode, Season: input.Season}
 	generation := resetPlaybackLocked()
 	playbackInventoryScanning = true
 	currentCatalogIdentity = input.CatalogIdentity
 	probeContext := playbackContext
-	externalSubtitles = providerSubtitles
+	if len(providerSubtitles) > 0 {
+		externalSubtitles = providerSubtitles
+	}
 	currentActiveTitle = input.Title
 	currentMixQualities = []string{}
 	currentMixAudios = []string{}
