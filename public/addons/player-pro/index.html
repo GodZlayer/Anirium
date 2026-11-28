@@ -5283,17 +5283,22 @@
             try {
                 if (window.parent && window.parent !== window) {
                     const parentLocked = Boolean(window.parent.__aniriumWatchPartyLocked);
-                    const parentPhase = String(window.parent.__aniriumWatchPartyPhase || '');
+                    let parentPhase = String(window.parent.__aniriumWatchPartyPhase || '');
+                    const syncUntil = Number(window.parent.__aniriumWatchPartySyncUntil || 0);
+                    if (parentLocked && parentPhase === 'stabilizing' && syncUntil > 0 && Date.now() >= syncUntil) {
+                        parentPhase = 'playing';
+                        window.parent.__aniriumWatchPartyPhase = 'playing';
+                    }
                     if (parentLocked !== state.wpLocked || parentPhase !== state.wpPhase) {
                         state.wpLocked = parentLocked;
                         state.wpPhase = parentPhase;
                         applyWatchPartyRoomMode();
-                    } else if (state.wpLocked && state.wpPhase === 'playing' && dom.video && dom.video.paused && state.initialPlaybackStarted) {
+                    } else if (state.wpLocked && state.wpPhase === 'playing' && dom.video && dom.video.paused) {
                         ensureWatchPartyAutoplay();
                     }
                 }
             } catch {}
-        }, 1000);
+        }, 500);
 
         // Recebe credenciais e contexto do Core via postMessage
         window.addEventListener('message', (event) => {

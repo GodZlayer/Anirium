@@ -4577,12 +4577,12 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                         </div>
                         <div class="flex-1 relative flex items-center justify-center overflow-hidden">
                             <div id="wp-theater-player-slot" class="w-full h-full flex items-center justify-center"></div>
-                            <div id="wp-theater-waiting" class="hidden fixed top-12 left-0 right-0 lg:right-80 bottom-64 lg:bottom-0 z-[9997] flex-col items-center justify-center bg-[#09090f]/95 text-center p-6 gap-3">
+                            <div id="wp-theater-waiting" class="hidden flex-col items-center justify-center bg-[#09090f]/95 text-center p-6 gap-3" style="position:fixed;top:48px;left:0;right:320px;bottom:0;z-index:9997;">
                                 <div class="w-12 h-12 rounded-full border-2 border-violet-500/40 border-t-violet-400 animate-spin"></div>
                                 <h3 class="text-lg font-bold text-white">Aguardando o líder escolher o próximo episódio...</h3>
                                 <p id="wp-theater-waiting-sub" class="text-xs text-zinc-400 max-w-md">Você continua conectado na sala e pode usar o chat normalmente.</p>
                             </div>
-                            <div id="wp-theater-stabilizing" class="hidden fixed top-12 left-0 right-0 lg:right-80 bottom-64 lg:bottom-0 z-[9998] flex-col items-center justify-center bg-black/90 backdrop-blur-md text-center p-6 gap-3">
+                            <div id="wp-theater-stabilizing" class="hidden flex-col items-center justify-center bg-black/90 backdrop-blur-md text-center p-6 gap-3" style="position:fixed;top:48px;left:0;right:320px;bottom:0;z-index:9998;">
                                 <div class="text-4xl font-mono font-black text-violet-400" id="wp-stabilize-countdown">60s</div>
                                 <h3 class="text-base font-bold text-white">Estabilizando e sincronizando todos via rede torrent P2P...</h3>
                                 <p class="text-xs text-zinc-400 max-w-md">Baixando buffer inicial pelo anirium-service para iniciar todos no tempo exato do líder.</p>
@@ -4696,6 +4696,7 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 if (!roomState) return;
                 const phase = String(roomState.phase || 'playing');
                 const lockUntilMs = roomState.syncLockUntil ? Date.parse(roomState.syncLockUntil) : 0;
+                window.__aniriumWatchPartySyncUntil = lockUntilMs;
                 const computedRem = lockUntilMs > 0 ? Math.max(0, Math.ceil((lockUntilMs - Date.now()) / 1000)) : 0;
                 const rem = computedRem > 0 ? computedRem : Number(roomState.syncRemainingSeconds || 0);
                 const isLeader = Boolean(roomState.isLeader);
