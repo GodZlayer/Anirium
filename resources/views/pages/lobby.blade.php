@@ -4695,7 +4695,9 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
             const renderRoomPhaseUI = (roomState) => {
                 if (!roomState) return;
                 const phase = String(roomState.phase || 'playing');
-                const rem = Number(roomState.syncRemainingSeconds || 0);
+                const lockUntilMs = roomState.syncLockUntil ? Date.parse(roomState.syncLockUntil) : 0;
+                const computedRem = lockUntilMs > 0 ? Math.max(0, Math.ceil((lockUntilMs - Date.now()) / 1000)) : 0;
+                const rem = computedRem > 0 ? computedRem : Number(roomState.syncRemainingSeconds || 0);
                 const isLeader = Boolean(roomState.isLeader);
 
                 if (syncCountdownTimer) { clearInterval(syncCountdownTimer); syncCountdownTimer = null; }
