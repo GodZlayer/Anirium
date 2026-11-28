@@ -138,6 +138,8 @@ Route::prefix('/api/watch-party')->middleware('throttle:180,1')->group(function 
     Route::post('/rooms/{code}/join', [WatchPartyController::class, 'join'])->name('watch_party.join');
     Route::get('/rooms/{code}', [WatchPartyController::class, 'state'])->name('watch_party.state');
     Route::post('/rooms/{code}/control', [WatchPartyController::class, 'control'])->name('watch_party.control');
+    Route::post('/rooms/{code}/ready', [WatchPartyController::class, 'reportBuffer'])->name('watch_party.ready');
+    Route::match(['get', 'post'], '/rooms/{code}/peers', [WatchPartyController::class, 'peers'])->name('watch_party.peers');
     Route::post('/rooms/{code}/messages', [WatchPartyController::class, 'sendMessage'])->name('watch_party.messages');
     Route::post('/rooms/{code}/leave', [WatchPartyController::class, 'leave'])->name('watch_party.leave');
 });

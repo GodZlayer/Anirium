@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class WatchPartyTest extends TestCase
@@ -163,5 +164,52 @@ class WatchPartyTest extends TestCase
         $this->actingAs($plus)->getJson('/api/watch-party/history')
             ->assertOk()
             ->assertJsonStructure(['items']);
+    }
+
+    public function test_sync_overtime_and_peer_exchange(): void
+    {
+        $userA = User::factory()->create(['tier' => 2]);
+        $userB = User::factory()->create(['tier' => 2]);
+
+        $roomId = DB::table('watch_party_rooms')->insertGetId([
+            'code' => 'OVRTIME1',
+            'mode' => 'live_launch',
+            'status' => 'playing',
+            'phase' => 'stabilizing',
+            'sync_lock_until' => now()->subSeconds(5),
+            'work_id' => 'w_test',
+            'episode_id' => 'w_test:ep:1',
+            'episode_number' => 1,
+            'playback_position_seconds' => 0,
+            'playback_updated_at' => now(),
+            'launch_at' => now()->subMinutes(5),
+            'live_edge_seconds' => 0,
+            'is_public' => true,
+            'created_at' => now()->subMinutes(5),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('watch_party_members')->insert([
+            ['room_id' => $roomId, 'user_id' => $userA->id, 'role' => 'member', 'is_ready' => false, 'buffered_seconds' => 185, 'last_seen_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+            ['room_id' => $roomId, 'user_id' => $userB->id, 'role' => 'member', 'is_ready' => false, 'buffered_seconds' => 90, 'last_seen_at' => now(), 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // 1. User B has < 180s -> room enters overtime (+60s max)
+        $this->actingAs($userA)->getJson('/api/watch-party/rooms/OVRTIME1')
+            ->assertOk()
+            ->assertJsonPath('room.phase', 'overtime')
+            ->assertJsonPath('room.isOvertime', true)
+            ->assertJsonPath('room.minBufferedSeconds', 90);
+
+        // 2. User B reports >= 180s -> overtime ends immediately and room flips to playing
+        $this->actingAs($userB)->postJson('/api/watch-party/rooms/OVRTIME1/ready', ['bufferedSeconds' => 185])
+            ->assertOk()
+            ->assertJsonPath('room.phase', 'playing')
+            ->assertJsonPath('room.isOvertime', false);
+
+        // 3. Peer exchange endpoint stores & returns valid ip:port peers
+        $this->actingAs($userA)->postJson('/api/watch-party/rooms/OVRTIME1/peers', ['peers' => ['192.168.1.20:6881', 'invalid-peer']])
+            ->assertOk()
+            ->assertJson(['peers' => ['192.168.1.20:6881']]);
     }
 }

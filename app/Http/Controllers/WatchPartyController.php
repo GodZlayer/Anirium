@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -736,6 +737,115 @@ class WatchPartyController extends Controller
         return response()->json(['status' => 'left']);
     }
 
+    private const TARGET_BUFFER_SECONDS = 180;
+
+    private const MAX_OVERTIME_SECONDS = 60;
+
+    private function findRoom(string $code): ?object
+    {
+        return DB::table('watch_party_rooms')
+            ->where('code', strtoupper(trim($code)))
+            ->first();
+    }
+
+    public function reportBuffer(Request $request, string $code): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['error' => 'unauthenticated'], 401);
+        }
+
+        $room = $this->findRoom($code);
+        if (! $room) {
+            return response()->json(['error' => 'room_not_found'], 404);
+        }
+
+        $buffered = max(0, min(7200, (int) $request->input('bufferedSeconds', 0)));
+        $isReady = $buffered >= self::TARGET_BUFFER_SECONDS;
+        $now = now();
+
+        DB::table('watch_party_members')
+            ->where('room_id', $room->id)
+            ->where('user_id', $user->id)
+            ->update([
+                'buffered_seconds' => $buffered,
+                'is_ready' => $isReady,
+                'last_seen_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+        if (in_array((string) ($room->phase ?? ''), ['stabilizing', 'overtime'], true) && ! empty($room->sync_overtime_until)) {
+            $unreadyCount = DB::table('watch_party_members')
+                ->where('room_id', $room->id)
+                ->where('buffered_seconds', '<', self::TARGET_BUFFER_SECONDS)
+                ->count();
+
+            if ($unreadyCount === 0) {
+                DB::table('watch_party_rooms')->where('id', $room->id)->update([
+                    'phase' => 'playing',
+                    'sync_lock_until' => $now,
+                    'sync_overtime_until' => null,
+                    'updated_at' => $now,
+                ]);
+                $room = $this->findRoom($code);
+                if ($room) {
+                    app(RealtimeEventStore::class)->publish('room:'.strtoupper($room->code), 'watch_party.updated', [
+                        'room' => $this->formatRoomState($room, (int) $user->id, 0),
+                    ]);
+                }
+            }
+        }
+
+        $fresh = $this->findRoom($code);
+
+        return response()->json([
+            'room' => $fresh ? $this->formatRoomState($fresh, (int) $user->id, 0) : null,
+        ]);
+    }
+
+    public function peers(Request $request, string $code): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['error' => 'unauthenticated'], 401);
+        }
+
+        $room = $this->findRoom($code);
+        if (! $room) {
+            return response()->json(['error' => 'room_not_found'], 404);
+        }
+
+        $cacheKey = 'wp:peers:'.strtoupper($room->code);
+        $existing = Cache::get($cacheKey, []);
+        if (! is_array($existing)) {
+            $existing = [];
+        }
+
+        if ($request->isMethod('post')) {
+            $incoming = $request->input('peers', []);
+            if (is_array($incoming)) {
+                foreach ($incoming as $peer) {
+                    if (! is_string($peer)) {
+                        continue;
+                    }
+                    $peer = trim($peer);
+                    if (preg_match('/^[0-9a-fA-F:\.\[\]]+:\d{2,5}$/', $peer)) {
+                        $existing[$peer] = time();
+                    }
+                }
+                if (count($existing) > 80) {
+                    arsort($existing);
+                    $existing = array_slice($existing, 0, 80, true);
+                }
+                Cache::put($cacheKey, $existing, now()->addMinutes(10));
+            }
+        }
+
+        return response()->json([
+            'peers' => array_keys($existing),
+        ]);
+    }
+
     private function upsertMember(int $roomId, int $userId, string $role, bool $isReady): void
     {
         $now = now();
@@ -804,7 +914,7 @@ class WatchPartyController extends Controller
             ->leftJoin('users as u', 'u.id', '=', 'm.user_id')
             ->where('m.room_id', $room->id)
             ->where('m.last_seen_at', '>=', $now->copy()->subSeconds(45))
-            ->select(['m.user_id', 'm.role', 'm.is_ready', 'u.name', 'u.handle'])
+            ->select(['m.user_id', 'm.role', 'm.is_ready', 'm.buffered_seconds', 'u.name', 'u.handle'])
             ->get();
 
         $messagesQuery = DB::table('watch_party_messages as msg')
@@ -827,14 +937,42 @@ class WatchPartyController extends Controller
         ])->values();
 
         $syncLockUntil = ! empty($room->sync_lock_until) ? Carbon::parse($room->sync_lock_until) : null;
+        $overtimeUntil = ! empty($room->sync_overtime_until) ? Carbon::parse($room->sync_overtime_until) : null;
+        $effectiveSyncUntil = $syncLockUntil;
         $syncRemainingSeconds = ($syncLockUntil && $now->lessThan($syncLockUntil))
             ? (int) $now->diffInSeconds($syncLockUntil)
             : 0;
         $phase = (string) ($room->phase ?? 'playing');
+        $minBufferedSeconds = $members->isNotEmpty()
+            ? (int) $members->min(fn ($m) => (int) ($m->buffered_seconds ?? 0))
+            : 0;
+        $allBufferedReady = $members->isNotEmpty()
+            && $members->every(fn ($m) => (int) ($m->buffered_seconds ?? 0) >= self::TARGET_BUFFER_SECONDS);
+
         if ($room->status === 'ended') {
             $phase = 'ended';
         } elseif ($phase === 'stabilizing' && $syncRemainingSeconds <= 0) {
-            $phase = 'playing';
+            if ($members->isNotEmpty() && ! $allBufferedReady && $syncLockUntil) {
+                if (! $overtimeUntil) {
+                    $overtimeUntil = $syncLockUntil->copy()->addSeconds(self::MAX_OVERTIME_SECONDS);
+                    DB::table('watch_party_rooms')->where('id', $room->id)->update([
+                        'sync_overtime_until' => $overtimeUntil,
+                        'updated_at' => $now,
+                    ]);
+                }
+                if ($now->lessThan($overtimeUntil)) {
+                    $phase = 'overtime';
+                    $effectiveSyncUntil = $overtimeUntil;
+                    $syncRemainingSeconds = (int) $now->diffInSeconds($overtimeUntil);
+                } else {
+                    $phase = 'playing';
+                    $effectiveSyncUntil = $overtimeUntil;
+                    $syncRemainingSeconds = 0;
+                }
+            } else {
+                $phase = 'playing';
+                $syncRemainingSeconds = 0;
+            }
         }
 
         $resolvedEpisodeId = $room->episode_id;
@@ -850,7 +988,10 @@ class WatchPartyController extends Controller
             'mode' => $room->mode,
             'status' => $live['effectiveStatus'],
             'phase' => $phase,
-            'syncLockUntil' => $syncLockUntil?->toIso8601String(),
+            'isOvertime' => $phase === 'overtime',
+            'targetBufferSeconds' => self::TARGET_BUFFER_SECONDS,
+            'minBufferedSeconds' => $minBufferedSeconds,
+            'syncLockUntil' => $effectiveSyncUntil?->toIso8601String(),
             'syncRemainingSeconds' => $syncRemainingSeconds,
             'serverTimeMs' => (int) round(microtime(true) * 1000),
             'workId' => $room->work_id,

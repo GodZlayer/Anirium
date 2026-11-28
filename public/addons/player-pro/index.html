@@ -5254,9 +5254,26 @@
             }
         });
 
+        function isWatchPartySyncHold() {
+            return Boolean(state.wpLocked && (state.wpPhase === 'stabilizing' || state.wpPhase === 'overtime'));
+        }
+
         function ensureWatchPartyAutoplay() {
             if (!state.wpLocked || state.wpPhase !== 'playing' || !dom.video) return;
             if (!dom.video.paused) return;
+            if (!state.wpInitialAligned) {
+                state.wpInitialAligned = true;
+                try {
+                    const syncUntil = Number((window.parent && window.parent !== window && window.parent.__aniriumWatchPartySyncUntil) || 0);
+                    const clockOffset = Number((window.parent && window.parent !== window && window.parent.__aniriumServerClockOffsetMs) || 0);
+                    if (syncUntil > 0) {
+                        const startAt = Math.max(0, ((Date.now() + clockOffset) - syncUntil) / 1000);
+                        if (startAt > 0.4 && startAt < 15) {
+                            dom.video.currentTime = startAt;
+                        }
+                    }
+                } catch {}
+            }
             const p = dom.video.play();
             if (p && typeof p.catch === 'function') {
                 p.catch(() => {
@@ -5271,7 +5288,7 @@
         function applyWatchPartyRoomMode() {
             document.body.classList.toggle('wp-room-locked', Boolean(state.wpLocked));
             document.body.classList.toggle('wp-room-playing', Boolean(state.wpLocked && state.wpPhase === 'playing'));
-            if (state.wpLocked && state.wpPhase === 'stabilizing' && dom.video && !dom.video.paused) {
+            if (isWatchPartySyncHold() && dom.video && !dom.video.paused) {
                 dom.video.pause();
             } else if (state.wpLocked && state.wpPhase === 'playing') {
                 ensureWatchPartyAutoplay();
@@ -5279,13 +5296,16 @@
         }
         applyWatchPartyRoomMode();
 
+        let wpLastBufferPostAt = 0;
         setInterval(() => {
             try {
                 if (window.parent && window.parent !== window) {
                     const parentLocked = Boolean(window.parent.__aniriumWatchPartyLocked);
                     let parentPhase = String(window.parent.__aniriumWatchPartyPhase || '');
                     const syncUntil = Number(window.parent.__aniriumWatchPartySyncUntil || 0);
-                    if (parentLocked && parentPhase === 'stabilizing' && syncUntil > 0 && Date.now() >= syncUntil) {
+                    const clockOffset = Number(window.parent.__aniriumServerClockOffsetMs || 0);
+                    const serverNow = Date.now() + clockOffset;
+                    if (parentLocked && (parentPhase === 'stabilizing' || parentPhase === 'overtime') && syncUntil > 0 && serverNow >= syncUntil) {
                         parentPhase = 'playing';
                         window.parent.__aniriumWatchPartyPhase = 'playing';
                     }
@@ -5295,6 +5315,13 @@
                         applyWatchPartyRoomMode();
                     } else if (state.wpLocked && state.wpPhase === 'playing' && dom.video && dom.video.paused) {
                         ensureWatchPartyAutoplay();
+                    }
+                    if (isWatchPartySyncHold() && Date.now() - wpLastBufferPostAt >= 2000) {
+                        wpLastBufferPostAt = Date.now();
+                        window.parent.postMessage({
+                            type: 'anirium:wp:buffer',
+                            bufferedSeconds: Math.floor(getBrowserBufferedEnd() || 0)
+                        }, '*');
                     }
                 }
             } catch {}
@@ -5338,7 +5365,6 @@
         body.wp-room-locked #btn-party { display: none !important; }
         body.wp-room-locked #timeline-box { pointer-events: none !important; }
         body.wp-room-playing #btn-quality,
-        body.wp-room-playing #btn-audio,
         body.wp-room-playing #btn-speed,
         body.wp-room-playing #btn-auto-skip,
         body.wp-room-playing #btn-bg-stages { display: none !important; }

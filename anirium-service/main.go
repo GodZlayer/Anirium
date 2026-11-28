@@ -36,7 +36,7 @@ var iconData []byte
 var shutdownTorrentClient func()
 
 // Injected by the release builder; installer and service share one version.
-var serviceVersion = "2.3.1"
+var serviceVersion = "2.3.2"
 
 //go:embed assets/Anirium-FullVersionLogo.png
 var logoData []byte
@@ -2152,6 +2152,54 @@ func newServiceHTTPHandler(port int) http.Handler {
 	mux.HandleFunc("/playback/window", handlePlaybackWindow)
 	mux.HandleFunc("/playback/buffer", handlePlaybackBuffer)
 	mux.HandleFunc("/playback/subtitles", handleSubtitleBundle)
+	mux.HandleFunc("/playback/peers", func(w http.ResponseWriter, r *http.Request) {
+		enableCORS(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+			return
+		}
+		ticket := strings.TrimSpace(r.URL.Query().Get("playbackTicket"))
+		if rejection := validatePlaybackGrantRejection(ticket); rejection != nil {
+			writeServiceAuthRejection(w, rejection)
+			return
+		}
+		var input struct {
+			Peers []string `json:"peers"`
+		}
+		if json.NewDecoder(io.LimitReader(r.Body, 256<<10)).Decode(&input) != nil {
+			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+		peerInfos := make([]torrent.PeerInfo, 0, len(input.Peers))
+		for _, raw := range input.Peers {
+			host, portStr, err := net.SplitHostPort(strings.TrimSpace(raw))
+			if err != nil {
+				continue
+			}
+			ip := net.ParseIP(host)
+			portNum, err := strconv.Atoi(portStr)
+			if ip == nil || err != nil || portNum <= 0 || portNum > 65535 {
+				continue
+			}
+			peerInfos = append(peerInfos, torrent.PeerInfo{
+				Addr:   &net.TCPAddr{IP: ip, Port: portNum},
+				Source: torrent.PeerSourceDirect,
+			})
+		}
+		added := 0
+		if torrentClient != nil && len(peerInfos) > 0 {
+			for _, t := range torrentClient.Torrents() {
+				t.AddPeers(peerInfos)
+				added += len(peerInfos)
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"injected": added})
+	})
 	mux.HandleFunc("/playback/renew", func(w http.ResponseWriter, r *http.Request) {
 		enableCORS(w)
 		if r.Method != http.MethodPost {

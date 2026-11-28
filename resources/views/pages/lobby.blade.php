@@ -4584,8 +4584,8 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                             </div>
                             <div id="wp-theater-stabilizing" class="hidden flex-col items-center justify-center bg-black/90 backdrop-blur-md text-center p-6 gap-3" style="position:fixed;top:48px;left:0;right:320px;bottom:0;z-index:9998;">
                                 <div class="text-4xl font-mono font-black text-violet-400" id="wp-stabilize-countdown">60s</div>
-                                <h3 class="text-base font-bold text-white">Estabilizando e sincronizando todos via rede torrent P2P...</h3>
-                                <p class="text-xs text-zinc-400 max-w-md">Baixando buffer inicial pelo anirium-service para iniciar todos no tempo exato do líder.</p>
+                                <h3 id="wp-stabilize-heading" class="text-base font-bold text-white">Estabilizando e sincronizando todos via rede torrent P2P...</h3>
+                                <p id="wp-stabilize-sub" class="text-xs text-zinc-400 max-w-md">Baixando buffer de segurança (3 min) pelo anirium-service para iniciar todos no tempo exato.</p>
                             </div>
                         </div>
                     </div>
@@ -4695,10 +4695,15 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
             const renderRoomPhaseUI = (roomState) => {
                 if (!roomState) return;
                 const phase = String(roomState.phase || 'playing');
+                if (roomState.serverTimeMs) {
+                    window.__aniriumServerClockOffsetMs = Number(roomState.serverTimeMs) - Date.now();
+                }
+                const clockOffset = Number(window.__aniriumServerClockOffsetMs || 0);
                 const lockUntilMs = roomState.syncLockUntil ? Date.parse(roomState.syncLockUntil) : 0;
                 window.__aniriumWatchPartySyncUntil = lockUntilMs;
-                const computedRem = lockUntilMs > 0 ? Math.max(0, Math.ceil((lockUntilMs - Date.now()) / 1000)) : 0;
+                const computedRem = lockUntilMs > 0 ? Math.max(0, Math.ceil((lockUntilMs - (Date.now() + clockOffset)) / 1000)) : 0;
                 const rem = computedRem > 0 ? computedRem : Number(roomState.syncRemainingSeconds || 0);
+                const isSyncHold = phase === 'stabilizing' || phase === 'overtime';
                 const isLeader = Boolean(roomState.isLeader);
 
                 if (syncCountdownTimer) { clearInterval(syncCountdownTimer); syncCountdownTimer = null; }
@@ -4714,14 +4719,26 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                     const waitEl = modal.querySelector('#wp-theater-waiting');
                     const stabEl = modal.querySelector('#wp-theater-stabilizing');
                     const cdEl = modal.querySelector('#wp-stabilize-countdown');
+                    const headEl = modal.querySelector('#wp-stabilize-heading');
+                    const subEl = modal.querySelector('#wp-stabilize-sub');
                     const memEl = modal.querySelector('#wp-theater-members');
                     if (memEl) memEl.textContent = `${roomState.membersCount || 1} na sala`;
 
-                    if (waitEl) { waitEl.classList.toggle('hidden', phase !== 'waiting'); waitEl.classList.toggle('flex', phase === 'waiting'); }
-                    if (stabEl) { stabEl.classList.toggle('hidden', !(phase === 'stabilizing' && rem > 0)); stabEl.classList.toggle('flex', phase === 'stabilizing' && rem > 0); }
+                    if (headEl) {
+                        headEl.textContent = roomState.isOvertime
+                            ? 'Sobretempo de sincronização (+60s máx.) — aguardando buffer de todos...'
+                            : 'Estabilizando e sincronizando todos via rede torrent P2P...';
+                    }
+                    if (subEl && typeof roomState.minBufferedSeconds === 'number') {
+                        const targetBuf = Number(roomState.targetBufferSeconds || 180);
+                        subEl.textContent = `Buffer de segurança coletivo: ${roomState.minBufferedSeconds}s / ${targetBuf}s • ${roomState.readyCount || 0}/${roomState.membersCount || 1} prontos`;
+                    }
 
-                    if (phase === 'stabilizing' && rem > 0 && cdEl) {
-                        window.__aniriumWatchPartyPhase = 'stabilizing';
+                    if (waitEl) { waitEl.classList.toggle('hidden', phase !== 'waiting'); waitEl.classList.toggle('flex', phase === 'waiting'); }
+                    if (stabEl) { stabEl.classList.toggle('hidden', !(isSyncHold && rem > 0)); stabEl.classList.toggle('flex', isSyncHold && rem > 0); }
+
+                    if (isSyncHold && rem > 0 && cdEl) {
+                        window.__aniriumWatchPartyPhase = phase;
                         let left = rem;
                         cdEl.textContent = `${left}s`;
                         syncCountdownTimer = setInterval(() => {
@@ -4748,7 +4765,7 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                                 cdEl.textContent = `${left}s`;
                             }
                         }, 1000);
-                    } else if (phase === 'playing' || (phase === 'stabilizing' && rem <= 0)) {
+                    } else if (phase === 'playing' || (isSyncHold && rem <= 0)) {
                         window.__aniriumWatchPartyPhase = 'playing';
                         try {
                             document.getElementById('anirium-player-pro-iframe')?.contentWindow?.postMessage({
@@ -4846,6 +4863,23 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 });
                 roomEventSource = es;
             };
+
+            let lastBufferReportAt = 0;
+            window.addEventListener('message', (event) => {
+                const msg = event.data;
+                if (!msg || typeof msg !== 'object' || msg.type !== 'anirium:wp:buffer' || !activeCode) return;
+                if (Date.now() - lastBufferReportAt < 4000) return;
+                lastBufferReportAt = Date.now();
+                const bufferedSeconds = Math.max(0, Math.floor(Number(msg.bufferedSeconds || 0)));
+                wpFetch(`/api/watch-party/rooms/${encodeURIComponent(activeCode)}/ready`, 'POST', { bufferedSeconds })
+                    .then((res) => {
+                        if (res?.room) {
+                            activeRoom = res.room;
+                            renderRoomPhaseUI(res.room);
+                        }
+                    })
+                    .catch(() => {});
+            });
 
             async function openRoom(code, password = '') {
                 if (!code) return;
