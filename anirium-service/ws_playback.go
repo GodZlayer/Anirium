@@ -155,23 +155,28 @@ func executePlaybackPrepare(ctx context.Context, input PlaybackPrepareRequest, a
 	}
 	var results []ProviderSearchResult
 	var providerSubtitles []ProviderSubtitle
+	input = enrichPlaybackTitlesFromMAL(ctx, input)
+	var searchWg sync.WaitGroup
 	if len(cachedMagnets) == 0 {
-		input = enrichPlaybackTitlesFromMAL(ctx, input)
-		var searchWg sync.WaitGroup
-		searchWg.Add(2)
+		searchWg.Add(1)
 		go func() {
 			defer searchWg.Done()
 			results = searchProviderServers(input, ctx)
 		}()
-		go func() {
-			defer searchWg.Done()
-			providerSubtitles = searchSubtitleProviders(input, ctx)
-			if len(providerSubtitles) > 0 {
-				globalMeshHub.PublishSubtitleLinks(input.MALID, input.Episode, providerSubtitles)
-			}
-		}()
-		searchWg.Wait()
-		appendLog(fmt.Sprintf("Playback provider search sources=%d status=%v", len(results), input.ManifestSnapshots.statusByID()))
+	}
+	searchWg.Add(1)
+	go func() {
+		defer searchWg.Done()
+		providerSubtitles = searchSubtitleProviders(input, ctx)
+		if len(providerSubtitles) > 0 {
+			globalMeshHub.PublishSubtitleLinks(input.MALID, input.Episode, providerSubtitles)
+		}
+	}()
+	searchWg.Wait()
+	if len(cachedMagnets) == 0 {
+		appendLog(fmt.Sprintf("Playback provider search sources=%d subs=%d status=%v", len(results), len(providerSubtitles), input.ManifestSnapshots.statusByID()))
+	} else {
+		appendLog(fmt.Sprintf("Playback subtitle search (cached magnets) subs=%d", len(providerSubtitles)))
 	}
 	if ctx.Err() != nil {
 		return playbackPrepareOutcome{}
