@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // Protected by swarmMu. Old workers may finish disk work but cannot publish
@@ -123,7 +124,12 @@ func resetPlaybackLocked() uint64 {
 	variantRuntimes = map[string]*variantRuntime{}
 	variantMu.Unlock()
 	grantMu.Lock()
-	grants = map[string]playbackGrant{}
+	now := time.Now()
+	for key, grant := range grants {
+		if now.After(grant.expires) {
+			delete(grants, key)
+		}
+	}
 	grantMu.Unlock()
 	return playbackGeneration
 }
