@@ -637,6 +637,9 @@ class WatchPartyController extends Controller
                 $targetPos = (float) ($validated['positionSeconds'] ?? $currentPos);
                 $updates['playback_position_seconds'] = $targetPos;
                 $updates['live_edge_seconds'] = max((float) $room->live_edge_seconds, $targetPos);
+                $updates['phase'] = 'stabilizing';
+                $updates['sync_lock_until'] = $now->copy()->addSeconds(15);
+                $updates['sync_overtime_until'] = null;
                 break;
 
             case 'change_episode':

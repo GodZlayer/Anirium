@@ -2641,19 +2641,31 @@
         }
 
         dom.video.addEventListener('play', () => {
-            if (state.wpLocked && state.wpPhase === 'stabilizing') {
+            if (isWatchPartySyncHold()) {
                 dom.video.pause();
                 return;
             }
             dom.iconPlay.style.display = 'none';
             dom.iconPause.style.display = 'block';
             resetIdleTimer();
+            if (!state.wpLocked && window.parent && window.parent !== window) {
+                try { window.parent.postMessage({ type: 'anirium:wp:leader-control', action: 'play', positionSeconds: Math.floor(getEpisodeTime() || 0) }, '*'); } catch {}
+            }
         });
 
         dom.video.addEventListener('pause', () => {
             dom.iconPlay.style.display = 'block';
             dom.iconPause.style.display = 'none';
             resetIdleTimer();
+            if (!state.wpLocked && window.parent && window.parent !== window) {
+                try { window.parent.postMessage({ type: 'anirium:wp:leader-control', action: 'pause', positionSeconds: Math.floor(getEpisodeTime() || 0) }, '*'); } catch {}
+            }
+        });
+
+        dom.video.addEventListener('seeked', () => {
+            if (!state.wpLocked && window.parent && window.parent !== window) {
+                try { window.parent.postMessage({ type: 'anirium:wp:leader-control', action: 'seek', positionSeconds: Math.floor(getEpisodeTime() || 0) }, '*'); } catch {}
+            }
         });
 
         function seekRelative(deltaSeconds) {
@@ -5346,6 +5358,18 @@
         window.addEventListener('message', (event) => {
             const msg = event.data;
             if (!msg || typeof msg !== 'object') return;
+            if (msg.type === 'anirium:watch-party:sync' && state.wpLocked && dom.video) {
+                const targetPos = Number(msg.positionSeconds || 0);
+                if (Number.isFinite(targetPos) && Math.abs((dom.video.currentTime || 0) - targetPos) > 1.2) {
+                    try { dom.video.currentTime = targetPos; } catch {}
+                }
+                if (msg.status === 'paused' && !dom.video.paused) {
+                    dom.video.pause();
+                } else if (msg.status === 'playing' && state.wpPhase === 'playing' && dom.video.paused) {
+                    ensureWatchPartyAutoplay();
+                }
+                return;
+            }
             if (msg.type === 'anirium:wp:state') {
                 const prevPhase = state.wpPhase;
                 state.wpLocked = Boolean(msg.locked);

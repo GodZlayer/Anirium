@@ -4915,7 +4915,7 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
             const connectRoomSse = (code) => {
                 if (roomEventSource) { roomEventSource.close(); roomEventSource = null; }
                 const es = new EventSource(`/api/stream?room_code=${encodeURIComponent(code)}`);
-                es.addEventListener('watch_party.updated', (e) => {
+                const handleRoomUpdateEvent = (e) => {
                     try {
                         const data = JSON.parse(e.data);
                         if (data.room) {
@@ -4932,7 +4932,9 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                             }
                         }
                     } catch (_) {}
-                });
+                };
+                es.addEventListener('watch_party.updated', handleRoomUpdateEvent);
+                es.addEventListener('watch_party.episode_changed', handleRoomUpdateEvent);
                 es.addEventListener('watch_party.ended', () => {
                     handleRoomEnded();
                 });
@@ -4952,6 +4954,10 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 if (msg.type === 'anirium:wp:playing') {
                     const stabEl = document.getElementById('wp-theater-stabilizing');
                     if (stabEl) { stabEl.classList.add('hidden'); stabEl.classList.remove('flex'); }
+                    return;
+                }
+                if (msg.type === 'anirium:wp:leader-control' && activeRoom?.isLeader && activeCode) {
+                    sendControl(msg.action, Number(msg.positionSeconds || 0));
                     return;
                 }
                 if (msg.type !== 'anirium:wp:buffer' || !activeCode) return;
