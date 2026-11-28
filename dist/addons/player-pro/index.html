@@ -5254,14 +5254,46 @@
             }
         });
 
+        function ensureWatchPartyAutoplay() {
+            if (!state.wpLocked || state.wpPhase !== 'playing' || !dom.video) return;
+            if (!dom.video.paused) return;
+            const p = dom.video.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch(() => {
+                    try {
+                        dom.video.muted = true;
+                        dom.video.play().catch(() => {});
+                    } catch {}
+                });
+            }
+        }
+
         function applyWatchPartyRoomMode() {
             document.body.classList.toggle('wp-room-locked', Boolean(state.wpLocked));
             document.body.classList.toggle('wp-room-playing', Boolean(state.wpLocked && state.wpPhase === 'playing'));
             if (state.wpLocked && state.wpPhase === 'stabilizing' && dom.video && !dom.video.paused) {
                 dom.video.pause();
+            } else if (state.wpLocked && state.wpPhase === 'playing') {
+                ensureWatchPartyAutoplay();
             }
         }
         applyWatchPartyRoomMode();
+
+        setInterval(() => {
+            try {
+                if (window.parent && window.parent !== window) {
+                    const parentLocked = Boolean(window.parent.__aniriumWatchPartyLocked);
+                    const parentPhase = String(window.parent.__aniriumWatchPartyPhase || '');
+                    if (parentLocked !== state.wpLocked || parentPhase !== state.wpPhase) {
+                        state.wpLocked = parentLocked;
+                        state.wpPhase = parentPhase;
+                        applyWatchPartyRoomMode();
+                    } else if (state.wpLocked && state.wpPhase === 'playing' && dom.video && dom.video.paused && state.initialPlaybackStarted) {
+                        ensureWatchPartyAutoplay();
+                    }
+                }
+            } catch {}
+        }, 1000);
 
         // Recebe credenciais e contexto do Core via postMessage
         window.addEventListener('message', (event) => {
@@ -5272,9 +5304,11 @@
                 state.wpLocked = Boolean(msg.locked);
                 state.wpPhase = String(msg.phase || '');
                 applyWatchPartyRoomMode();
-                if (state.wpLocked && prevPhase === 'stabilizing' && state.wpPhase === 'playing' && dom.video) {
-                    try { dom.video.currentTime = 0; } catch {}
-                    dom.video.play().catch(() => {});
+                if (state.wpLocked && state.wpPhase === 'playing' && dom.video) {
+                    if (prevPhase === 'stabilizing') {
+                        try { dom.video.currentTime = 0; } catch {}
+                    }
+                    ensureWatchPartyAutoplay();
                 }
             } else if (msg.type === 'anirium:core:init-player') {
                 Object.assign(state, msg.payload || {});
