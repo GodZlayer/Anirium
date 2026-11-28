@@ -3344,6 +3344,13 @@
 
             const cleanEpNum = parseInt(epNum, 10) || 1;
             const resolvedEpId = epId || `${workId}:ep:${cleanEpNum}`;
+            if (window.AniriumWatchParty?.isLeader?.()) {
+                window.AniriumWatchParty.sendControl('change_episode', 0, {
+                    workId: workId,
+                    episodeId: resolvedEpId,
+                    episodeNumber: cleanEpNum,
+                });
+            }
             const stage = document.getElementById('episode-context-stage')
                 || document.getElementById('work-context-stage')
                 || document.getElementById('arc-context-stage');
@@ -3459,6 +3466,13 @@
 
             const cleanEpNum = parseInt(epNum, 10) || 1;
             const resolvedEpId = epId || `${workId}:ep:${cleanEpNum}`;
+            if (window.AniriumWatchParty?.isLeader?.()) {
+                window.AniriumWatchParty.sendControl('change_episode', 0, {
+                    workId: workId,
+                    episodeId: resolvedEpId,
+                    episodeNumber: cleanEpNum,
+                });
+            }
             const stage = document.getElementById('episode-context-stage')
                 || document.getElementById('work-context-stage')
                 || document.getElementById('arc-context-stage');
@@ -5080,7 +5094,7 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 }
             });
 
-            return { openRoom, createRoom, startPartyMode, sendControl, sendMessage, leaveRoom, getActiveCode: () => activeCode };
+            return { openRoom, createRoom, startPartyMode, sendControl, sendMessage, leaveRoom, getActiveCode: () => activeCode, isLeader: () => Boolean(activeRoom?.isLeader) };
         })();
 
         // Inicializa estado ao carregar
