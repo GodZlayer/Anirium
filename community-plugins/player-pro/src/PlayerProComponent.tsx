@@ -1125,6 +1125,7 @@ export default function PlayerProComponent({
   }, [volume, isMuted, streamSrc, customMediaSrc, isServiceOnline]);
 
   const togglePlay = () => {
+    if (watchPartyLocked || (window as any).__aniriumWatchPartyLocked) return;
     if ((serviceManifest?.continuousBuffer || bundledSubtitles) && !customMediaSrc && completedPositionRef.current !== null) {
       void requestServiceWindow(0, selectedQuality, true);
       return;
@@ -1501,6 +1502,7 @@ export default function PlayerProComponent({
                   : "[&::cue]:text-lg"
               }`}
               onTimeUpdate={handleTimeUpdate}
+              onPlay={(e) => { if (String((window as any).__aniriumWatchPartyPhase || '') === 'stabilizing') { e.currentTarget.pause(); setIsPlaying(false); } }}
               onProgress={handleProgress}
               onCanPlay={handleProgress}
               onCanPlayThrough={handleProgress}

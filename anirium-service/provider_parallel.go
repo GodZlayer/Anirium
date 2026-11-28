@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -40,21 +39,7 @@ func parallelProviderSearchWithGrace[T any](query PlaybackPrepareRequest, parent
 	servers = mergeAccountProviderServers(servers, query.AccountProviderServers)
 	results := make([][]T, len(servers))
 	slots := make(chan struct{}, 12)
-	var (
-		workers              sync.WaitGroup
-		graceOnce            sync.Once
-		timerMu              sync.Mutex
-		graceTmr             *time.Timer
-		totalResults         atomic.Int32
-		providersWithResults atomic.Int32
-	)
-	defer func() {
-		timerMu.Lock()
-		if graceTmr != nil {
-			graceTmr.Stop()
-		}
-		timerMu.Unlock()
-	}()
+	var workers sync.WaitGroup
 	for index, server := range servers {
 		if !server.Enabled || !containsString(query.AuthorizedAddonIDs, server.ID) {
 			continue
@@ -70,24 +55,7 @@ func parallelProviderSearchWithGrace[T any](query PlaybackPrepareRequest, parent
 			defer func() { <-slots }()
 			ctx, cancel := context.WithTimeout(searchCtx, providerTimeout(server))
 			defer cancel()
-			res := search(query, ctx, []ProviderServer{server})
-			results[index] = res
-			if len(res) > 0 {
-				total := totalResults.Add(int32(len(res)))
-				providers := providersWithResults.Add(1)
-				if (total >= 6 && providers >= 2) || (total >= 12 && providers >= 1) {
-					graceOnce.Do(func() {
-						delay := graceDelay
-						if delay <= 0 {
-							delay = 1800 * time.Millisecond
-						}
-						t := time.AfterFunc(delay, cancelSearch)
-						timerMu.Lock()
-						graceTmr = t
-						timerMu.Unlock()
-					})
-				}
-			}
+			results[index] = search(query, ctx, []ProviderServer{server})
 		}(index, server)
 	}
 	workers.Wait()
@@ -100,11 +68,24 @@ func parallelProviderSearchWithGrace[T any](query PlaybackPrepareRequest, parent
 
 func searchProviderServers(query PlaybackPrepareRequest, parents ...context.Context) []ProviderSearchResult {
 	setCurrentSkipTarget(query.MALID, query.Episode)
-	return parallelProviderSearchWithGrace(query, parents, 1800*time.Millisecond, searchProviderServersSubset)
+	all := parallelProviderSearchWithGrace(query, parents, 1800*time.Millisecond, searchProviderServersSubset)
+	if len(all) == 0 {
+		return all
+	}
+	strict := make([]ProviderSearchResult, 0, len(all))
+	for _, r := range all {
+		if strings.TrimSpace(r.Title) == "" || rssItemMatchesRequest(r.Title, query) {
+			strict = append(strict, r)
+		}
+	}
+	if len(strict) > 0 {
+		return strict
+	}
+	return all
 }
 
 func searchSubtitleProviders(query PlaybackPrepareRequest, parents ...context.Context) []ProviderSubtitle {
-	results := parallelProviderSearchWithGrace(query, parents, 4500*time.Millisecond, searchSubtitleProvidersSubset)
+	results := parallelProviderSearchWithGrace(query, parents, 1500*time.Millisecond, searchSubtitleProvidersSubset)
 	unique := []ProviderSubtitle{}
 	seen := map[string]bool{}
 	for _, result := range results {

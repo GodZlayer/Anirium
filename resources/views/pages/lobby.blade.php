@@ -4731,6 +4731,8 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 const lastEpId = activeRoom?.episodeId || activeRoom?.episode_id || null;
                 activeCode = null;
                 activeRoom = null;
+                window.__aniriumWatchPartyLocked = false;
+                window.__aniriumWatchPartyPhase = '';
                 if (syncCountdownTimer) { clearInterval(syncCountdownTimer); syncCountdownTimer = null; }
                 if (roomEventSource) { roomEventSource.close(); roomEventSource = null; }
                 const drawer = document.getElementById('anirium-wp-drawer');
@@ -4850,6 +4852,8 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                 }
 
                 const epId = activeRoom?.episode_id || activeRoom?.episodeId;
+                window.__aniriumWatchPartyLocked = !activeRoom?.isLeader || activeRoom?.mode === 'live_launch' || activeRoom?.phase === 'stabilizing';
+                window.__aniriumWatchPartyPhase = String(activeRoom?.phase || 'playing');
                 renderRoomPhaseUI(activeRoom);
                 if (epId) {
                     if (activeRoom?.isLeader) {
