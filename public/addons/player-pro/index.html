@@ -1459,7 +1459,9 @@
             releasedEpisodes: parseInt(params.get('releasedEpisodes') || '0', 10) || 0,
             malId: parseInt(params.get('malId') || '0', 10) || 0,
             format: params.get('format') || 'TV',
-            initialResumeTime: Math.floor(parseFloat(params.get('resume') || '0')) || 0,
+            wpLocked: params.get('wpLocked') === '1' || (() => { try { return Boolean(window.parent && window.parent !== window && window.parent.__aniriumWatchPartyLocked); } catch { return false; } })(),
+            wpPhase: params.get('wpPhase') || (() => { try { return String((window.parent && window.parent !== window && window.parent.__aniriumWatchPartyPhase) || ''); } catch { return ''; } })(),
+            initialResumeTime: (params.get('wpLocked') === '1' || (() => { try { return Boolean(window.parent && window.parent !== window && window.parent.__aniriumWatchPartyLocked); } catch { return false; } })()) ? 0 : (Math.floor(parseFloat(params.get('resume') || '0')) || 0),
             hasResumed: false,
             title: params.get('title') || 'Anime',
             titleEnglish: params.get('titleEnglish') || '',
@@ -2434,7 +2436,9 @@
             updateStartupStagesUI({ subtitleReady: true });
             dom.centralOverlay.style.display = 'none';
             if (dom.video && dom.video.paused) {
-                dom.video.play().catch(() => {});
+                if (!(state.wpLocked && state.wpPhase === 'stabilizing')) {
+                    dom.video.play().catch(() => {});
+                }
             }
             updateSubtitleCue(getEpisodeTime());
         }
@@ -2628,6 +2632,7 @@
         //  REPRODUÇÃO, SEEK E VOLUME
         // ==========================================
         function togglePlay() {
+            if (state.wpLocked) return;
             if (dom.video.paused) {
                 dom.video.play().catch(() => {});
             } else {
@@ -2636,6 +2641,10 @@
         }
 
         dom.video.addEventListener('play', () => {
+            if (state.wpLocked && state.wpPhase === 'stabilizing') {
+                dom.video.pause();
+                return;
+            }
             dom.iconPlay.style.display = 'none';
             dom.iconPause.style.display = 'block';
             resetIdleTimer();
@@ -2648,6 +2657,7 @@
         });
 
         function seekRelative(deltaSeconds) {
+            if (state.wpLocked) return;
             const current = getEpisodeTime() || 0;
             const dur = (state.manifest?.episodeDuration && state.manifest.episodeDuration > 0)
                 ? state.manifest.episodeDuration
@@ -4372,7 +4382,9 @@
                     }
                     state.videoReadyForStartup = true;
                     if (state.initialPlaybackStarted) {
-                        dom.video.play().catch(() => {});
+                        if (!(state.wpLocked && state.wpPhase === 'stabilizing')) {
+                            dom.video.play().catch(() => {});
+                        }
                     } else {
                         releaseStartupGateIfReady('video_ready');
                     }
@@ -5242,11 +5254,29 @@
             }
         });
 
+        function applyWatchPartyRoomMode() {
+            document.body.classList.toggle('wp-room-locked', Boolean(state.wpLocked));
+            document.body.classList.toggle('wp-room-playing', Boolean(state.wpLocked && state.wpPhase === 'playing'));
+            if (state.wpLocked && state.wpPhase === 'stabilizing' && dom.video && !dom.video.paused) {
+                dom.video.pause();
+            }
+        }
+        applyWatchPartyRoomMode();
+
         // Recebe credenciais e contexto do Core via postMessage
         window.addEventListener('message', (event) => {
             const msg = event.data;
             if (!msg || typeof msg !== 'object') return;
-            if (msg.type === 'anirium:core:init-player') {
+            if (msg.type === 'anirium:wp:state') {
+                const prevPhase = state.wpPhase;
+                state.wpLocked = Boolean(msg.locked);
+                state.wpPhase = String(msg.phase || '');
+                applyWatchPartyRoomMode();
+                if (state.wpLocked && prevPhase === 'stabilizing' && state.wpPhase === 'playing' && dom.video) {
+                    try { dom.video.currentTime = 0; } catch {}
+                    dom.video.play().catch(() => {});
+                }
+            } else if (msg.type === 'anirium:core:init-player') {
                 Object.assign(state, msg.payload || {});
                 initPlayer();
             } else if (msg.type === 'anirium:core:token-renewed' && msg.token) {
@@ -5258,6 +5288,21 @@
         initPlayer();
     </script>
     <style>
+        body.wp-room-locked #btn-play-pause,
+        body.wp-room-locked button[onclick*="seekRelative"],
+        body.wp-room-locked #btn-prev-ep,
+        body.wp-room-locked #btn-next-ep,
+        body.wp-room-locked #btn-next-ep-float,
+        body.wp-room-locked #btn-skip-op,
+        body.wp-room-locked #btn-skip-ed,
+        body.wp-room-locked #wp-toggle-btn,
+        body.wp-room-locked #btn-party { display: none !important; }
+        body.wp-room-locked #timeline-box { pointer-events: none !important; }
+        body.wp-room-playing #btn-quality,
+        body.wp-room-playing #btn-audio,
+        body.wp-room-playing #btn-speed,
+        body.wp-room-playing #btn-auto-skip,
+        body.wp-room-playing #btn-bg-stages { display: none !important; }
         #wp-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 320px; max-width: 92vw; background: rgba(13, 13, 18, 0.96); backdrop-filter: blur(16px); border-left: 1px solid rgba(255,255,255,0.1); z-index: 9990; transform: translateX(100%); transition: transform .22s ease; display: flex; flex-direction: column; color: #f4f4f5; font-family: system-ui, -apple-system, sans-serif; }
         #wp-drawer.wp-open { transform: translateX(0); }
         .wp-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); font-weight: 700; font-size: 14px; }

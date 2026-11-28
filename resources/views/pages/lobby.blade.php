@@ -3427,7 +3427,9 @@
                 malId: String(malId),
                 format: workFormat,
                 totalEpisodes: String(episodeCount),
-                resume: String(resumeSeconds),
+                resume: window.__aniriumWatchPartyLocked ? '0' : String(resumeSeconds),
+                wpLocked: window.__aniriumWatchPartyLocked ? '1' : '0',
+                wpPhase: String(window.__aniriumWatchPartyPhase || ''),
                 _v: String(Date.now())
             });
 
@@ -3563,7 +3565,9 @@
                 malId: String(malId),
                 format: workFormat,
                 totalEpisodes: String(episodeCount),
-                resume: String(resumeSeconds),
+                resume: window.__aniriumWatchPartyLocked ? '0' : String(resumeSeconds),
+                wpLocked: window.__aniriumWatchPartyLocked ? '1' : '0',
+                wpPhase: String(window.__aniriumWatchPartyPhase || ''),
                 _v: String(Date.now())
             });
 
@@ -4724,6 +4728,13 @@ window.toggleEntityBookmark = async function(type, id, btnEl) {
                                 stabEl?.classList.add('hidden');
                                 stabEl?.classList.remove('flex');
                                 window.__aniriumWatchPartyPhase = 'playing';
+                                try {
+                                    document.getElementById('anirium-player-pro-iframe')?.contentWindow?.postMessage({
+                                        type: 'anirium:wp:state',
+                                        locked: Boolean(window.__aniriumWatchPartyLocked),
+                                        phase: 'playing'
+                                    }, '*');
+                                } catch {}
                                 if (activeRoom) {
                                     activeRoom.phase = 'playing';
                                     activeRoom.isPlaying = true;
