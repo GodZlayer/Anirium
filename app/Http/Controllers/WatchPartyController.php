@@ -509,6 +509,10 @@ class WatchPartyController extends Controller
             app(RealtimeEventStore::class)->publish('room:'.strtoupper($room->code), 'watch_party.updated', [
                 'room' => $formattedForBroadcast,
             ]);
+        } else {
+            app(RealtimeEventStore::class)->publish('room:'.strtoupper($room->code), 'watch_party.updated', [
+                'room' => $this->formatRoomState($room, (int) $user->id, 0),
+            ]);
         }
 
         return response()->json([
@@ -731,6 +735,10 @@ class WatchPartyController extends Controller
             app(RealtimeEventStore::class)->publish('room:'.strtoupper($room->code), 'watch_party.ended', [
                 'code' => $room->code,
                 'reason' => 'leader_left',
+            ]);
+        } else {
+            app(RealtimeEventStore::class)->publish('room:'.strtoupper($room->code), 'watch_party.updated', [
+                'room' => $this->formatRoomState($room, (int) $user->id, 0),
             ]);
         }
 
