@@ -195,11 +195,26 @@
             try {
                 const payload = JSON.parse(ev.data);
                 if (payload?.room) {
-                    state.room = payload.room;
+                    if (payload.room.status === 'ended') {
+                        stopPolling();
+                        state.code = null;
+                        state.room = null;
+                        renderRoom();
+                        return;
+                    }
+                    const localIsLeader = state.room ? Boolean(state.room.isLeader) : Boolean(payload.room.isLeader);
+                    const mergedRoom = { ...payload.room, isLeader: localIsLeader };
+                    state.room = mergedRoom;
                     renderRoom();
-                    syncVideoWithRoom(payload.room);
+                    syncVideoWithRoom(mergedRoom);
                 }
             } catch {}
+        });
+        es.addEventListener('watch_party.ended', () => {
+            stopPolling();
+            state.code = null;
+            state.room = null;
+            renderRoom();
         });
         es.addEventListener('watch_party.message', (ev) => {
             try {
