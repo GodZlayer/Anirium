@@ -36,7 +36,7 @@ var iconData []byte
 var shutdownTorrentClient func()
 
 // Injected by the release builder; installer and service share one version.
-var serviceVersion = "2.2.0"
+var serviceVersion = "2.3.0"
 
 //go:embed assets/Anirium-FullVersionLogo.png
 var logoData []byte
@@ -1274,6 +1274,26 @@ func initTorrentClient() (*torrent.Client, error) {
 	return initTorrentClientWithOptions(serviceStartupOptions{})
 }
 
+func wipePreviousVersionState(currentVersion string) {
+	base, err := os.UserCacheDir()
+	if err != nil || strings.TrimSpace(base) == "" {
+		return
+	}
+	root := filepath.Join(base, "anirium-service")
+	versionFile := filepath.Join(root, "version.txt")
+	if data, err := os.ReadFile(versionFile); err == nil && strings.TrimSpace(string(data)) == strings.TrimSpace(currentVersion) {
+		return
+	}
+	if entries, err := os.ReadDir(root); err == nil {
+		for _, entry := range entries {
+			_ = os.RemoveAll(filepath.Join(root, entry.Name()))
+		}
+	}
+	_ = os.MkdirAll(root, 0o755)
+	_ = os.WriteFile(versionFile, []byte(strings.TrimSpace(currentVersion)+"\n"), 0o644)
+	appendLog(fmt.Sprintf("[VersionUpgrade] Limpeza completa aplicada para versão %s em %s", currentVersion, root))
+}
+
 func initTorrentClientWithOptions(options serviceStartupOptions) (*torrent.Client, error) {
 	cfg := torrent.NewDefaultClientConfig()
 	// Dependency diagnostics include torrent names, infohashes and peer details.
@@ -1283,6 +1303,7 @@ func initTorrentClientWithOptions(options serviceStartupOptions) (*torrent.Clien
 	if !options.Headless {
 		var cacheErr error
 		if !testing.Testing() && os.Getenv("ANIRIUM_E2E_CHILD") != "1" {
+			wipePreviousVersionState(serviceVersion)
 			cfg.DataDir, cleanupRuntimeCache, cacheErr = newPersistentTorrentCache()
 		} else {
 			cfg.DataDir, cleanupRuntimeCache, cacheErr = newRuntimeTorrentCache()
